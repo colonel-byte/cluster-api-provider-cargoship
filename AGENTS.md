@@ -131,7 +131,7 @@ Do not condense struct literals in table-driven test cases onto single lines (su
 
 ## Writing style
 
-Use `-` (hyphen), not `—` (em dash), wherever a hyphen reads fine.
+Use `-` (hyphen), not `-` (em dash), wherever a hyphen reads fine.
 
 ### Markdown line formatting
 

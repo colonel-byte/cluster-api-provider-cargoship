@@ -10,13 +10,13 @@ An end-to-end test needs something a converge can actually SSH into, and that is
 
 ## Why not the Docker infrastructure provider
 
-The obvious choice for a provider's e2e suite is CAPD — Cluster API's Docker provider — because it needs nothing but Docker. **It cannot be used here.** CAPD machines are containers running a kubelet; they run no sshd. Cargoship's first phase is `Connect`, and there is nothing to connect to.
+The obvious choice for a provider's e2e suite is CAPD - Cluster API's Docker provider - because it needs nothing but Docker. **It cannot be used here.** CAPD machines are containers running a kubelet; they run no sshd. Cargoship's first phase is `Connect`, and there is nothing to connect to.
 
 This is worth stating because every other provider's e2e documentation points at CAPD, and discovering why it does not work here costs an afternoon.
 
 ## What is used instead
 
-`colonel-byte/cargoship`'s microVM fleet, which is importable for exactly this reason — `test/microvm` and the root `test` package are exported rather than internal so another module's suite can drive them, which `terraform-provider-cargoship` already does.
+`colonel-byte/cargoship`'s microVM fleet, which is importable for exactly this reason - `test/microvm` and the root `test` package are exported rather than internal so another module's suite can drive them, which `terraform-provider-cargoship` already does.
 
 The suite:
 
@@ -26,7 +26,7 @@ The suite:
 
 `CARGOSHIP_E2E_EXAMPLE_ROOT` points it at a cargoship checkout so it reads the generated distro definitions rather than carrying a copy.
 
-The microVM backend is also the only one where cargoship's SELinux, fapolicyd and firewalld phases run as the paths they are rather than as gates that correctly do nothing — so it is a better test of a converge than a container fleet would be even if containers could run sshd.
+The microVM backend is also the only one where cargoship's SELinux, fapolicyd and firewalld phases run as the paths they are rather than as gates that correctly do nothing - so it is a better test of a converge than a container fleet would be even if containers could run sshd.
 
 ## Reading a run
 
