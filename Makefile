@@ -128,8 +128,15 @@ build: ## Build both manager binaries.
 
 .PHONY: docker-build
 docker-build: ## Build both controller images.
-	docker build -f containers/manager/Dockerfile -t $(BOOTSTRAP_IMG) --build-arg MANAGER=bootstrap-manager .
-	docker build -f containers/manager/Dockerfile -t $(CONTROLPLANE_IMG) --build-arg MANAGER=controlplane-manager .
+	# The binaries go to dist/<os>/<arch>/ and the build context is dist/, because the Dockerfile
+	# copies from ${TARGETPLATFORM}/${MANAGER} -- which is how goreleaser lays its docker context
+	# out, so this builds the same image the release does. Getting it wrong fails with
+	# `"/linux/amd64/<manager>": not found`, which names the path and not the mistake.
+	mkdir -p dist/linux/amd64
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/linux/amd64/bootstrap-manager ./bootstrap/cmd/manager
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/linux/amd64/controlplane-manager ./controlplane/cmd/manager
+	docker build -f containers/manager/Dockerfile --build-arg MANAGER=bootstrap-manager -t $(BOOTSTRAP_IMG) dist
+	docker build -f containers/manager/Dockerfile --build-arg MANAGER=controlplane-manager -t $(CONTROLPLANE_IMG) dist
 
 ##@ Release
 
@@ -144,4 +151,4 @@ release-manifests: manifests ## Render the component manifests clusterctl instal
 
 .PHONY: clean
 clean: ## Remove build output.
-	rm -rf bin $(RELEASE_DIR) cover.out
+	rm -rf bin dist $(RELEASE_DIR) cover.out
