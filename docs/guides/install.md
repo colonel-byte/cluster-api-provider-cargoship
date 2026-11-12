@@ -29,7 +29,7 @@ This installs two controller deployments, into `cargoship-bootstrap-system` and 
 
 ## The SSH key
 
-The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent — treat it accordingly.
+The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.
 
 ```sh
 ssh-keygen -t ed25519 -N '' -f cluster-key
@@ -48,7 +48,7 @@ The public half is **derived** from this secret by the bootstrap provider and au
 
 The control-plane controller pulls and extracts cargoship distro packages, so it needs writable storage. The shipped manifest mounts an `emptyDir` with a 20 GiB limit at `/var/lib/cargoship`.
 
-One extracted package is as large as the package, so **raise the limit to suit the packages in use** — an `emptyDir` that fills takes the node's filesystem with it. Replace it with a `persistentVolumeClaim` where the registry is far away: the blob cache survives a restart, which is the expensive part to lose.
+One extracted package is as large as the package, so **raise the limit to suit the packages in use** - an `emptyDir` that fills takes the node's filesystem with it. Replace it with a `persistentVolumeClaim` where the registry is far away: the blob cache survives a restart, which is the expensive part to lose.
 
 Note what the cache does and does not save. It saves the *fetch*. The package is extracted once per converge either way.
 
