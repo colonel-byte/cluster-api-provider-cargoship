@@ -1,0 +1,73 @@
+---
+name: Vulnerability scan
+
+on:
+  pull_request:
+  merge_group:
+  schedule:
+    # Weekly, off the hour: a scheduled scan reports advisories published after a commit landed,
+    # which is most of them.
+    - cron: "41 6 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scan-vuln-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
+        with:
+          go-version-file: go.mod
+          # Reachability analysis rather than a dependency-list match, so an advisory in a
+          # package nothing calls does not fail the build. That matters here because the
+          # cluster-api and controller-runtime trees are large and almost entirely unreachable
+          # from two managers.
+          check-latest: true
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build the manager binaries
+        run: |
+          mkdir -p dist/linux_amd64
+          CGO_ENABLED=0 go build -mod=vendor -o dist/linux_amd64/controlplane-manager ./controlplane/cmd/manager
+        env:
+          GOFLAGS: -mod=vendor
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          GOTOOLCHAIN: local
+
+      # One image, not both. They are the same base and the same Go toolchain, differing only in
+      # which static binary is copied in, so scanning the second would report the same findings
+      # and cost another runner.
+      - name: Build an image to scan
+        run: |
+          docker build -f containers/manager/Dockerfile \
+            --build-arg TARGETPLATFORM=linux_amd64 \
+            --build-arg MANAGER=controlplane-manager \
+            -t localhost/cargoship-controlplane:scan .
+
+      - name: Run trivy
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+        with:
+          image-ref: localhost/cargoship-controlplane:scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
