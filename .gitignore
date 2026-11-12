@@ -25,6 +25,9 @@ cover.out
 # Added for mdbook:
 /book/
 
+# commitlint is an npm package, installed by the workflow that lints pull request titles.
+.github/commitlint/node_modules/
+
 # Added for go mod vendor. The tree is committed: this follows colonel-byte/cargoship, whose
 # management node is air-gapped, so a build has to work with no module proxy reachable.
 !/vendor/
