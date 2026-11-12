@@ -1,0 +1,35 @@
+.DS_Store
+.direnv/
+.idea/
+.scratch/
+/.tool-versions
+*.tar
+*.tar.gz
+*.tgz
+*.zst
+!**/testdata/**
+coverage.out
+
+# Build output: the two module files, and the package cache the e2e suite fills.
+#
+# Every pattern in this block is anchored with a leading slash, so it matches only the
+# directory at the repository root. Unanchored, `build/` also matches magefiles/pkg/build/ --
+# the package magefiles/build.go imports -- which git then refuses to track, and every CI job
+# that compiles the magefiles fails on a package that is right there on disk.
+/build/
+
+# The collection tarball the goreleaser before hook builds.
+/bin/
+
+# Added for goreleaser:
+/dist/
+
+# Added for mdbook:
+/book/
+
+# Ansible compiles the action plugins on first use.
+__pycache__/
+
+# Added for go mod vendor. The tree is committed: the management node this is for is
+# air-gapped, so a build has to work with no module proxy reachable.
+!/vendor/
