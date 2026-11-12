@@ -41,27 +41,18 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 
-      - name: Build the manager binaries
-        run: |
-          mkdir -p dist/linux_amd64
-          CGO_ENABLED=0 go build -mod=vendor -o dist/linux_amd64/bootstrap-manager ./bootstrap/cmd/manager
-          CGO_ENABLED=0 go build -mod=vendor -o dist/linux_amd64/controlplane-manager ./controlplane/cmd/manager
+      # Through `make docker-build` rather than a hand-written docker invocation, so the
+      # Dockerfile's ${TARGETPLATFORM}/${MANAGER} copy is exercised against the same layout the
+      # release uses and the two cannot drift. The first version of this workflow built the
+      # binaries into dist/ and set the context to the repository root, which fails with
+      # `"/linux/amd64/<manager>": not found`.
+      - name: Build the controller images
+        run: make docker-build REGISTRY=localhost TAG=smoke
         env:
           GOFLAGS: -mod=vendor
           GOPROXY: "off"
           GOSUMDB: "off"
           GOTOOLCHAIN: local
-
-      # The same Dockerfile the release builds, so a Dockerfile that only works under goreleaser's
-      # context is caught here rather than during a tag.
-      - name: Build the controller images
-        run: |
-          for m in bootstrap controlplane; do
-            docker build -f containers/manager/Dockerfile \
-              --build-arg TARGETPLATFORM=linux_amd64 \
-              --build-arg "MANAGER=${m}-manager" \
-              -t "localhost/cargoship-${m}:smoke" .
-          done
 
       - name: Create a kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
@@ -70,8 +61,8 @@ jobs:
 
       - name: Load the images into kind
         run: |
-          kind load docker-image localhost/cargoship-bootstrap:smoke --name smoke
-          kind load docker-image localhost/cargoship-controlplane:smoke --name smoke
+          kind load docker-image localhost/cluster-api-cargoship-bootstrap-controller:smoke --name smoke
+          kind load docker-image localhost/cluster-api-cargoship-controlplane-controller:smoke --name smoke
 
       - name: Render the component manifests
         run: make release-manifests RELEASE_DIR=out TAG=smoke REGISTRY=localhost

@@ -23,15 +23,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
+      # go-version-file, so the toolchain floor this scan runs against is the one in go.mod. That
+      # is load-bearing here: the only finding this check has ever produced was a standard
+      # library advisory, cleared by raising that floor rather than by changing a dependency.
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          # Reachability analysis rather than a dependency-list match, so an advisory in a
-          # package nothing calls does not fail the build. That matters here because the
-          # cluster-api and controller-runtime trees are large and almost entirely unreachable
-          # from two managers.
-          check-latest: true
+
+      # Run directly rather than through golang/govulncheck-action. Its composite steps all
+      # reported "skipped" and the job failed with no output at all, which is what an input it
+      # does not accept looks like -- and the shape of this is two lines, so there is nothing to
+      # be gained by debugging the wrapper.
+      #
+      # -mod=mod, not vendor: govulncheck needs the module graph to decide what is reachable, and
+      # it cannot read one from a vendored tree. This is the one job here that is allowed network
+      # access, because it also fetches the vulnerability database.
+      #
+      # Reachability, not a dependency-list match: an advisory in a package nothing calls does
+      # not fail the build. That matters because the cluster-api and controller-runtime trees are
+      # large and almost entirely unreachable from two managers.
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        env:
+          GOFLAGS: -mod=mod
 
   images:
     runs-on: ubuntu-latest
@@ -44,30 +59,21 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build the manager binaries
-        run: |
-          mkdir -p dist/linux_amd64
-          CGO_ENABLED=0 go build -mod=vendor -o dist/linux_amd64/controlplane-manager ./controlplane/cmd/manager
+      # One image, not both. They are the same base and the same Go toolchain, differing only in
+      # which static binary is copied in, so scanning the second would report the same findings
+      # and cost another runner.
+      - name: Build an image to scan
+        run: make docker-build REGISTRY=localhost TAG=scan
         env:
           GOFLAGS: -mod=vendor
           GOPROXY: "off"
           GOSUMDB: "off"
           GOTOOLCHAIN: local
 
-      # One image, not both. They are the same base and the same Go toolchain, differing only in
-      # which static binary is copied in, so scanning the second would report the same findings
-      # and cost another runner.
-      - name: Build an image to scan
-        run: |
-          docker build -f containers/manager/Dockerfile \
-            --build-arg TARGETPLATFORM=linux_amd64 \
-            --build-arg MANAGER=controlplane-manager \
-            -t localhost/cargoship-controlplane:scan .
-
       - name: Run trivy
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         with:
-          image-ref: localhost/cargoship-controlplane:scan
+          image-ref: localhost/cluster-api-cargoship-controlplane-controller:scan
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
