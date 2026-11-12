@@ -1,0 +1,48 @@
+---
+name: Unit tests
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # `go test ./...` exits non-zero on a module with no packages at all, which is the state
+      # of the bottom of a stack that vendors its dependencies before any code is written. The
+      # guard is here rather than in the Makefile because it is a property of running this in CI
+      # on a partial tree, not of the repository.
+      #
+      # -race because the one piece of concurrency here is the converge runner, and what it has
+      # to get right -- a goroutine outliving the reconcile that started it, and being cancelled
+      # when the desired state changes -- is exactly what the detector catches.
+      - name: Run unit tests
+        run: |
+          if [ -z "$(go list -mod=vendor ./... 2>/dev/null)" ]; then
+            echo "::notice::no Go packages in this tree yet; nothing to test"
+            exit 0
+          fi
+          go test -mod=vendor -race ./...
+        env:
+          # Everything the tests need is vendored, so make any accidental network access
+          # fail fast.
+          GOFLAGS: -mod=vendor
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          GOTOOLCHAIN: local

@@ -1,0 +1,96 @@
+---
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        exclude: vendor/.*
+        args:
+          - "--maxkb=1024"
+      - id: check-merge-conflict
+      - id: detect-private-key
+        # The provider's whole threat model is a cluster-wide SSH key, so this hook earns its
+        # place here more than in most repositories. The test key is generated at run time
+        # rather than carried as a fixture, so nothing legitimate trips it.
+        exclude: vendor/.*
+      - id: detect-aws-credentials
+        exclude: vendor/.*
+        args:
+          - "--allow-missing-credentials"
+      - id: fix-byte-order-marker
+        exclude: vendor/.*
+      - id: end-of-file-fixer
+        exclude: |-
+          (?x)^(
+              vendor/.*
+          )$
+      - id: trailing-whitespace
+        args:
+          - --markdown-linebreak-ext=md
+        exclude: |-
+          (?x)^(
+              vendor/.*
+          )$
+  - repo: https://github.com/sirosen/texthooks
+    rev: 1.0.0
+    hooks:
+      - id: fix-smartquotes
+        exclude: vendor/.*
+  - repo: https://github.com/google/addlicense
+    rev: v1.2.0
+    hooks:
+      - id: addlicense
+        exclude: |-
+          (?x)^(
+              vendor/.*
+          )$
+        exclude_types:
+          - yaml
+          - markdown
+        args:
+          - -c
+          - colonel-byte
+          - -l
+          - apache
+          - -y
+          - "2026"
+  - repo: https://github.com/google/keep-sorted
+    rev: v0.10.0
+    hooks:
+      - id: keep-sorted
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.15.0
+    hooks:
+      # Run from here rather than from go.mod as a tool dependency. Adding it to go.mod drags
+      # k8s.io/* up to a patch release wanting structured-merge-diff/v7 while cluster-api pins
+      # v6, and the module stops building. See docs/agent/choice-tool-dependencies.md.
+      - id: golangci-lint
+        language_version: "1.27.3"
+        exclude: vendor/.*
+      - id: golangci-lint-config-verify
+        language_version: "1.27.3"
+        exclude: vendor/.*
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint-docker
+        exclude: vendor/.*
+  - repo: local
+    hooks:
+      # controller-gen writes the CRDs, the RBAC roles and the deepcopy functions, and all of
+      # them are checked in. Running it here rather than only in CI means a type change and its
+      # generated output land in the same commit.
+      - id: controller-gen
+        name: generate-manifests-and-deepcopy
+        language: system
+        pass_filenames: false
+        files: \.go$
+        entry: make generate
+      # The component manifests are the actual release artifact, so a kustomization that no
+      # longer builds is worth catching before a tag rather than during one.
+      - id: kustomize-build
+        name: check-component-manifests
+        language: system
+        pass_filenames: false
+        files: ^(bootstrap|controlplane)/config/.*
+        entry: make release-manifests
