@@ -1,0 +1,15 @@
+# See the note on the bootstrap provider's kustomization about the contract label.
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cargoship-controlplane-system
+namePrefix: cargoship-controlplane-
+labels:
+  - includeSelectors: false
+    pairs:
+      cluster.x-k8s.io/provider: control-plane-cargoship
+      cluster.x-k8s.io/v1beta2: v1alpha1
+resources:
+  - ../crd
+  - ../rbac
+  - ../manager

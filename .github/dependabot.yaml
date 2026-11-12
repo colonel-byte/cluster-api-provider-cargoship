@@ -1,0 +1,64 @@
+---
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: daily
+    allow:
+      - dependency-type: "all"
+    open-pull-requests-limit: 50
+    groups:
+      # The Cluster API modules and controller-runtime move together with a Kubernetes minor
+      # release, and the contract version this provider declares in metadata.yaml is tied to the
+      # cluster-api version. Grouped so a bump arrives as one reviewable change rather than as
+      # four pull requests that only compile together.
+      cluster-api:
+        patterns:
+          - "sigs.k8s.io/cluster-api"
+          - "sigs.k8s.io/cluster-api/*"
+          - "sigs.k8s.io/controller-runtime"
+          - "sigs.k8s.io/controller-runtime/*"
+      k8s:
+        patterns:
+          - "k8s.io/*"
+          - "sigs.k8s.io/*"
+      # The tool dependencies, which Dependabot owns because they are in go.mod. controller-gen
+      # in particular writes the checked-in CRDs, so its bumps need `make verify` to pass.
+      tools:
+        patterns:
+          - "sigs.k8s.io/controller-tools"
+          - "sigs.k8s.io/kustomize/*"
+          - "github.com/golangci/golangci-lint/*"
+      golang:
+        patterns:
+          - "golang.org/x/*"
+    ignore:
+      # cargoship is consumed as a library and its version is chosen deliberately: a bump has to
+      # be checked against what pkg/converge calls, and the provider's own release notes should
+      # say which cargoship it carries. A daily automated bump would make that invisible.
+      - dependency-name: "github.com/colonel-byte/cargoship"
+  - package-ecosystem: pre-commit
+    directory: "/"
+    schedule:
+      interval: daily
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: daily
+    groups:
+      core:
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: "/.github/commitlint"
+    schedule:
+      interval: weekly
+    groups:
+      commitlint:
+        patterns:
+          - "*"
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: daily

@@ -1,0 +1,33 @@
+---
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# No write anywhere: release-please is handed the app token minted below and does every
+# write with that, so GITHUB_TOKEN is only along for the ride.
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Release Please token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_GITHUB_APP_SECRET }}
+
+      - name: Run Release Please
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          target-branch: main
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
