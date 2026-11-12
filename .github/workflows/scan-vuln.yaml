@@ -84,10 +84,27 @@ jobs:
       # better, because it does reachability analysis and trivy does not. If this job starts
       # reporting findings govulncheck has judged unreachable, delete it rather than growing a
       # list of ignores.
+      #
+      # The binary is downloaded and run directly rather than through aquasecurity/trivy-action.
+      # That action installed trivy and then exited 1 with its own "Run Trivy" step reported as
+      # skipped and no diagnostic of any kind -- the same shape of failure
+      # golang/govulncheck-action produced in the job above. A wrapper that fails without saying
+      # why is worse than four lines of curl.
+      #
+      # TRIVY_VERSION is a pin no Dependabot ecosystem tracks, so it is bumped by hand. It is
+      # here rather than in a tool manifest because nothing else in this repository needs trivy.
       - name: Run trivy
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
-        with:
-          input: image.tar
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
+        env:
+          TRIVY_VERSION: "0.76.2"
+        run: |
+          curl -fsSL \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            | tar xz trivy
+          # --scanners vuln, because secret scanning a static Go binary finds nothing and
+          # trivy itself suggests disabling it when it is not wanted.
+          ./trivy image \
+            --input image.tar \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1
