@@ -70,10 +70,24 @@ jobs:
           GOSUMDB: "off"
           GOTOOLCHAIN: local
 
+      # Scanned as a saved tarball rather than by image reference. Given a `localhost/...` name
+      # trivy treats the prefix as a registry host and tries to pull over the network, which
+      # fails in about two seconds with no findings table -- indistinguishable at a glance from
+      # a clean scan that found nothing. A tarball has no registry or daemon ambiguity.
+      - name: Save the image
+        run: docker save -o image.tar localhost/cluster-api-cargoship-controlplane-controller:scan
+
+      # Note what this does and does not add over the govulncheck job above. The image is
+      # Chainguard static plus one static Go binary, so there are no OS packages to find
+      # anything in; what trivy reports is read out of the binary's embedded build info, which
+      # is the same standard library and module set govulncheck already covers -- and covers
+      # better, because it does reachability analysis and trivy does not. If this job starts
+      # reporting findings govulncheck has judged unreachable, delete it rather than growing a
+      # list of ignores.
       - name: Run trivy
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         with:
-          image-ref: localhost/cluster-api-cargoship-controlplane-controller:scan
+          input: image.tar
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
