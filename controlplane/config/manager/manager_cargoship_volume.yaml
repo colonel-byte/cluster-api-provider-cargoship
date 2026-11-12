@@ -1,0 +1,34 @@
+# The control-plane controller is the one that pulls and extracts distro packages, so it is the
+# only one of the two that needs writable storage.
+#
+# An emptyDir is the default because it needs no cluster to have a StorageClass, and a converge
+# works perfectly with one: the package is re-pulled after a restart. Replace it with a
+# persistentVolumeClaim where a package is large or the registry is far away -- the blob cache is
+# what survives, which is the expensive part. Note that the cache saves the fetch, not the
+# extraction: a package is extracted per converge either way.
+#
+# sizeLimit is set because an emptyDir with none can fill the node's filesystem, and one extracted
+# distro package is as large as the package. Raise it to suit the packages in use.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --leader-elect
+            - --metrics-bind-address=:8080
+            - --cache-path=/var/lib/cargoship/cache
+            - --temp-path=/var/lib/cargoship/tmp
+          volumeMounts:
+            - name: cargoship
+              mountPath: /var/lib/cargoship
+      volumes:
+        - name: cargoship
+          emptyDir:
+            sizeLimit: 20Gi

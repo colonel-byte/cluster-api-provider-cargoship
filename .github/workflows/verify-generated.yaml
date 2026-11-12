@@ -1,0 +1,34 @@
+---
+name: Verify generated files
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # The CRDs, RBAC roles and deepcopy functions are checked in, and the component
+      # manifests are the release artifact. A type change that did not regenerate them
+      # produces a release that installs the previous schema, which nothing else here catches.
+      - name: Check the generators are up to date
+        run: make verify
+
+      - name: Check the component manifests still build
+        run: make release-manifests

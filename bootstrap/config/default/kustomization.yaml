@@ -1,0 +1,18 @@
+# The contract label is what makes this installable, and it is the one easy thing to get wrong:
+# clusterctl and the core Cluster API controllers read
+# `cluster.x-k8s.io/<contract>: <crd versions>` off each CRD to decide which version of this
+# provider's API to talk, and a CRD without it is ignored rather than rejected.
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cargoship-bootstrap-system
+namePrefix: cargoship-bootstrap-
+labels:
+  - includeSelectors: false
+    pairs:
+      cluster.x-k8s.io/provider: bootstrap-cargoship
+      cluster.x-k8s.io/v1beta2: v1alpha1
+resources:
+  - ../crd
+  - ../rbac
+  - ../manager
