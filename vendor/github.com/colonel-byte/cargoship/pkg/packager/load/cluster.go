@@ -1,0 +1,85 @@
+// Copyright 2021 zarf authors
+// Copyright 2026 colonel-byte
+//
+// This file contains code derived from zarf:
+// https://github.com/zarf-dev/zarf
+//
+// Modifications Copyright 2026 colonel-byte.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package load for loading a given package
+package load
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	v1alpha1 "github.com/colonel-byte/cargoship/api/colonel-byte.dev/v1alpha1/cluster"
+	"github.com/colonel-byte/cargoship/pkg/packager/layout"
+	"github.com/zarf-dev/zarf/src/pkg/logger"
+)
+
+// ClusterOptions optional args that will be passed in for loading a distro package
+type ClusterOptions struct{}
+
+// ClusterDefinition loads a package from the filesystem
+func ClusterDefinition(ctx context.Context, configPath string, _ ClusterOptions) (v1alpha1.Cluster, error) {
+	l := logger.From(ctx)
+	start := time.Now()
+	l.Debug("start layout.ClusterDefinition", "path", configPath)
+
+	conPath, err := layout.ResolveClusterPath(configPath)
+	if err != nil {
+		return v1alpha1.Cluster{}, err
+	}
+
+	b, err := os.ReadFile(conPath.ManifestFile)
+	if err != nil {
+		return v1alpha1.Cluster{}, err
+	}
+	cluster, err := v1alpha1.Parse(ctx, b)
+	if err != nil {
+		return v1alpha1.Cluster{}, err
+	}
+
+	err = validateCluster(ctx, cluster, conPath.ManifestFile)
+	if err != nil {
+		return v1alpha1.Cluster{}, err
+	}
+
+	// Profiles are folded here, once, so that every phase reads a profile that already carries
+	// what it inherits and none of them has to know inheritance exists.
+	cluster.Spec.Config.Profiles, err = v1alpha1.ResolveProfiles(cluster.Spec.Config.Profiles)
+	if err != nil {
+		return v1alpha1.Cluster{}, fmt.Errorf("%s: %w", conPath.ManifestFile, err)
+	}
+
+	l.Debug("done layout.ClusterDefinition", "duration", time.Since(start))
+	return cluster, nil
+}
+
+func validateCluster(ctx context.Context, c v1alpha1.Cluster, path string) error {
+	if err := v1alpha1.ValidateRegistries(c.Spec.Config.Registries); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	for _, registry := range c.Spec.Config.Registries {
+		for _, pattern := range registry.Proxy.UnreferencedRewrites() {
+			logger.From(ctx).Warn("proxy.rewrite captures a group its replacement does not reference; the capture is discarded",
+				"registry", registry.Name, "pattern", pattern, "replacement", registry.Proxy.Rewrite[pattern], "path", path)
+		}
+	}
+	return nil
+}
