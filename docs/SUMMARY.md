@@ -18,4 +18,5 @@
 - [A tagged distro reference is not re-resolved](agent/choice-distro-pinning.md)
 - [There is no rollout](agent/choice-no-rollout.md)
 - [Tool versions live in go.mod, except golangci-lint](agent/choice-tool-dependencies.md)
+- [The Zarf package is built from the release artifact](agent/choice-zarf-package.md)
 - [A Makefile, not mage](agent/choice-makefile-not-mage.md)

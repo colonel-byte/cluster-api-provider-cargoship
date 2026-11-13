@@ -118,9 +118,10 @@ make generate         # CRDs, RBAC and deepcopy functions
 make test             # unit tests, with the race detector
 make verify           # fail if a generator would change a checked-in file
 make release-manifests  # the three files clusterctl downloads
+make zarf-package     # the air-gapped Zarf package, built from those manifests
 ```
 
-The repository vendors its dependencies, so everything above works with no network access. See [`docs/dev/e2e-tests.md`](dev/e2e-tests.md) for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider's containers run no sshd, so they cannot be used to test a converge.
+The repository vendors its dependencies, so everything above works with no network access - apart from `make zarf-package`, which pulls the published controller images. See [`docs/dev/e2e-tests.md`](dev/e2e-tests.md) for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider's containers run no sshd, so they cannot be used to test a converge.
 
 ## License
 
