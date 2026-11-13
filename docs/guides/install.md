@@ -2,6 +2,8 @@
 
 ## Register it with clusterctl
 
+On a Rancher Turtles management cluster, skip to [installing with Rancher Turtles](rancher-turtles.md) instead - Turtles installs providers through the Cluster API Operator, and the rest of this guide still applies.
+
 Until the provider is in `clusterctl`'s built-in list, point it at the releases. Add this to `~/.config/cluster-api/clusterctl.yaml`:
 
 ```yaml

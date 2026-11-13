@@ -5,6 +5,7 @@
 # Guides
 
 - [Installing the provider](guides/install.md)
+- [Installing the provider with Rancher Turtles](guides/rancher-turtles.md)
 - [Node removal and the pre-terminate hook](guides/node-removal.md)
 
 # Development
