@@ -3,7 +3,7 @@ module github.com/colonel-byte/cluster-api-provider-cargoship
 go 1.27.4
 
 require (
-	github.com/colonel-byte/cargoship v0.41.1
+	github.com/colonel-byte/cargoship v0.41.2
 	github.com/k0sproject/rig/v2 v2.3.0
 	golang.org/x/crypto v0.58.0
 	k8s.io/api v0.37.2
