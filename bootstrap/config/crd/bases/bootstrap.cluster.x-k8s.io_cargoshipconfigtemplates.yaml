@@ -1,0 +1,193 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: cargoshipconfigtemplates.bootstrap.cluster.x-k8s.io
+spec:
+  group: bootstrap.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: CargoshipConfigTemplate
+    listKind: CargoshipConfigTemplateList
+    plural: cargoshipconfigtemplates
+    shortNames:
+    - csct
+    singular: cargoshipconfigtemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Time since creation
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          CargoshipConfigTemplate is a template for CargoshipConfig, referenced by a MachineDeployment so
+          its worker machines each get their own config.
+
+          It has no status and no controller: a template is never reconciled, only stamped by the
+          MachineSet controller. That is the whole of the ConfigTemplate half of the bootstrap contract.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec is the desired state of CargoshipConfigTemplate.
+            properties:
+              template:
+                description: template is the CargoshipConfig to create per machine.
+                properties:
+                  metadata:
+                    description: metadata is the labels and annotations stamped onto
+                      the created CargoshipConfig.
+                    minProperties: 1
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          annotations is an unstructured key value map stored with a resource that may be
+                          set by external tools to store and retrieve arbitrary metadata. They are not
+                          queryable and should be preserved when modifying objects.
+                          More info: http://kubernetes.io/docs/user-guide/annotations
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          labels is a map of string keys and values that can be used to organize and categorize
+                          (scope and select) objects. May match selectors of replication controllers
+                          and services.
+                          More info: http://kubernetes.io/docs/user-guide/labels
+                        type: object
+                    type: object
+                  spec:
+                    description: spec is the CargoshipConfig spec to stamp.
+                    properties:
+                      files:
+                        description: |-
+                          files are written to the machine before cargoship connects.
+
+                          Keep this empty if you can. It exists for what must be true before SSH works at all -- a
+                          proxy configuration, a CA bundle the machine needs to resolve anything, a network script
+                          the image does not carry. Everything after the first connection is a cargoship phase, and
+                          a file placed here is a file no phase reports on and no receipt records.
+                        items:
+                          description: File is a file written by the bootstrap data.
+                          properties:
+                            content:
+                              description: |-
+                                content is the file's contents, written literally.
+
+                                A secret does not belong here: bootstrap data reaches the machine through the
+                                infrastructure provider's user-data channel, which on most providers is readable from the
+                                instance metadata service by anything running on the host. Use contentFrom.
+                              maxLength: 131072
+                              type: string
+                            contentFrom:
+                              description: |-
+                                contentFrom reads the contents from a secret key in the CargoshipConfig's namespace.
+
+                                This is no more private than content once the bootstrap secret is rendered -- the value is
+                                copied into it either way. What it buys is that the value is not in the CargoshipConfig
+                                itself, so it is not in the Git repository the CR is applied from.
+                              properties:
+                                secret:
+                                  description: secret is the secret and key to read.
+                                  properties:
+                                    key:
+                                      description: key within the secret.
+                                      maxLength: 253
+                                      minLength: 1
+                                      type: string
+                                    name:
+                                      description: name of the secret.
+                                      maxLength: 253
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - key
+                                  - name
+                                  type: object
+                              required:
+                              - secret
+                              type: object
+                            owner:
+                              description: owner is the "user:group" the file is written
+                                as.
+                              maxLength: 65
+                              type: string
+                            path:
+                              description: path is the absolute path to write to.
+                              maxLength: 4096
+                              minLength: 1
+                              type: string
+                            permissions:
+                              description: |-
+                                permissions is the file mode, as a string, because a leading zero in YAML is how "0600"
+                                becomes 384.
+                              maxLength: 4
+                              type: string
+                          required:
+                          - path
+                          type: object
+                        maxItems: 32
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      preCargoshipCommands:
+                        description: |-
+                          preCargoshipCommands run on first boot, before cargoship connects. The same warning as
+                          files applies, and more strongly: a command here runs once, unreported, with no retry.
+                        items:
+                          type: string
+                        maxItems: 32
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      sshAuthorizedKeys:
+                        description: |-
+                          sshAuthorizedKeys are public keys appended to the user's authorized_keys.
+
+                          The control plane's own key is added by the controller from its sshSecretRef, so this is
+                          for the extra ones: an operator's key for breaking glass, a backup agent's. A config with
+                          none is valid and normal.
+                        items:
+                          type: string
+                        maxItems: 32
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      user:
+                        description: |-
+                          user is the login cargoship connects as. The user must already exist in the image; this
+                          configures its authorized keys rather than creating it, because an image that does not
+                          carry the account is a packaging problem a bootstrap script should not paper over.
+                        maxLength: 32
+                        minLength: 1
+                        type: string
+                    type: object
+                type: object
+            required:
+            - template
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}

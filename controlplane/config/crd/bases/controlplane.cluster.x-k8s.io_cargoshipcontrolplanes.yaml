@@ -1,0 +1,595 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: cargoshipcontrolplanes.controlplane.cluster.x-k8s.io
+spec:
+  group: controlplane.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: CargoshipControlPlane
+    listKind: CargoshipControlPlaneList
+    plural: cargoshipcontrolplanes
+    shortNames:
+    - cscp
+    singular: cargoshipcontrolplane
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Control plane is answering
+      jsonPath: .status.initialization.controlPlaneInitialized
+      name: Initialized
+      type: string
+    - description: Desired control-plane machines
+      jsonPath: .spec.replicas
+      name: Desired
+      type: integer
+    - description: Control-plane machines that exist
+      jsonPath: .status.replicas
+      name: Replicas
+      type: integer
+    - description: Control-plane machines reporting ready
+      jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
+    - description: Observed Kubernetes version
+      jsonPath: .status.version
+      name: Version
+      type: string
+    - description: Time since creation
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          CargoshipControlPlane is a Kubernetes control plane installed and converged by cargoship over
+          SSH, in place of kubeadm.
+
+          It owns the whole fleet rather than only the control-plane machines, which is a deliberate
+          departure from KubeadmControlPlane. Cargoship converges controllers and workers in one run, with
+          its own per-profile concurrency, and splitting that across two controllers would mean two
+          uncoordinated SSH walks over hosts that share an /etc/hosts file and a firewall. See
+          docs/agent/choice-one-converge.md.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec is the desired state of CargoshipControlPlane.
+            properties:
+              apply:
+                description: apply tunes the converge.
+                properties:
+                  allowDowngrade:
+                    description: |-
+                      allowDowngrade lets a converge continue against a host already running a version newer than
+                      the package, rather than refusing.
+                    type: boolean
+                  concurrency:
+                    description: concurrency caps how many hosts a phase acts on at
+                      once. Zero is unlimited.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  driftIntervalSeconds:
+                    description: |-
+                      driftIntervalSeconds is how often a converged fleet is re-converged to catch drift. Zero
+                      takes 600.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  labelNodes:
+                    description: labelNodes adds the node-role.kubernetes.io/<profile>
+                      label to each node.
+                    type: boolean
+                  modifyFirewall:
+                    description: modifyFirewall lets cargoship open the ports the
+                      cluster needs in the host's own firewall.
+                    type: boolean
+                  modifyHosts:
+                    description: modifyHosts lets cargoship write every node into
+                      each host's /etc/hosts.
+                    type: boolean
+                  timeoutSeconds:
+                    description: |-
+                      timeoutSeconds bounds the retry loops inside each phase. Zero takes cargoship's own
+                      default, which is 15 minutes.
+
+                      This is not a budget for the whole converge: it is how long one phase waits for one host to
+                      get where it is going. Nothing in this controller bounds the total, on purpose -- a machine
+                      that takes eleven minutes to boot is not an error, and the reconcile that is waiting for it
+                      costs nothing.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  workerConcurrent:
+                    description: workerConcurrent is the worker batch size, a count
+                      ("5") or a percentage ("25%").
+                    maxLength: 8
+                    type: string
+                type: object
+              clusterConfig:
+                description: |-
+                  clusterConfig is the cargoship cluster configuration's spec.config, verbatim.
+
+                  It is carried as an opaque object rather than mirrored field by field, which is a deliberate
+                  trade. What it buys: the YAML here is the YAML of a cargoship inventory, so it needs no
+                  translation and cannot drift from the schema cargoship actually validates against -- and
+                  cargoship does validate it, against the package's own values schema, before any phase runs.
+                  What it costs: the API server will not reject a typo in it, so a mistake surfaces as a
+                  reconcile error on the custom resource rather than as a rejected apply.
+
+                  loadbalancer is ignored here; controlPlaneEndpoint above is the contract field for it.
+                x-kubernetes-preserve-unknown-fields: true
+              controlPlaneEndpoint:
+                description: |-
+                  controlPlaneEndpoint is the host clients reach the API through, and becomes the cluster
+                  configuration's loadbalancer.
+
+                  It is a contract field, so Cluster API copies it onto the Cluster. Leave it unset and the
+                  controller fills it in from the first control-plane machine's address, which is right for a
+                  single-controller cluster and wrong for any cluster that will grow one.
+                minProperties: 1
+                properties:
+                  host:
+                    description: host is the hostname on which the API server is serving.
+                    maxLength: 512
+                    minLength: 1
+                    type: string
+                  port:
+                    description: port is the port on which the API server is serving.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                type: object
+              distro:
+                description: distro is the cargoship package the fleet is converged
+                  to.
+                properties:
+                  arch:
+                    description: |-
+                      arch is the package architecture to pull, "amd64" or "arm64". Empty takes the package's
+                      sole architecture, and fails if it carries more than one.
+                    enum:
+                    - amd64
+                    - arm64
+                    type: string
+                  caBundleSecretRef:
+                    description: |-
+                      caBundleSecretRef is a secret holding PEM-encoded certificates to trust when pulling the
+                      package, in its "ca.crt" key. They are trusted in addition to the controller's own roots,
+                      so a registry with a private CA does not stop the controller reaching anything else.
+
+                      This is the way to pull from a registry serving a certificate nothing public signed - a
+                      Zarf registry, usually. Prefer it to insecureSkipTLSVerify, which verifies nothing at all.
+                    properties:
+                      name:
+                        description: name of the referenced object.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  insecureSkipTLSVerify:
+                    description: |-
+                      insecureSkipTLSVerify accepts the registry's certificate without verifying it, rather than
+                      trusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH
+                      connections to the fleet nor the workload cluster's API server.
+                    type: boolean
+                  ociRef:
+                    description: |-
+                      ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
+
+                      A tag is resolved to a digest once and the digest is recorded in status.distro.digest.
+                      Every later reconcile uses the digest, so a tag that moves underneath a running cluster
+                      does not silently change what the fleet converges to; change the reference to adopt it.
+                    maxLength: 2048
+                    minLength: 1
+                    type: string
+                  pullSecretRef:
+                    description: |-
+                      pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses
+                      anonymous access.
+
+                      The secret must be of type kubernetes.io/dockerconfigjson, which is what
+                      `kubectl create secret docker-registry` produces. Its registries are merged into a Docker
+                      config file the controller keeps on its cache volume, because that file is the only place
+                      the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
+                    properties:
+                      name:
+                        description: name of the referenced object.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - ociRef
+                type: object
+              machineTemplate:
+                description: |-
+                  machineTemplate is the infrastructure and metadata each control-plane machine is created
+                  from.
+                properties:
+                  metadata:
+                    description: metadata is the labels and annotations stamped onto
+                      each machine.
+                    minProperties: 1
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          annotations is an unstructured key value map stored with a resource that may be
+                          set by external tools to store and retrieve arbitrary metadata. They are not
+                          queryable and should be preserved when modifying objects.
+                          More info: http://kubernetes.io/docs/user-guide/annotations
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          labels is a map of string keys and values that can be used to organize and categorize
+                          (scope and select) objects. May match selectors of replication controllers
+                          and services.
+                          More info: http://kubernetes.io/docs/user-guide/labels
+                        type: object
+                    type: object
+                  spec:
+                    description: spec is the machine template's own spec.
+                    properties:
+                      failureDomains:
+                        description: |-
+                          failureDomains are the failure domains to spread control-plane machines across, in order.
+                          Empty lets the infrastructure provider choose.
+                        items:
+                          type: string
+                        maxItems: 64
+                        type: array
+                        x-kubernetes-list-type: atomic
+                      infrastructureRef:
+                        description: |-
+                          infrastructureRef is the infrastructure machine template each control-plane machine is
+                          created from.
+                        properties:
+                          apiGroup:
+                            description: |-
+                              apiGroup is the group of the resource being referenced.
+                              apiGroup must be fully qualified domain name.
+                              The corresponding version for this reference will be looked up from the contract
+                              labels of the corresponding CRD of the resource being referenced.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                            type: string
+                          kind:
+                            description: |-
+                              kind of the resource being referenced.
+                              kind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
+                            type: string
+                          name:
+                            description: |-
+                              name of the resource being referenced.
+                              name must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                            type: string
+                        required:
+                        - apiGroup
+                        - kind
+                        - name
+                        type: object
+                    required:
+                    - infrastructureRef
+                    type: object
+                required:
+                - spec
+                type: object
+              replicas:
+                default: 1
+                description: |-
+                  replicas is the number of control-plane machines.
+
+                  An even number is accepted rather than refused, because cargoship does not own the etcd
+                  topology decision and an operator growing a cluster passes through even numbers. The
+                  controller warns.
+                format: int32
+                minimum: 1
+                type: integer
+              ssh:
+                description: ssh is how the controller reaches the machines.
+                properties:
+                  port:
+                    description: port is the SSH port. Zero means 22.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                  privateKeySecretRef:
+                    description: |-
+                      privateKeySecretRef is a secret holding the private key, in the "ssh-privatekey" key of a
+                      kubernetes.io/ssh-auth secret.
+
+                      The key is read into memory and handed to the SSH client as an auth method. It is never
+                      written to the pod's filesystem, so the controller needs no writable mount for it and a
+                      container compromise has to read process memory rather than a file.
+                    properties:
+                      name:
+                        description: name of the referenced object.
+                        maxLength: 253
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  useSudo:
+                    default: true
+                    description: |-
+                      useSudo runs privileged commands through sudo rather than as the login user. Needed for any
+                      user that is not root, which should be every user.
+                    type: boolean
+                  user:
+                    description: user is the login to connect as.
+                    maxLength: 32
+                    minLength: 1
+                    type: string
+                required:
+                - privateKeySecretRef
+                - user
+                type: object
+              version:
+                description: |-
+                  version is the desired Kubernetes version, as the contract requires it: a semantic version
+                  with a leading "v".
+
+                  It must agree with what the distro package installs. The controller reads the package's own
+                  version and refuses a mismatch rather than installing something other than what was asked
+                  for -- the package is the authority on what lands on a host, and a CR that disagreed with
+                  it would make status.version a lie.
+                maxLength: 256
+                minLength: 1
+                type: string
+            required:
+            - distro
+            - machineTemplate
+            - ssh
+            - version
+            type: object
+          status:
+            description: status is the observed state of CargoshipControlPlane.
+            properties:
+              availableReplicas:
+                description: availableReplicas is the number of control-plane machines
+                  that are available.
+                format: int32
+                type: integer
+              conditions:
+                description: conditions represent the observations of the control
+                  plane's current state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                maxItems: 32
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              distro:
+                description: distro records what was actually converged to, as opposed
+                  to what was asked for.
+                properties:
+                  digest:
+                    description: |-
+                      digest is the package digest, set only when the reference named one.
+
+                      It is empty for a tagged reference, which is also the case in which this provider cannot
+                      tell that a republished package has changed. Pin the reference to a digest where that
+                      matters; see docs/agent/choice-distro-pinning.md.
+                    maxLength: 256
+                    type: string
+                  engine:
+                    description: 'engine is the distro engine the package carries:
+                      k3s, rke2, or upstream.'
+                    maxLength: 32
+                    type: string
+                  ref:
+                    description: |-
+                      ref is the package reference the fleet was converged to, exactly as spec.distro.ociRef
+                      gave it.
+                    maxLength: 2048
+                    type: string
+                  version:
+                    description: version is the Kubernetes version the package installs.
+                    maxLength: 256
+                    type: string
+                type: object
+              hosts:
+                description: hosts is what the last converge did, per host.
+                items:
+                  description: HostStatus is one host's line in the last converge.
+                  properties:
+                    address:
+                      description: |-
+                        address is the host as the inventory addressed it, which is the identity cargoship's own
+                        run receipt uses.
+                      maxLength: 256
+                      minLength: 1
+                      type: string
+                    changed:
+                      description: changed is whether the last converge changed anything
+                        on this host.
+                      type: boolean
+                    machine:
+                      description: machine is the Machine this host came from.
+                      maxLength: 253
+                      type: string
+                    phasesNamed:
+                      description: |-
+                        phasesNamed is how many phases spoke for this host, and phasesReporting how many declared
+                        per-host results at all.
+
+                        They are a pair because the first cannot be read without the second: a host named by two of
+                        two reporting phases is fully accounted for, one named by two of fifteen is not, and the
+                        two look identical without the denominator.
+                      format: int32
+                      type: integer
+                    phasesReporting:
+                      description: phasesReporting is the denominator for phasesNamed.
+                      format: int32
+                      type: integer
+                    role:
+                      description: role is controller or worker.
+                      enum:
+                      - controller
+                      - worker
+                      type: string
+                  required:
+                  - address
+                  type: object
+                maxItems: 256
+                type: array
+                x-kubernetes-list-map-keys:
+                - address
+                x-kubernetes-list-type: map
+              initialization:
+                description: initialization provides observations of the initialization
+                  process.
+                properties:
+                  controlPlaneInitialized:
+                    description: |-
+                      controlPlaneInitialized is true once the Kubernetes API has accepted a request, which is
+                      also when the kubeconfig secret exists.
+
+                      This field is part of the Cluster API contract and is what releases worker machines to be
+                      created. The v1beta1 spelling was status.initialized.
+                    type: boolean
+                type: object
+              lastAppliedHash:
+                description: |-
+                  lastAppliedHash is the desired-state fingerprint of the last successful converge: the host
+                  set, the cluster configuration and the pinned package digest.
+
+                  It is what keeps a reconcile from re-running a multi-minute apply on every resync. A
+                  converge is idempotent, so re-running one is safe rather than destructive -- this is a cost
+                  control, not a correctness gate, and clearing it forces a converge.
+                maxLength: 64
+                type: string
+              observedGeneration:
+                description: observedGeneration is the latest generation observed
+                  by the controller.
+                format: int64
+                type: integer
+              readyReplicas:
+                description: readyReplicas is the number of control-plane machines
+                  reporting ready.
+                format: int32
+                type: integer
+              replicas:
+                description: replicas is the number of control-plane machines that
+                  exist.
+                format: int32
+                type: integer
+              selector:
+                description: selector is the label selector in string form, for the
+                  scale subresource.
+                maxLength: 4096
+                type: string
+              upToDateReplicas:
+                description: |-
+                  upToDateReplicas is the number of control-plane machines converged to the current desired
+                  state.
+                format: int32
+                type: integer
+              version:
+                description: version is the lowest Kubernetes version observed across
+                  the control-plane machines.
+                maxLength: 256
+                minLength: 1
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+      status: {}
