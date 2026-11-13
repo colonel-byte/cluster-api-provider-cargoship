@@ -1,0 +1,46 @@
+# The air-gapped install path: one Zarf package carrying both controller images and the same
+# component manifests clusterctl would download, so a management cluster with no route to
+# ghcr.io can still be given this provider.
+#
+# The manifests come from out/, which `make release-manifests` writes, rather than from the
+# kustomizations directly. Zarf can run kustomize itself, but then the package would deploy
+# something assembled a second way, and the thing an operator installs by hand and the thing
+# this package installs would be free to drift. `make zarf-package` builds out/ first, at the
+# version pinned below, so the manifests cannot name a tag the package's images do not carry.
+#
+# The three pins are not templated, because `###ZARF_PKG_TMPL_...###` does not reach an image
+# reference in a v1beta1 package: validation parses the reference before `--set` is applied and
+# rejects it. release-please rewrites all three on a release instead -- it is listed in
+# release-please-config.json's extra-files for that, and the trailing comments are what it
+# looks for.
+---
+apiVersion: zarf.dev/v1beta1
+kind: ZarfPackageConfig
+metadata:
+  name: cluster-api-provider-cargoship
+  description: The cargoship bootstrap and control-plane providers for Cluster API
+  version: 0.1.0 # x-release-please-version
+  annotations:
+    org.opencontainers.image.source: https://github.com/colonel-byte/cluster-api-provider-cargoship
+components:
+  # Neither component is optional. Both providers ship from one tag and are only ever
+  # version-matched; a cluster holding one of them reconciles nothing.
+  - name: bootstrap-provider
+    description: CargoshipConfig and CargoshipConfigTemplate, in cargoship-bootstrap-system
+    manifests:
+      - name: bootstrap-components
+        namespace: cargoship-bootstrap-system
+        files:
+          - out/bootstrap-components.yaml
+    images:
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.1.0 # x-release-please-version
+
+  - name: controlplane-provider
+    description: CargoshipControlPlane, in cargoship-controlplane-system
+    manifests:
+      - name: control-plane-components
+        namespace: cargoship-controlplane-system
+        files:
+          - out/control-plane-components.yaml
+    images:
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.1.0 # x-release-please-version
