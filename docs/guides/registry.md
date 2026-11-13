@@ -56,3 +56,7 @@ Three things about it:
 `insecureSkipTLSVerify: true` is the other option, and it is a different thing: it accepts whatever certificate the registry presents without checking it. Reach for it to prove a registry is otherwise reachable, not to run a fleet. It covers the package pull only - the SSH connections and the workload cluster's API server are not affected by either field.
 
 What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with `mtlsStrategy` set to anything requiring one cannot be pulled from by this controller.
+
+## Why this is not the Zarf package's problem
+
+[The Zarf package](install.md#installing-without-a-route-to-ghcrio) installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.
