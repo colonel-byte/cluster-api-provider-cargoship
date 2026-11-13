@@ -46,7 +46,7 @@ The public half is **derived** from this secret by the bootstrap provider and au
 
 ## Storage for the control-plane controller
 
-The control-plane controller pulls and extracts cargoship distro packages, so it needs writable storage. The shipped manifest mounts an `emptyDir` with a 20 GiB limit at `/var/lib/cargoship`.
+The control-plane controller pulls and extracts cargoship distro packages, so it needs writable storage. Where that registry wants credentials or serves its own certificate, see [pulling the distro package from a Zarf registry](registry.md). The shipped manifest mounts an `emptyDir` with a 20 GiB limit at `/var/lib/cargoship`.
 
 One extracted package is as large as the package, so **raise the limit to suit the packages in use** - an `emptyDir` that fills takes the node's filesystem with it. Replace it with a `persistentVolumeClaim` where the registry is far away: the blob cache survives a restart, which is the expensive part to lose.
 
