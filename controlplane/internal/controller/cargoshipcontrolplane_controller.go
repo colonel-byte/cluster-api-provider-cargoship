@@ -37,6 +37,7 @@ import (
 
 	controlplanev1 "github.com/colonel-byte/cluster-api-provider-cargoship/controlplane/api/v1alpha1"
 	"github.com/colonel-byte/cluster-api-provider-cargoship/pkg/converge"
+	"github.com/colonel-byte/cluster-api-provider-cargoship/pkg/dockerconfig"
 	"github.com/colonel-byte/cluster-api-provider-cargoship/pkg/sshkey"
 )
 
@@ -230,19 +231,28 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
 	}
 
-	// 7. Start or observe the converge.
+	// 7. Make the registry's credentials available, and start or observe the converge.
+	//
+	//    Done here rather than beside the SSH key, because it writes a file: a cluster that is
+	//    already converged resyncs for all sorts of reasons and has no business rewriting it.
+	if err := r.writePullSecret(ctx, cp); err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "PullSecretUnusable", err.Error())
+		return ctrl.Result{}, err
+	}
+
 	key := client.ObjectKeyFromObject(cp).String()
 	run := r.Runner.Start(ctx, key, fingerprint, func(runCtx context.Context) (*converge.Run, error) {
 		return converge.Apply(runCtx, inv, converge.Options{
-			Source:           source,
-			Architecture:     cp.Spec.Distro.Arch,
-			Concurrency:      int(cp.Spec.Apply.Concurrency),
-			WorkerConcurrent: cp.Spec.Apply.WorkerConcurrent,
-			ModifyHosts:      cp.Spec.Apply.ModifyHosts,
-			ModifyFirewall:   cp.Spec.Apply.ModifyFirewall,
-			LabelNodes:       cp.Spec.Apply.LabelNodes,
-			AllowDowngrade:   cp.Spec.Apply.AllowDowngrade,
-			Timeout:          time.Duration(cp.Spec.Apply.TimeoutSeconds) * time.Second,
+			Source:                source,
+			Architecture:          cp.Spec.Distro.Arch,
+			InsecureSkipTLSVerify: cp.Spec.Distro.InsecureSkipTLSVerify,
+			Concurrency:           int(cp.Spec.Apply.Concurrency),
+			WorkerConcurrent:      cp.Spec.Apply.WorkerConcurrent,
+			ModifyHosts:           cp.Spec.Apply.ModifyHosts,
+			ModifyFirewall:        cp.Spec.Apply.ModifyFirewall,
+			LabelNodes:            cp.Spec.Apply.LabelNodes,
+			AllowDowngrade:        cp.Spec.Apply.AllowDowngrade,
+			Timeout:               time.Duration(cp.Spec.Apply.TimeoutSeconds) * time.Second,
 		})
 	})
 
@@ -296,6 +306,40 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	}
 
 	return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
+}
+
+// writePullSecret merges the registry credentials spec.distro.pullSecretRef names into the Docker
+// config file the pull reads, and does nothing when the field is unset.
+//
+// A missing or malformed secret is returned as an error rather than ignored. Falling back to
+// anonymous access would turn "the credentials are wrong" into a pull that fails deep inside
+// cargoship with a 401 against a registry the operator believed they had authenticated to.
+func (r *CargoshipControlPlaneReconciler) writePullSecret(
+	ctx context.Context,
+	cp *controlplanev1.CargoshipControlPlane,
+) error {
+	if cp.Spec.Distro.PullSecretRef == nil {
+		return nil
+	}
+
+	key := types.NamespacedName{
+		Namespace: cp.Namespace,
+		Name:      cp.Spec.Distro.PullSecretRef.Name,
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, key, secret); err != nil {
+		return fmt.Errorf("unable to read the pull secret %s: %w", key, err)
+	}
+
+	payload, ok := secret.Data[corev1.DockerConfigJsonKey]
+	if !ok {
+		return fmt.Errorf("pull secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
+			key, corev1.DockerConfigJsonKey)
+	}
+	if err := dockerconfig.Merge(payload); err != nil {
+		return fmt.Errorf("unable to use the pull secret %s: %w", key, err)
+	}
+	return nil
 }
 
 // buildInventory decodes the cluster config and builds the cargoship inventory.

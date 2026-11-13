@@ -160,8 +160,25 @@ type DistroSource struct {
 
 	// pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses
 	// anonymous access.
+	//
+	// The secret must be of type kubernetes.io/dockerconfigjson, which is what
+	// `kubectl create secret docker-registry` produces. Its registries are merged into a Docker
+	// config file the controller keeps on its cache volume, because that file is the only place
+	// the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
 	// +optional
 	PullSecretRef *LocalObjectReference `json:"pullSecretRef,omitempty"`
+
+	// insecureSkipTLSVerify accepts the registry's certificate without verifying it. It covers
+	// the package pull only, and neither the SSH connections to the fleet nor the workload
+	// cluster's API server.
+	//
+	// It is here because a self-signed registry cannot otherwise be pulled from per resource: the
+	// pull takes no CA bundle, so trusting one properly means mounting it into the controller and
+	// pointing SSL_CERT_FILE at it, which is a property of the deployment rather than of one
+	// cluster. Prefer that where the same registry serves every cluster. See
+	// docs/guides/registry.md.
+	// +optional
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty"`
 }
 
 // SSHConfig is how the controller connects to the machines.

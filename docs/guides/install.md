@@ -46,7 +46,7 @@ zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.
 Three things it does not do, each of which will otherwise be found out later:
 
 - **It does not install core Cluster API.** `clusterctl init` is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.
-- **It does not carry the cargoship distro packages.** The control-plane controller pulls the package named in `spec.distro.ociRef` over OCI at converge time, from inside the management cluster. Mirror it to a registry the cluster can reach and point the reference there.
+- **It does not carry the cargoship distro packages.** The control-plane controller pulls the package named in `spec.distro.ociRef` over OCI at converge time, from inside the management cluster. Mirror it to a registry the cluster can reach and point the reference there - [pulling it from a Zarf registry](registry.md) covers the credentials and the certificate that usually come with one.
 - **`clusterctl` does not know the provider is installed.** The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the `clusterctl.cluster.x-k8s.io` bookkeeping `clusterctl init` adds - so `clusterctl upgrade` will not see this provider. Upgrade it by deploying the next package.
 
 ## The SSH key

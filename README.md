@@ -109,6 +109,7 @@ Stated plainly, because each of these is a thing an operator will reach for:
 - **No rollout or in-place upgrade.** Scale up and scale down only. A change to `spec.version` is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.
 - **No tag-to-digest resolution.** A republished tag is not noticed. Pin the reference.
 - **No encrypted registry credentials.** Cargoship's keyring type is not reachable from outside its module.
+- **No mTLS to the package registry.** A pull secret and a self-signed certificate are handled - see [`docs/guides/registry.md`](docs/guides/registry.md) - but the pull presents no client certificate of its own.
 - **No MachineHealthCheck remediation**, etcd backup or restore.
 
 ## Development

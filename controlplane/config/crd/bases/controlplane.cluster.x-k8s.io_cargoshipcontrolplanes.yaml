@@ -174,6 +174,18 @@ spec:
                     - amd64
                     - arm64
                     type: string
+                  insecureSkipTLSVerify:
+                    description: |-
+                      insecureSkipTLSVerify accepts the registry's certificate without verifying it. It covers
+                      the package pull only, and neither the SSH connections to the fleet nor the workload
+                      cluster's API server.
+
+                      It is here because a self-signed registry cannot otherwise be pulled from per resource: the
+                      pull takes no CA bundle, so trusting one properly means mounting it into the controller and
+                      pointing SSL_CERT_FILE at it, which is a property of the deployment rather than of one
+                      cluster. Prefer that where the same registry serves every cluster. See
+                      docs/guides/registry.md.
+                    type: boolean
                   ociRef:
                     description: |-
                       ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
@@ -188,6 +200,11 @@ spec:
                     description: |-
                       pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses
                       anonymous access.
+
+                      The secret must be of type kubernetes.io/dockerconfigjson, which is what
+                      `kubectl create secret docker-registry` produces. Its registries are merged into a Docker
+                      config file the controller keeps on its cache volume, because that file is the only place
+                      the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
                     properties:
                       name:
                         description: name of the referenced object.

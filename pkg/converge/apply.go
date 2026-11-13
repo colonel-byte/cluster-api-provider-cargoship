@@ -19,11 +19,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/colonel-byte/cargoship/config"
 	"github.com/colonel-byte/cargoship/pkg/action"
 	"github.com/colonel-byte/cargoship/pkg/distro"
+
+	"github.com/colonel-byte/cluster-api-provider-cargoship/pkg/dockerconfig"
 )
 
 // Options tune the apply a converge runs. They mirror the subset of cargoship's own apply options
@@ -33,6 +36,11 @@ type Options struct {
 	Source string
 	// Architecture is the package architecture to pull. Empty takes the package's sole one.
 	Architecture string
+	// InsecureSkipTLSVerify accepts the registry's certificate without verifying it, which is the
+	// only way a self-signed registry can be pulled from per resource: cargoship's remote options
+	// carry no CA bundle, so trusting one properly means a bundle in the controller's own trust
+	// store. See docs/guides/registry.md.
+	InsecureSkipTLSVerify bool
 	// Concurrency caps how many hosts a phase acts on at once. Zero is unlimited.
 	Concurrency int
 	// WorkerConcurrent is the worker batch size, a count ("5") or a percentage ("25%").
@@ -78,7 +86,11 @@ func SetPaths(p Paths) error {
 	}
 	config.CommonOptions.CachePath = p.Cache
 	config.CommonOptions.TempDirectory = p.Temp
-	return nil
+
+	// Registry credentials for a pull are read from $DOCKER_CONFIG, which is unset in the
+	// container and would otherwise resolve to a HOME the image does not have. Pointing it inside
+	// the cache puts the file on the same mounted volume as the blobs it authenticates.
+	return dockerconfig.Use(filepath.Join(p.Cache, "docker"))
 }
 
 // Apply loads the package and converges the inventory to it.
@@ -101,11 +113,16 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 		return nil, fmt.Errorf("unable to resolve the cache path: %w", err)
 	}
 
-	layout, err := distro.Load(ctx, opts.Source, distro.LoadOptions{
+	loadOptions := distro.LoadOptions{
 		CachePath:    cachePath,
 		Architecture: opts.Architecture,
 		Output:       config.CommonOptions.TempDirectory,
-	})
+	}
+	// Set through the promoted field rather than by naming cargoship's embedded
+	// types.RemoteOptions, which would make zarf a direct dependency of this module for one bool.
+	loadOptions.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
+
+	layout, err := distro.Load(ctx, opts.Source, loadOptions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load the distro package %s: %w", opts.Source, err)
 	}
