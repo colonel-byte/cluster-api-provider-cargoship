@@ -76,6 +76,47 @@ That ConfigMap is also where the core Cluster API version Turtles installs is wr
 kubectl get configmap clusterctl-config -n cattle-turtles-system -o jsonpath='{.data.clusterctl\.yaml}'
 ```
 
+## Air-gapped, with nothing to fetch
+
+`fetchConfig` takes a `selector` instead of a `url`, and then the operator reads the components and the metadata out of ConfigMaps in the cluster - so an air-gapped management cluster needs no route to GitHub at all, and no mirror to stand in for it. One ConfigMap per half, carrying the same two files a release does under the keys `components` and `metadata`.
+
+On the connected side:
+
+```sh
+gh release download v0.1.0 --repo colonel-byte/cluster-api-provider-cargoship \
+  --pattern 'bootstrap-components.yaml' --pattern 'control-plane-components.yaml' --pattern 'metadata.yaml'
+```
+
+Inside:
+
+```sh
+kubectl create configmap v0.1.0 --namespace cargoship-bootstrap-system \
+  --from-file=components=bootstrap-components.yaml \
+  --from-file=metadata=metadata.yaml
+kubectl label configmap v0.1.0 --namespace cargoship-bootstrap-system provider-components=cargoship
+
+kubectl create configmap v0.1.0 --namespace cargoship-controlplane-system \
+  --from-file=components=control-plane-components.yaml \
+  --from-file=metadata=metadata.yaml
+kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provider-components=cargoship
+```
+
+Then both objects lose `fetchConfig.url` and gain the selector, with everything else unchanged:
+
+```yaml
+  fetchConfig:
+    selector:
+      matchLabels:
+        provider-components: cargoship
+```
+
+- **The ConfigMap's name is the version the operator offers**, unless it carries a `provider.cluster.x-k8s.io/version` label saying otherwise - and it has to match the `spec.version` on the `CAPIProvider`. Two ConfigMaps both called `v0.1.0` is fine here only because each sits in its own namespace; in one namespace, give them different names and a version label each.
+- **The label is yours.** `provider-components` is only the convention the operator's own examples use; nothing reads the key, the selector just has to match.
+- **The components still name `ghcr.io` images.** Mirror the two controller images and override the registry through the `CAPIProvider`'s `configSecret`, whose `images` key the operator reads as a clusterctl image override - `all: {repository: <registry>/<org>}`. This is the one part of the air-gapped install that a selector does not cover.
+- **A ConfigMap holds 1 MiB.** These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, `gzip` the components and annotate the ConfigMap `provider.cluster.x-k8s.io/compressed: "true"`, without which the operator reads the archive as YAML.
+
+`fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: it pulls `metadata.yaml` and the typed `bootstrap-components.yaml` and `control-plane-components.yaml` out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.
+
 ## Check it came up
 
 ```sh
@@ -96,4 +137,4 @@ Rancher then installs its cluster agent into the workload cluster, which needs a
 
 ## What this does not solve
 
-`clusterctl` and Turtles are two ways to install the same component manifests, and installing with one leaves the other unaware. If the provider was installed with [the Zarf package](install.md#installing-without-a-route-to-ghcrio) instead, Turtles does not manage it and `kubectl get capiproviders` shows nothing - deploy the next package to upgrade, or delete it and declare the `CAPIProvider` objects to hand it over.
+`clusterctl` and Turtles are two ways to install the same component manifests, and installing with one leaves the other unaware. If the provider was installed with [the Zarf package](install.md#installing-without-a-route-to-ghcrio) instead, Turtles does not manage it and `kubectl get capiproviders` shows nothing - deploy the next package to upgrade, or delete it and declare the `CAPIProvider` objects to hand it over. On a Turtles cluster the selector above is the better air-gapped route of the two, because what it installs is still a provider Turtles manages.
