@@ -1,0 +1,432 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2021-Present The Zarf Authors
+
+package v1beta1
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/zarf-dev/zarf/src/api"
+	"github.com/zarf-dev/zarf/src/api/v1beta1"
+	"github.com/zarf-dev/zarf/src/pkg/transform"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+const (
+	// ZarfMaxChartNameLength limits helm chart name size to account for K8s/helm limits and zarf prefix
+	ZarfMaxChartNameLength   = 40
+	maxMapKeyLength          = 256
+	maxAnnotationsSize       = 32 * 1024
+	errChartReleaseNameEmpty = "release name empty, unable to fallback to chart name"
+)
+
+// Package errors found during validation.
+const (
+	PkgValidateErrComponentNameNotUnique  = "component name %q is not unique"
+	PkgValidateErrChartNameNotUnique      = "chart name %q is not unique"
+	PkgValidateErrChart                   = "invalid chart definition: %w"
+	PkgValidateErrManifestNameNotUnique   = "manifest name %q is not unique"
+	PkgValidateErrManifest                = "invalid manifest definition: %w"
+	PkgValidateErrAction                  = "invalid action: %w"
+	PkgValidateErrActionCmdWait           = "action %q cannot be both a command and wait action"
+	PkgValidateErrActionClusterNetwork    = "a single wait action must contain only one of cluster or network"
+	PkgValidateErrActionSetValueOnDeploy  = "setValues is not supported in onCreate actions"
+	PkgValidateErrActionTemplateOnCreate  = "templating is not supported in onCreate actions"
+	PkgValidateErrChartName               = "chart %q exceed the maximum length of %d characters"
+	PkgValidateErrChartSource             = "chart %q must include exactly one source (helmRepository, git, local, or oci)"
+	PkgValidateErrChartNamespaceMissing   = "chart %q must include a namespace"
+	PkgValidateErrManifestFileOrKustomize = "manifest %q must have at least one file or kustomization"
+	PkgValidateErrManifestNameLength      = "manifest %q exceed the maximum length of %d characters"
+	PkgValidateErrManifestNamePath        = "manifest %q must not contain path separators"
+	PkgValidateErrAttachmentsKeyPath      = "attachment key %q must not contain path separators"
+	PkgValidateErrAttachmentsKeyTraversal = "attachment key %q must not be a traversal path"
+	PkgValidateErrNoComponents            = "package does not contain any compatible components"
+	PkgValidateErrGitURLWithRef           = "git URL %q must not contain an embedded ref; use the ref field instead"
+	PkgValidateErrServiceRequiresInit     = "component %q declares service %q, but only ZarfInitConfig packages may declare services"
+	PkgValidateErrServiceNotUnique        = "service %q is declared by multiple components (%q, %q)"
+	PkgValidateErrFileChecksumAlgorithm   = "component %q file %q has unsupported checksum algorithm %q (expected sha256 or sha512)"
+	PkgValidateErrFileChecksumDigest      = "component %q file %q has an empty checksum digest"
+	PkgValidateErrImageConflictingSources = "image %q has conflicting sources %q and %q"
+	PkgValidateErrMapKeyLength            = "%s key %q exceeds the maximum length of %d characters"
+	PkgValidateErrAnnotationsSize         = "metadata.annotations exceeds the maximum total size of %d bytes"
+)
+
+// ValidationErrors contains all errors found during package validation.
+type ValidationErrors []error
+
+// Error returns the validation errors separated by newlines.
+func (errs ValidationErrors) Error() string {
+	var builder strings.Builder
+	for _, err := range errs {
+		if err == nil {
+			continue
+		}
+		if builder.Len() > 0 {
+			builder.WriteByte('\n')
+		}
+		builder.WriteString(err.Error())
+	}
+	return builder.String()
+}
+
+// Unwrap returns the individual validation errors.
+func (errs ValidationErrors) Unwrap() []error {
+	return errs
+}
+
+// ValidatePackage runs all validation checks on the package.
+func ValidatePackage(pkg v1beta1.Package) ValidationErrors {
+	var errs ValidationErrors
+	if len(pkg.Components) == 0 {
+		errs = append(errs, errors.New(PkgValidateErrNoComponents))
+	}
+	errs = append(errs, ValidateAnnotations(pkg.Metadata.Annotations)...)
+	errs = append(errs, validateMapKeys("documentation", pkg.Attachments)...)
+	errs = append(errs, validateMapKeys("build.registryOverrides", pkg.Build.RegistryOverrides)...)
+	for key := range pkg.Attachments {
+		if key == ".." {
+			errs = append(errs, fmt.Errorf(PkgValidateErrAttachmentsKeyTraversal, key))
+		} else if strings.ContainsAny(key, `/\`) {
+			errs = append(errs, fmt.Errorf(PkgValidateErrAttachmentsKeyPath, key))
+		}
+	}
+	uniqueComponentNames := make(map[string]bool)
+	serviceComponents := make(map[v1beta1.ServiceName]string)
+	seenSources := make(map[string]v1beta1.ImageSource)
+	for _, component := range pkg.Components {
+		if component.Service.Name != "" {
+			if pkg.Kind != v1beta1.ZarfInitConfig {
+				errs = append(errs, fmt.Errorf(PkgValidateErrServiceRequiresInit, component.Name, component.Service.Name))
+			}
+			if previous, exists := serviceComponents[component.Service.Name]; exists {
+				errs = append(errs, fmt.Errorf(PkgValidateErrServiceNotUnique, component.Service.Name, previous, component.Name))
+			} else {
+				serviceComponents[component.Service.Name] = component.Name
+			}
+		}
+		// ensure component name is unique
+		if _, ok := uniqueComponentNames[component.Name]; ok {
+			errs = append(errs, fmt.Errorf(PkgValidateErrComponentNameNotUnique, component.Name))
+		}
+		uniqueComponentNames[component.Name] = true
+		for _, image := range component.Images {
+			ref, err := transform.ParseImageRef(image.Name)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("invalid image %q: %w", image.Name, err))
+				continue
+			}
+			source := image.Source
+			if source == "" {
+				source = v1beta1.ImageSourceRegistry
+			}
+			if previous, exists := seenSources[ref.Reference]; exists {
+				if previous != source {
+					errs = append(errs, fmt.Errorf(PkgValidateErrImageConflictingSources, ref.Reference, previous, source))
+				}
+				continue
+			}
+			seenSources[ref.Reference] = source
+		}
+
+		errs = append(errs, ValidateComponent(component)...)
+	}
+
+	return errs
+}
+
+// ValidateAnnotations checks metadata annotation key lengths and total size.
+func ValidateAnnotations(annotations map[string]string) ValidationErrors {
+	errs := validateMapKeys("metadata.annotations", annotations)
+	var size int
+	for key, value := range annotations {
+		size += len(key) + len(value)
+	}
+	if size > maxAnnotationsSize {
+		errs = append(errs, fmt.Errorf(PkgValidateErrAnnotationsSize, maxAnnotationsSize))
+	}
+	return errs
+}
+
+func validateMapKeys(field string, entries map[string]string) ValidationErrors {
+	var errs ValidationErrors
+	for key := range entries {
+		if utf8.RuneCountInString(key) > maxMapKeyLength {
+			errs = append(errs, fmt.Errorf(PkgValidateErrMapKeyLength, field, key, maxMapKeyLength))
+		}
+	}
+	return errs
+}
+
+// ValidateComponent runs the component-local validation shared by packages and
+// standalone component configs. The component name is used in diagnostics.
+func ValidateComponent(component v1beta1.Component) ValidationErrors {
+	var errs ValidationErrors
+	for _, err := range ValidateImageIDs(component.ComponentSpec) {
+		errs = append(errs, fmt.Errorf("component %q: %w", component.Name, err))
+	}
+	for _, file := range component.Files {
+		algorithm, digest, hasPrefix := strings.Cut(file.Checksum, ":")
+		if !hasPrefix {
+			continue
+		}
+		if algorithm != string(api.ChecksumSHA256) && algorithm != string(api.ChecksumSHA512) {
+			errs = append(errs, fmt.Errorf(PkgValidateErrFileChecksumAlgorithm, component.Name, file.Source, algorithm))
+		} else if digest == "" {
+			errs = append(errs, fmt.Errorf(PkgValidateErrFileChecksumDigest, component.Name, file.Source))
+		}
+	}
+	for _, repository := range component.Repositories {
+		if err := validateGitURL(repository.URL); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	uniqueChartNames := make(map[string]bool)
+	for _, chart := range component.Charts {
+		// ensure chart name is unique
+		if _, ok := uniqueChartNames[chart.Name]; ok {
+			errs = append(errs, fmt.Errorf(PkgValidateErrChartNameNotUnique, chart.Name))
+		}
+		uniqueChartNames[chart.Name] = true
+		for _, chartErr := range validateChart(chart) {
+			errs = append(errs, fmt.Errorf(PkgValidateErrChart, chartErr))
+		}
+	}
+	uniqueManifestNames := make(map[string]bool)
+	for _, manifest := range component.Manifests {
+		// ensure manifest name is unique
+		if _, ok := uniqueManifestNames[manifest.Name]; ok {
+			errs = append(errs, fmt.Errorf(PkgValidateErrManifestNameNotUnique, manifest.Name))
+		}
+		uniqueManifestNames[manifest.Name] = true
+		for _, manifestErr := range validateManifest(manifest) {
+			errs = append(errs, fmt.Errorf(PkgValidateErrManifest, manifestErr))
+		}
+	}
+	for _, actionsErr := range validateActions(component.Actions) {
+		errs = append(errs, fmt.Errorf("%q: %w", component.Name, actionsErr))
+	}
+	return errs
+}
+
+// ValidateImageIDs checks that non-empty IDs are unique across all images in a component.
+// Import resolution checks authored definitions before merging; component validation
+// checks the resolved result so regular-image overrides remain allowed.
+func ValidateImageIDs(spec v1beta1.ComponentSpec) ValidationErrors {
+	var errs ValidationErrors
+	seen := make(map[string]string)
+	check := func(id, path string) {
+		if id == "" {
+			return
+		}
+		if previous, exists := seen[id]; exists {
+			errs = append(errs, fmt.Errorf("image ID %q is not unique (%s and %s)", id, previous, path))
+			return
+		}
+		seen[id] = path
+	}
+	for i, image := range spec.Images {
+		check(image.ID, fmt.Sprintf("images[%d]", i))
+	}
+	for i, archive := range spec.ImageArchives {
+		for j, image := range archive.Images {
+			check(image.ID, fmt.Sprintf("imageArchives[%d].images[%d]", i, j))
+		}
+	}
+	return errs
+}
+
+// validateActions validates the actions of a component.
+func validateActions(a v1beta1.ComponentActions) ValidationErrors {
+	var errs ValidationErrors
+
+	errs = append(errs, validateActionSet(a.OnCreate)...)
+
+	if hasSetValues(a.OnCreate) {
+		errs = append(errs, errors.New(PkgValidateErrActionSetValueOnDeploy))
+	}
+
+	if hasTemplating(a.OnCreate) {
+		errs = append(errs, errors.New(PkgValidateErrActionTemplateOnCreate))
+	}
+
+	errs = append(errs, validateActionSet(a.OnDeploy)...)
+	errs = append(errs, validateActionSet(a.OnRemove)...)
+
+	return errs
+}
+
+// hasSetValues returns true if any of the actions contain setValues.
+func hasSetValues(as v1beta1.ComponentActionSet) bool {
+	return slices.ContainsFunc(as.Before, hasActionSetValues) ||
+		slices.ContainsFunc(as.OnSuccess, hasActionSetValues) ||
+		slices.ContainsFunc(as.OnFailure, hasActionSetValues)
+}
+
+// hasTemplating returns true if any of the actions have templating enabled.
+func hasTemplating(as v1beta1.ComponentActionSet) bool {
+	return slices.ContainsFunc(as.Before, hasActionTemplating) ||
+		slices.ContainsFunc(as.OnSuccess, hasActionTemplating) ||
+		slices.ContainsFunc(as.OnFailure, hasActionTemplating)
+}
+
+func hasActionSetValues(action v1beta1.ComponentAction) bool {
+	return len(action.SetValues) > 0
+}
+
+func hasActionTemplating(action v1beta1.ComponentAction) bool {
+	return action.EnableTemplating
+}
+
+// validateActionSet runs all validation checks on component action sets.
+func validateActionSet(as v1beta1.ComponentActionSet) ValidationErrors {
+	var errs ValidationErrors
+	validate := func(actions []v1beta1.ComponentAction) {
+		for _, action := range actions {
+			for _, actionErr := range validateAction(action) {
+				errs = append(errs, fmt.Errorf(PkgValidateErrAction, actionErr))
+			}
+		}
+	}
+
+	validate(as.Before)
+	validate(as.OnFailure)
+	validate(as.OnSuccess)
+	return errs
+}
+
+// validateAction runs all validation checks on an action.
+func validateAction(action v1beta1.ComponentAction) ValidationErrors {
+	if action.Wait == nil {
+		return nil
+	}
+
+	var errs ValidationErrors
+
+	// Validate only cmd or wait, not both
+	if action.Cmd != "" {
+		errs = append(errs, fmt.Errorf(PkgValidateErrActionCmdWait, action.Cmd))
+	}
+
+	// Validate only cluster or network, not both
+	if action.Wait.Cluster != nil && action.Wait.Network != nil {
+		errs = append(errs, errors.New(PkgValidateErrActionClusterNetwork))
+	}
+
+	// Validate at least one of cluster or network
+	if action.Wait.Cluster == nil && action.Wait.Network == nil {
+		errs = append(errs, errors.New(PkgValidateErrActionClusterNetwork))
+	}
+
+	return errs
+}
+
+// validateReleaseName validates a release name against DNS 1035 spec, using chartName as fallback.
+// https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#rfc-1035-label-names
+func validateReleaseName(chartName, releaseName string) error {
+	// Fallback to chartName if releaseName is empty
+	// NOTE: Similar fallback mechanism happens in src/internal/packager/helm/chart.go:InstallOrUpgradeChart
+	if releaseName == "" {
+		releaseName = chartName
+	}
+
+	// Check if the final releaseName is empty and return an error if so
+	if releaseName == "" {
+		return errors.New(errChartReleaseNameEmpty)
+	}
+
+	// Validate the releaseName against DNS 1035 label spec
+	if errs := validation.IsDNS1035Label(releaseName); len(errs) > 0 {
+		return fmt.Errorf("invalid release name '%s': %s", releaseName, strings.Join(errs, "; "))
+	}
+
+	return nil
+}
+
+// validateChart runs all validation checks on a chart.
+func validateChart(chart v1beta1.Chart) ValidationErrors {
+	var errs ValidationErrors
+
+	sources := 0
+	for _, set := range []bool{chart.HelmRepository != nil, chart.Git != nil, chart.Local != nil, chart.OCI != nil} {
+		if set {
+			sources++
+		}
+	}
+	if sources != 1 {
+		errs = append(errs, fmt.Errorf(PkgValidateErrChartSource, chart.Name))
+	}
+	if chart.HelmRepository != nil {
+		if chart.HelmRepository.URL == "" {
+			errs = append(errs, fmt.Errorf("chart %q must include helmRepository.url", chart.Name))
+		}
+		if chart.HelmRepository.Version == "" {
+			errs = append(errs, fmt.Errorf("chart %q must include helmRepository.version", chart.Name))
+		}
+	}
+	if chart.Git != nil {
+		if chart.Git.URL == "" {
+			errs = append(errs, fmt.Errorf("chart %q must include git.url", chart.Name))
+		}
+		if chart.Git.Ref == (v1beta1.GitRef{}) {
+			errs = append(errs, fmt.Errorf("chart %q must include git.ref", chart.Name))
+		}
+	}
+	if chart.OCI != nil {
+		if chart.OCI.URL == "" {
+			errs = append(errs, fmt.Errorf("chart %q must include oci.url", chart.Name))
+		}
+		if chart.OCI.Ref == (v1beta1.OCIRef{}) {
+			errs = append(errs, fmt.Errorf("chart %q must include oci.ref", chart.Name))
+		}
+	}
+
+	if len(chart.Name) > ZarfMaxChartNameLength {
+		errs = append(errs, fmt.Errorf(PkgValidateErrChartName, chart.Name, ZarfMaxChartNameLength))
+	}
+
+	if chart.Namespace == "" {
+		errs = append(errs, fmt.Errorf(PkgValidateErrChartNamespaceMissing, chart.Name))
+	}
+
+	if nameErr := validateReleaseName(chart.Name, chart.ReleaseName); nameErr != nil {
+		errs = append(errs, nameErr)
+	}
+	if chart.Git != nil {
+		if err := validateGitURL(chart.Git.URL); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func validateGitURL(url string) error {
+	_, ref, err := transform.GitURLSplitRef(url)
+	if err == nil && ref != "" {
+		return fmt.Errorf(PkgValidateErrGitURLWithRef, url)
+	}
+	return nil
+}
+
+// validateManifest runs all validation checks on a manifest.
+func validateManifest(manifest v1beta1.Manifest) ValidationErrors {
+	var errs ValidationErrors
+
+	if len(manifest.Name) > ZarfMaxChartNameLength {
+		errs = append(errs, fmt.Errorf(PkgValidateErrManifestNameLength, manifest.Name, ZarfMaxChartNameLength))
+	}
+
+	if strings.ContainsAny(manifest.Name, `/\`) {
+		errs = append(errs, fmt.Errorf(PkgValidateErrManifestNamePath, manifest.Name))
+	}
+
+	if len(manifest.Files) < 1 && len(manifest.Kustomize.Files) < 1 {
+		errs = append(errs, fmt.Errorf(PkgValidateErrManifestFileOrKustomize, manifest.Name))
+	}
+
+	return errs
+}

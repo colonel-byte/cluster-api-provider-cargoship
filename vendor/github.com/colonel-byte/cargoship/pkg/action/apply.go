@@ -1,0 +1,231 @@
+// Copyright 2023 k0sctl authors
+// Copyright 2026 colonel-byte
+//
+// This file contains code derived from k0sctl:
+// https://github.com/k0sproject/k0sctl
+//
+// Modifications Copyright 2026 colonel-byte.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package action are various actions used by the package
+package action
+
+import (
+	"context"
+	"time"
+
+	"github.com/colonel-byte/cargoship/internal/clustercfg"
+	"github.com/colonel-byte/cargoship/pkg/phase"
+	"github.com/zarf-dev/zarf/src/pkg/logger"
+)
+
+// ApplyOptions struct
+type ApplyOptions struct {
+	// Manager is the phase manager
+	Manager *phase.Manager
+	// AllowDowngrade continues when a host already runs a version newer than the package,
+	// rather than refusing the run
+	AllowDowngrade bool
+	// NoDrain skips draining worker nodes
+	NoDrain bool
+	// ModifyHosts updates the /etc/hosts file with all the nodes in the cluster
+	ModifyHosts bool
+	// ModifyFirewall updates the firewall, firewalld, ufw, or nftables, on the nodes
+	ModifyFirewall bool
+	// WorkerConcurrent number of workers that will be installed or upgraded at a time, as a fixed
+	// count ("5") or a percentage of the batch ("25%")
+	WorkerConcurrent string
+	// UpdateKubeConfig whether to update the config
+	UpdateKubeConfig bool
+	// KubeConfigPath is the kubeconfig file to merge the admin creds into, the standard
+	// location when empty
+	KubeConfigPath string
+	// NoKubeConfigFile builds the admin credentials without merging them into the operator's
+	// kubeconfig, so that a caller can read them through KubeConfigBytes and nothing on the
+	// machine running the apply is changed.
+	//
+	// It is phrased as the negative for the reason KubeConfigOptions.NoWrite is: the zero value
+	// writes, which is what every caller before this field existed did. The OpenTofu provider is
+	// the caller that sets it -- an apply that merged credentials into ~/.kube/config as a side
+	// effect would be changing a machine the resource does not describe.
+	NoKubeConfigFile bool
+	// LabelNodes whether to check and add the node-role.kubernetes.io/<profile> label on nodes
+	LabelNodes bool
+	// AllowUnmanagedNodes lets an apply continue when the cluster holds a node no host in the
+	// config accounts for, rather than stopping on it
+	AllowUnmanagedNodes bool
+	// Keyring decrypts encrypted registry credentials, in either supported format
+	Keyring *clustercfg.Keyring
+}
+
+// Apply state logic
+type Apply struct {
+	ApplyOptions
+	Phases phase.Phases
+	// kubeconfig is the phase that builds the admin credentials, retained so KubeConfigBytes can
+	// read what it built.
+	kubeconfig *phase.KubeConfig
+}
+
+// NewApply an apply action object
+func NewApply(opts ApplyOptions) (*Apply, error) {
+	d, err := DistroModule(opts.Manager.DistroID)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.Manager.Concurrency < 0 {
+		opts.Manager.Concurrency = 0
+	}
+
+	kubeconfig := &phase.KubeConfig{
+		Distro:    d,
+		ClusterID: opts.Manager.Config.Metadata.Name,
+		Enabled:   opts.UpdateKubeConfig,
+		Write:     !opts.NoKubeConfigFile,
+		Path:      opts.KubeConfigPath,
+	}
+
+	lockPhase := &phase.Lock{}
+	return &Apply{
+		ApplyOptions: opts,
+		kubeconfig:   kubeconfig,
+		Phases: phase.Phases{
+			&phase.Connect{},
+
+			&phase.DetectOS{},
+			&phase.GatherFacts{},
+			&phase.ValidateHosts{},
+			&phase.GatherFactsDistro{
+				Distro:         d,
+				AllowDowngrade: opts.AllowDowngrade,
+			},
+			// Before anything is changed: an apply that is about to walk past a node the config
+			// no longer holds should say so while stopping is still free.
+			&phase.DetectRemovedHosts{
+				Distro:         d,
+				AllowUnmanaged: opts.AllowUnmanagedNodes,
+			},
+			// The lock goes after every read-only phase and before every phase that changes a
+			// host, so that the checks above report without having written to anything. It used
+			// to sit directly after DetectOS, which meant a refused downgrade or a leftover node
+			// had already put a lock file on every host in the config. Nothing between here and
+			// Connect needs the lock, and the cost of moving it is a short unlocked window during
+			// fact gathering: two concurrent runs can both gather facts, and the second then
+			// fails here instead of earlier.
+			lockPhase,
+			&phase.PrepareHosts{},
+			&phase.PrepareSelinux{},
+			&phase.PrepareFapolicy{},
+			&phase.PrepareSelinuxPolicy{},
+			&phase.ModifyHosts{
+				Enabled: opts.ModifyHosts,
+			},
+			&phase.ConfigureFirewall{
+				Distro:  d,
+				Enabled: opts.ModifyFirewall,
+			},
+
+			&phase.UploadFiles{},
+			&phase.RPMUploadFiles{},
+			&phase.APTUploadFiles{},
+			&phase.BINUploadFiles{
+				Distro: d,
+			},
+			&phase.ImportImages{
+				Distro: d,
+			},
+
+			&phase.ConfigureEngine{
+				Distro:  d,
+				Keyring: opts.Keyring,
+			},
+			&phase.InitializeControllers{
+				Distro: d,
+			},
+			&phase.ApplyManifests{
+				Distro: d,
+			},
+			&phase.InitializeWorkers{
+				Distro:           d,
+				WorkerConcurrent: opts.WorkerConcurrent,
+			},
+			&phase.UpgradeController{
+				UpgradeHosts: phase.UpgradeHosts{
+					Distro: d,
+				},
+			},
+			&phase.UpgradeWorkers{
+				UpgradeHosts: phase.UpgradeHosts{
+					Distro: d,
+				},
+				WorkerConcurrent: opts.WorkerConcurrent,
+			},
+			// After the upgrade phases, so a host either of them claimed has already had its
+			// install run; this is only for a host neither acts on. See InstallStagedFiles.
+			&phase.InstallStagedFiles{},
+
+			&phase.EngineConfigSyncController{
+				EngineConfigSyncHosts: phase.EngineConfigSyncHosts{
+					Distro:  d,
+					Keyring: opts.Keyring,
+				},
+			},
+			&phase.EngineConfigSyncWorker{
+				EngineConfigSyncHosts: phase.EngineConfigSyncHosts{
+					Distro:  d,
+					Keyring: opts.Keyring,
+				},
+				WorkerConcurrent: opts.WorkerConcurrent,
+			},
+			kubeconfig,
+			&phase.LabelNodes{
+				Distro:  d,
+				Enabled: opts.LabelNodes,
+			},
+
+			lockPhase.UnlockPhase(),
+			&phase.Disconnect{},
+		},
+	}, nil
+}
+
+// KubeConfigBytes is the cluster's admin credentials, serialized, as the run built them.
+//
+// It is read after Run, and only means anything for a run that enabled UpdateKubeConfig: the phase
+// is skipped otherwise and there is nothing to return. What comes back is cluster-admin, so a
+// caller holding it is holding the cluster.
+func (a Apply) KubeConfigBytes() ([]byte, error) {
+	if a.kubeconfig == nil {
+		return nil, phase.ErrNoKubeConfig
+	}
+	return a.kubeconfig.Bytes()
+}
+
+// Run the actions
+func (a Apply) Run(ctx context.Context) error {
+	l := logger.From(ctx)
+	start := time.Now()
+	a.Manager.SetPhases(a.Phases)
+
+	if result := a.Manager.Run(ctx); result != nil {
+		l.Info("apply failed", "error", result)
+		return result
+	}
+
+	duration := time.Since(start).Truncate(time.Second)
+	l.Info("finished in", "duration", duration)
+
+	return nil
+}

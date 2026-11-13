@@ -1,0 +1,27 @@
+# Everything a generator writes is marked linguist-generated, which collapses it in a GitHub
+# diff and keeps it out of the repository's language statistics. A generated file that is not
+# marked shows up as hand-written work in every review, and a regenerated thousand-line CRD
+# buries the twenty lines that were actually written.
+#
+# Grouped by the target that writes them, so this file reads as a list of what each generator
+# owns. Check a specific file rather than reasoning about the patterns:
+#
+#   git check-attr linguist-generated -- controlplane/api/v1alpha1/zz_generated.deepcopy.go
+
+# `go mod vendor`
+vendor/** linguist-vendored
+
+# `make generate-deepcopy` (controller-gen object)
+**/zz_generated.deepcopy.go linguist-generated
+
+# `make manifests` (controller-gen crd)
+bootstrap/config/crd/bases/*.yaml linguist-generated
+controlplane/config/crd/bases/*.yaml linguist-generated
+
+# `make manifests` (controller-gen rbac). Only role.yaml: the other five files in each rbac
+# directory are hand-written and must stay unmarked.
+bootstrap/config/rbac/role.yaml linguist-generated
+controlplane/config/rbac/role.yaml linguist-generated
+
+# release-please
+CHANGELOG.md linguist-generated
