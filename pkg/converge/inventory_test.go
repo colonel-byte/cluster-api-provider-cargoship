@@ -365,3 +365,37 @@ func TestDecodeClusterConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildInventoryLeavesOutMachinesBeingDeleted(t *testing.T) {
+	t.Parallel()
+
+	departing := machine("fleet-cp-1", true, "", internal("10.0.0.12"))
+	now := metav1.Now()
+	departing.DeletionTimestamp = &now
+	departing.Finalizers = []string{"test"}
+
+	inv, err := BuildInventory(Input{
+		ClusterName: "fleet",
+		Endpoint:    "10.0.0.11",
+		SSH:         SSHParams{User: "rocky", PrivateKey: testKey(t)},
+		Machines: []*clusterv1.Machine{
+			machine("fleet-cp-0", true, "", internal("10.0.0.11")),
+			departing,
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildInventory: %v", err)
+	}
+
+	// This is what the pre-terminate hook window is for: the converge that runs while Cluster API
+	// holds the instance has to rewrite the survivors' /etc/hosts and firewall rules from a host
+	// list the departing machine is not in.
+	if len(inv.Hosts) != 1 || inv.Hosts[0].Address != "10.0.0.11" {
+		t.Fatalf("built %d hosts %v, want only the surviving machine", len(inv.Hosts), inv.Hosts)
+	}
+	// Skipped means "no address yet", which comes right on its own. A machine being deleted does
+	// not, and reporting it there would read as a fleet still waiting on its infrastructure.
+	if len(inv.Skipped) != 0 {
+		t.Errorf("Skipped = %v, want empty", inv.Skipped)
+	}
+}

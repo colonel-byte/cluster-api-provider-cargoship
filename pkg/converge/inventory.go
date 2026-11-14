@@ -149,6 +149,16 @@ func BuildInventory(in Input) (*Inventory, error) {
 	inv.Cluster.Spec.Config.LoadBalancer = in.Endpoint
 
 	for _, m := range machines {
+		// A machine being deleted is left out, which is the whole point of the pre-terminate
+		// hook: Cluster API holds the instance while this converge rewrites the survivors'
+		// /etc/hosts and firewall rules, and it can only rewrite them without the departing
+		// host if the departing host is absent from the inventory. Not recorded in Skipped --
+		// that is "has no address yet", a state that comes right on its own, and this one does
+		// not.
+		if !m.DeletionTimestamp.IsZero() {
+			continue
+		}
+
 		address := pickAddress(m, order)
 		if address == "" {
 			inv.Skipped = append(inv.Skipped, m.Name)
