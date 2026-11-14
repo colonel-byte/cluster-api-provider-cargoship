@@ -143,6 +143,19 @@ release-manifests: manifests ## Render the component manifests clusterctl instal
 	$(KUSTOMIZE) build controlplane/config/default > $(RELEASE_DIR)/control-plane-components.yaml
 	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
 
+.PHONY: oci-artifact
+oci-artifact: release-manifests ## Pack the component manifests into an OCI artifact for the Cluster API Operator.
+	# The third way the operator can install a provider, after a release page and ConfigMaps, and
+	# the one an air gap with a registry wants. A layout directory rather than a push: the registry
+	# this is destined for is usually on the other side of the air gap from the machine that builds
+	# it, so filling it is `oras cp --from-oci-layout` on the inside. See
+	# docs/guides/rancher-turtles.md.
+	$(MAGE) generate:ociArtifact $(RELEASE_DIR) $(TAG)
+	# Tarred from inside the layout rather than from above it: `--from-oci-layout` on a tar looks
+	# for oci-layout and index.json at the root of the archive, and a one-directory prefix makes it
+	# report the layout as invalid.
+	tar -C $(RELEASE_DIR)/oci -cf $(RELEASE_DIR)/cargoship-capi-providers-$(TAG).oci.tar .
+
 # The version the Zarf package pins, read back out of zarf.yaml so that `make zarf-package`
 # builds the component manifests at the tag the package's images already name. Overriding TAG
 # here would produce a package whose manifests and images disagree, which is why the target
