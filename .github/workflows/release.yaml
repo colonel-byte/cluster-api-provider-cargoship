@@ -59,8 +59,8 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASS }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_KEY }}
 
       # The three files clusterctl fetches by name. Checked rather than assumed, because a
       # release missing one of them fails at `clusterctl init` time with a 404 that names a URL
