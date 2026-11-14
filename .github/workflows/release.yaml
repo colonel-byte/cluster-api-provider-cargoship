@@ -89,12 +89,32 @@ jobs:
         with:
           subject-checksums: ./dist/digest.txt
 
+      # The AI-usage disclosure, stamped with this release's version, commit and build time. It is
+      # a per-release snapshot of what .github/ai-bom.json claims rather than a list of anything
+      # in the release, which is why it is rendered here and not built by goreleaser.
+      - name: Render AI-BOM
+        run: |
+          jq \
+            --arg version "${GITHUB_REF_NAME}" \
+            --arg commit "${GITHUB_SHA}" \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '.subject.version = $version | .subject.commit = $commit | .generatedAt = $generatedAt' \
+            .github/ai-bom.json > dist/ai-bom.json
+
+      - name: Attest AI-BOM
+        id: attest-ai-bom
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/ai-bom.json
+
       - name: Publish provenance with the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp "${{ steps.attest-artifacts.outputs.bundle-path }}" provider_artifacts.intoto.jsonl
           cp "${{ steps.attest-images.outputs.bundle-path }}" provider_images.intoto.jsonl
+          cp "${{ steps.attest-ai-bom.outputs.bundle-path }}" provider_ai-bom.intoto.jsonl
 
           gh release upload "${GITHUB_REF_NAME}" \
-            provider_artifacts.intoto.jsonl provider_images.intoto.jsonl --clobber
+            provider_artifacts.intoto.jsonl provider_images.intoto.jsonl \
+            provider_ai-bom.intoto.jsonl dist/ai-bom.json --clobber
