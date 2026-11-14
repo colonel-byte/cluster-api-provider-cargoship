@@ -1,0 +1,38 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended"
+  ],
+  dependencyDashboard: {
+    "enabled": true,
+    "autoclose": false,
+    "title": "Dependency Dashboard",
+    "header": "This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.",
+    "osvVulnerabilitySummary": "none",
+    "reportAbandonment": true,
+    "pinned": true,
+    "customize": {}
+  },
+  // Only the Zarf release is tracked. Action digests, Go modules and the images zarf.yaml names
+  // are each pinned by something else in this repository - release-please rewrites the package
+  // version, and the digest comments beside `uses:` are updated by hand - so widening this
+  // config would open pull requests nothing is ready to merge.
+  enabledManagers: [
+    "custom.regex"
+  ],
+  customManagers: [
+    {
+      customType: "regex",
+      description: [
+        "The Zarf release `zarf package create` runs at, annotated at its setup-zarf version input"
+      ],
+      managerFilePatterns: [
+        "/(^|/)\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      matchStrings: [
+        "(?m:# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?\\n\\s+version: (?<currentValue>\\S+)$)"
+      ],
+      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    }
+  ]
+}
