@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.3...v0.2.0) (2026-11-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* drive both reconcilers against a real api server ([#26](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/26))
+
+### Documentation
+
+* add a guide for wiring rancher turtles to this provider ([#10](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/10)) ([e449e62](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e449e62c42de406cbe93e15391551322c4d28fd2))
+
+
+### Tests
+
+* drive both reconcilers against a real api server ([#26](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/26)) ([475a4b3](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/475a4b33fe3f63659ffbeb0a6f9d4eb903d85599))
+
+
+### Build
+
+* add a zarf v1beta1 package for air-gapped installs ([#9](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/9)) ([0dc8633](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0dc8633c13cc04f7553fdcc4487bb526b179a088))
+* **deps:** bump controller-tools to 0.23.0, watch the kustomize hold ([#32](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/32)) ([e71a3fd](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e71a3fd088ca50ac3d5ab52f3c2ea26473aea3f8))
+
 ## [0.1.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.2...v0.1.3) (2026-11-14)
 
 
