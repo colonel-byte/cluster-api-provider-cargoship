@@ -12,6 +12,8 @@ atomicgo.dev/keyboard/keys
 # atomicgo.dev/schedule v0.1.0
 ## explicit; go 1.18
 atomicgo.dev/schedule
+# cloud.google.com/go/auth/oauth2adapt v0.3.1
+## explicit; go 1.26.0
 # dario.cat/mergo v1.0.2
 ## explicit; go 1.13
 dario.cat/mergo
@@ -109,6 +111,9 @@ github.com/ProtonMail/go-crypto/openpgp/x448
 # github.com/STARRY-S/zip v0.2.3
 ## explicit; go 1.23
 github.com/STARRY-S/zip
+# github.com/agnivade/levenshtein v1.2.1
+## explicit; go 1.21
+github.com/agnivade/levenshtein
 # github.com/andybalholm/brotli v1.3.0
 ## explicit; go 1.22
 github.com/andybalholm/brotli
@@ -638,6 +643,10 @@ github.com/google/go-containerregistry/pkg/v1/types
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
+# github.com/googleapis/enterprise-certificate-proxy v0.3.24
+## explicit; go 1.25.0
+# github.com/googleapis/gax-go/v2 v2.27.0
+## explicit; go 1.26.0
 # github.com/grpc-ecosystem/grpc-gateway/v2 v2.33.0
 ## explicit; go 1.26.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
@@ -1183,7 +1192,7 @@ github.com/xlab/treeprint
 # github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 ## explicit; go 1.17
 github.com/youmark/pkcs8
-# github.com/zarf-dev/zarf v0.89.0
+# github.com/zarf-dev/zarf v1.0.0
 ## explicit; go 1.26.10
 github.com/zarf-dev/zarf/src/api
 github.com/zarf-dev/zarf/src/api/convert
@@ -1203,6 +1212,7 @@ github.com/zarf-dev/zarf/src/pkg/message
 github.com/zarf-dev/zarf/src/pkg/oci
 github.com/zarf-dev/zarf/src/pkg/oci/cache
 github.com/zarf-dev/zarf/src/pkg/ocischeme
+github.com/zarf-dev/zarf/src/pkg/packager/filters
 github.com/zarf-dev/zarf/src/pkg/pki
 github.com/zarf-dev/zarf/src/pkg/state
 github.com/zarf-dev/zarf/src/pkg/template
@@ -1396,6 +1406,8 @@ golang.org/x/tools/internal/versions
 # gomodules.xyz/jsonpatch/v2 v2.5.0
 ## explicit; go 1.20
 gomodules.xyz/jsonpatch/v2
+# google.golang.org/genproto v0.0.0-20261012220534-4341edf3f941
+## explicit; go 1.26.0
 # google.golang.org/genproto/googleapis/api v0.0.0-20261026165753-2ffab32bce7e
 ## explicit; go 1.26.0
 google.golang.org/genproto/googleapis/api
