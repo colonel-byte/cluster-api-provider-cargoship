@@ -1,0 +1,584 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title></title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="docs/css/root-2b369fa7.css">
+        <link rel="stylesheet" href="docs/css/print-69d0807c.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-c57c642b.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-8fec7eb9.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title"></h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/tree/main" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="cluster-api-provider-cargoship"><a class="header" href="#cluster-api-provider-cargoship">cluster-api-provider-cargoship</a></h1>
+<p>A Cluster API bootstrap and control-plane provider that stands up Kubernetes with <a href="https://github.com/colonel-byte/cargoship">cargoship</a> instead of kubeadm.</p>
+<p>Cargoship builds offline K3s, RKE2 and upstream Kubernetes packages and installs them over SSH from a management node. This provider does the same thing from a management <em>cluster</em>: it creates the <code>Machine</code> objects, waits for an infrastructure provider to give them addresses, and then converges the whole fleet - control plane and workers together - with one <code>cargoship apply</code>. Rancher Turtles imports the result like any other Cluster API cluster, with no cargoship-specific configuration on the Turtles side.</p>
+<h2 id="why-not-a-timer"><a class="header" href="#why-not-a-timer">Why not a timer</a></h2>
+<p>Every infrastructure provider takes its own unpredictable time to produce a machine with an address, and the Kubernetes API then takes its own unpredictable time after that. A design with a timeout in it is wrong for at least one provider.</p>
+<p>There are no timers here. Cargoship’s <code>apply</code> is a converge rather than an install - each phase decides per host whether it has anything to do - so every reconcile rebuilds the host list from <strong>whatever machines currently have an address</strong>, converges those, and lets the next reconcile pick up the ones that arrived late. A machine that boots in 40 seconds and one that boots in 11 minutes take the same code path, and nothing anywhere gives up because something took too long.</p>
+<p>The one long operation is the cargoship apply itself, which walks every host over SSH and takes minutes. It cannot be suspended and resumed, so the reconcile does not call it directly: it starts at most one converge per cluster and the reconciles that follow observe the one that is running. Everything else - an address appearing, SSH beginning to answer, the API server beginning to answer - is an ordinary requeue.</p>
+<h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
+<pre><code class="language-sh">clusterctl init \
+  --infrastructure vsphere \
+  --bootstrap cargoship \
+  --control-plane cargoship
+</code></pre>
+<p><code>clusterctl</code> needs to know where the provider lives until it is in the built-in list. Add this to <code>~/.config/cluster-api/clusterctl.yaml</code>:</p>
+<pre><code class="language-yaml">providers:
+  - name: cargoship
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/bootstrap-components.yaml
+    type: BootstrapProvider
+  - name: cargoship
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/control-plane-components.yaml
+    type: ControlPlaneProvider
+</code></pre>
+<h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
+<p>The SSH key the controller connects with, and the only secret this provider needs:</p>
+<pre><code class="language-sh">ssh-keygen -t ed25519 -N '' -f cluster-key
+kubectl create secret generic fleet-ssh \
+  --type=kubernetes.io/ssh-auth \
+  --from-file=ssh-privatekey=cluster-key
+</code></pre>
+<p>The key is read into memory and handed to the SSH client as an auth method. It is never written to the controller’s filesystem - the bootstrap provider derives the public half from the same secret and authorizes it on every machine, so there is no second key to keep in step.</p>
+<p>A control plane:</p>
+<pre><code class="language-yaml">apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+kind: CargoshipControlPlane
+metadata:
+  name: fleet
+spec:
+  replicas: 3
+  version: v1.34.1
+  distro:
+    # Pin to a digest. A tag that is republished underneath a running cluster is not picked up;
+    # see docs/agent/choice-distro-pinning.md.
+    ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
+    arch: amd64
+  ssh:
+    user: rocky
+    privateKeySecretRef:
+      name: fleet-ssh
+  machineTemplate:
+    spec:
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: VSphereMachineTemplate
+        name: fleet-cp
+  clusterConfig:
+    # cargoship's own spec.config, verbatim: registries, profiles, values.
+    values:
+      cni: cilium
+    profiles:
+      gpu:
+        engine:
+          labels:
+            nvidia.com/gpu: "true"
+  apply:
+    modifyHosts: true
+    modifyFirewall: true
+    labelNodes: true
+</code></pre>
+<p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together.</p>
+<h2 id="how-it-differs-from-kubeadmcontrolplane"><a class="header" href="#how-it-differs-from-kubeadmcontrolplane">How it differs from KubeadmControlPlane</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>KubeadmControlPlane</th><th>CargoshipControlPlane</th></tr>
+</thead>
+<tbody>
+<tr><td>Install mechanism</td><td>cloud-init on each machine</td><td>SSH from the management cluster</td></tr>
+<tr><td>Bootstrap data</td><td>the whole install</td><td>an authorized key, so cargoship can connect</td></tr>
+<tr><td>Scope</td><td>control-plane machines</td><td>the whole fleet, in one converge</td></tr>
+<tr><td>Worker joins</td><td>a separate bootstrap provider per machine</td><td>the same converge</td></tr>
+<tr><td>Node removal</td><td>drain and delete</td><td>drain, delete, then re-converge the survivors</td></tr>
+</tbody>
+</table>
+</div>
+<p>The scope row is the real difference and the reason for the design: a cargoship fleet shares an <code>/etc/hosts</code> file and a firewall across every host, so two uncoordinated SSH walks over it would fight. See <a href="#the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines"><code>docs/agent/choice-one-converge.md</code></a>.</p>
+<p>The node-removal row is the second. A machine Cluster API is destroying needs no <code>cargoship reset</code> - but the machines that remain need their <code>/etc/hosts</code> and firewall rules rewritten without it, and a departing control-plane member needs to leave etcd first. Both are handled with a Cluster API pre-terminate hook: Cluster API drains the node and deletes the <code>Node</code> object, then blocks the infrastructure provider from destroying the instance until the controller releases the hook. The controller converges the survivors in that window and then lets the instance go.</p>
+<h2 id="not-yet-supported"><a class="header" href="#not-yet-supported">Not yet supported</a></h2>
+<p>Stated plainly, because each of these is a thing an operator will reach for:</p>
+<ul>
+<li><strong>No rollout or in-place upgrade.</strong> Scale up and scale down only. A change to <code>spec.version</code> is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.</li>
+<li><strong>No tag-to-digest resolution.</strong> A republished tag is not noticed. Pin the reference.</li>
+<li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
+<li><strong>No mTLS to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> - but the pull presents no client certificate of its own.</li>
+<li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
+</ul>
+<h2 id="development"><a class="header" href="#development">Development</a></h2>
+<pre><code class="language-sh">make generate         # CRDs, RBAC and deepcopy functions
+make test             # unit tests, with the race detector
+make verify           # fail if a generator would change a checked-in file
+make release-manifests  # the three files clusterctl downloads
+</code></pre>
+<p>The repository vendors its dependencies, so everything above works with no network access. See <a href="#end-to-end-tests"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p>Apache 2.0. See <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE"><code>LICENSE</code></a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installing-the-provider"><a class="header" href="#installing-the-provider">Installing the provider</a></h1>
+<h2 id="register-it-with-clusterctl"><a class="header" href="#register-it-with-clusterctl">Register it with clusterctl</a></h2>
+<p>Until the provider is in <code>clusterctl</code>’s built-in list, point it at the releases. Add this to <code>~/.config/cluster-api/clusterctl.yaml</code>:</p>
+<pre><code class="language-yaml">providers:
+  - name: cargoship
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/bootstrap-components.yaml
+    type: BootstrapProvider
+  - name: cargoship
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/control-plane-components.yaml
+    type: ControlPlaneProvider
+</code></pre>
+<p>Both providers come from one repository and one tag, so they are always version-matched.</p>
+<h2 id="install"><a class="header" href="#install">Install</a></h2>
+<pre><code class="language-sh">clusterctl init \
+  --infrastructure vsphere \
+  --bootstrap cargoship \
+  --control-plane cargoship
+</code></pre>
+<p>This installs two controller deployments, into <code>cargoship-bootstrap-system</code> and <code>cargoship-controlplane-system</code>.</p>
+<h2 id="the-ssh-key"><a class="header" href="#the-ssh-key">The SSH key</a></h2>
+<p>The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.</p>
+<pre><code class="language-sh">ssh-keygen -t ed25519 -N '' -f cluster-key
+kubectl create secret generic fleet-ssh \
+  --namespace default \
+  --type=kubernetes.io/ssh-auth \
+  --from-file=ssh-privatekey=cluster-key
+rm cluster-key
+</code></pre>
+<p>The secret must be in the same namespace as the <code>CargoshipControlPlane</code>. The key must not have a passphrase: there is no terminal in a controller to supply one, and an encrypted key is refused rather than prompted for.</p>
+<p>The public half is <strong>derived</strong> from this secret by the bootstrap provider and authorized on every machine, so there is no second key to keep in step. Delete <code>cluster-key.pub</code> too; it is not used.</p>
+<h2 id="storage-for-the-control-plane-controller"><a class="header" href="#storage-for-the-control-plane-controller">Storage for the control-plane controller</a></h2>
+<p>The control-plane controller pulls and extracts cargoship distro packages, so it needs writable storage. Where that registry wants credentials or serves its own certificate, see <a href="#pulling-the-distro-package-from-a-zarf-registry">pulling the distro package from a Zarf registry</a>. The shipped manifest mounts an <code>emptyDir</code> with a 20 GiB limit at <code>/var/lib/cargoship</code>.</p>
+<p>One extracted package is as large as the package, so <strong>raise the limit to suit the packages in use</strong> - an <code>emptyDir</code> that fills takes the node’s filesystem with it. Replace it with a <code>persistentVolumeClaim</code> where the registry is far away: the blob cache survives a restart, which is the expensive part to lose.</p>
+<p>Note what the cache does and does not save. It saves the <em>fetch</em>. The package is extracted once per converge either way.</p>
+<h2 id="checking-it-is-up"><a class="header" href="#checking-it-is-up">Checking it is up</a></h2>
+<pre><code class="language-sh">kubectl -n cargoship-controlplane-system logs deploy/cargoship-controlplane-controller-manager
+kubectl -n cargoship-bootstrap-system logs deploy/cargoship-bootstrap-controller-manager
+</code></pre>
+<p>A healthy control-plane controller logs the cache and temp paths it resolved at startup. If it exited instead, those paths are the reason: it refuses to start rather than fall back to a default that would put the cache on the pod’s writable layer.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="node-removal-and-the-pre-terminate-hook"><a class="header" href="#node-removal-and-the-pre-terminate-hook">Node removal and the pre-terminate hook</a></h1>
+<p>A machine Cluster API is destroying needs no <code>cargoship reset</code> - the instance is going, so uninstalling software from it is work for nothing. But two things do need to happen, and neither is automatic:</p>
+<ol>
+<li><strong>The surviving hosts’ <code>/etc/hosts</code> and firewall rules still name the departing machine.</strong> Cargoship’s <code>ModifyHosts</code> and <code>ConfigureFirewall</code> phases write per-host state derived from the whole inventory, so they have to run again with the departing host absent.</li>
+<li><strong>A departing control-plane member has to leave etcd</strong> before its instance disappears, or the cluster loses a voter without being told.</li>
+</ol>
+<p>Both are handled with a Cluster API <strong>pre-terminate hook</strong>.</p>
+<h2 id="what-the-hook-does"><a class="header" href="#what-the-hook-does">What the hook does</a></h2>
+<p>The controller puts <code>pre-terminate.delete.hook.machine.cluster.x-k8s.io/cargoship</code> on every machine it creates, at creation time. <code>ensurePreTerminateHooks</code> adds it to any machine missing it - one adopted from elsewhere, or created by an older version of the controller.</p>
+<p>When a machine is deleted, Cluster API:</p>
+<ol>
+<li>Cordons and drains the node.</li>
+<li>Deletes the <code>Node</code> object.</li>
+<li><strong>Stops</strong>, and waits for every <code>pre-terminate.delete.hook...</code> annotation to be removed before letting the infrastructure provider destroy the instance.</li>
+</ol>
+<p>The controller uses that window. Its next reconcile builds the inventory from the machines that remain - the departing one has no <code>Node</code> and is being deleted, so it is simply not in the list - converges them, and only then removes the annotation.</p>
+<p>The annotation has to be claimed <strong>at creation</strong>, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.</p>
+<h2 id="why-this-also-keeps-a-safety-check-working"><a class="header" href="#why-this-also-keeps-a-safety-check-working">Why this also keeps a safety check working</a></h2>
+<p><code>phase.DetectRemovedHosts</code> stops an apply when the cluster holds a <code>Node</code> that no host in the inventory accounts for. That check is worth keeping - a genuinely stray node is worth stopping on - and the provider runs with <code>AllowUnmanagedNodes: false</code> so it is live.</p>
+<p>The reason it does not fire during an ordinary scale-down is step 2 above: Cluster API deletes the <code>Node</code> object <em>before</em> the hook is consulted. By the time the controller’s converge runs, there is nothing unaccounted for.</p>
+<p><strong>If <code>DetectRemovedHosts</code> starts failing during a normal scale-down, the hook is not working.</strong> Do not reach for an option to silence the check - find out why the annotation is missing or why it was released early.</p>
+<h2 id="deleting-the-whole-control-plane"><a class="header" href="#deleting-the-whole-control-plane">Deleting the whole control plane</a></h2>
+<p><code>reconcileDelete</code> releases every hook and deletes every machine without converging anything. There are no survivors whose <code>/etc/hosts</code> needs correcting, and any converge still walking the fleet is cancelled so it does not hold SSH sessions open against hosts being destroyed.</p>
+<h2 id="the-one-thing-to-verify"><a class="header" href="#the-one-thing-to-verify">The one thing to verify</a></h2>
+<p>Whether k3s and RKE2 remove the etcd member on <code>Node</code> deletion. Both document that they do, through their own etcd controllers, and the ordering above gives them the chance to: the <code>Node</code> is deleted while the instance is still running and the etcd process is still up.</p>
+<p>If either turns out not to, the hook is the right place to add an explicit member removal - which is a reason to have the hook even if the answer is yes.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="pulling-the-distro-package-from-a-zarf-registry"><a class="header" href="#pulling-the-distro-package-from-a-zarf-registry">Pulling the distro package from a Zarf registry</a></h1>
+<p>The control-plane controller pulls <code>spec.distro.ociRef</code> itself, from inside the management cluster, every time it converges a fleet. A Zarf registry is the usual place for that package in an air gap, and it is the awkward one: it wants credentials, and it serves a certificate nothing in the controller trusts. Both are handled on the <code>CargoshipControlPlane</code>.</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    ociRef: oci://zarf-docker-registry.zarf.svc.cluster.local:5000/example/k3s@sha256:1f5c...
+    pullSecretRef:
+      name: zarf-registry
+    caBundleSecretRef:
+      name: zarf-registry-ca
+</code></pre>
+<h2 id="the-credentials"><a class="header" href="#the-credentials">The credentials</a></h2>
+<p>A <code>kubernetes.io/dockerconfigjson</code> secret, in the same namespace as the <code>CargoshipControlPlane</code> - the controller reads it from there and nowhere else. Zarf’s pull-only user is <code>zarf-pull</code>, and its password comes out of the cluster rather than out of a notebook:</p>
+<pre><code class="language-sh">kubectl create secret docker-registry zarf-registry \
+  --namespace default \
+  --docker-server=zarf-docker-registry.zarf.svc.cluster.local:5000 \
+  --docker-username=zarf-pull \
+  --docker-password="$(zarf tools get-creds registry-readonly)"
+</code></pre>
+<p><strong><code>--docker-server</code> must match the registry in <code>ociRef</code> exactly</strong>, port included. The credential store is keyed by that string, so <code>zarf-docker-registry.zarf.svc.cluster.local:5000</code> and <code>zarf-docker-registry.zarf.svc.cluster.local</code> are two different registries as far as the pull is concerned, and the second one has no credentials.</p>
+<p>The controller merges the secret’s registries into a Docker config file on its cache volume, because that file is the only thing the pull reads credentials from - there is no in-process credential hook to use instead. One file is shared by every <code>CargoshipControlPlane</code> and merged per registry, so two clusters pulling from two registries coexist; two naming the same registry with different credentials do not, and the last converge to start wins. See <a href="#registry-credentials-are-written-to-a-file-and-the-ssh-key-is-not">the decision record</a>.</p>
+<p>A pull secret that is missing, or is not a <code>dockerconfigjson</code> secret, fails the reconcile rather than quietly falling back to anonymous access. <code>kubectl describe cargoshipcontrolplane</code> reports it on the <code>Converged</code> condition with the reason <code>PullSecretUnusable</code>.</p>
+<h2 id="the-certificate"><a class="header" href="#the-certificate">The certificate</a></h2>
+<p>The registry serves a certificate nothing public signed, so hand the controller the CA that signed it. Where that CA comes from depends on how the registry was stood up - Zarf generates one when it manages the registry’s TLS, and an external registry has whatever PKI issued it - but it reaches the controller the same way either way, in a secret’s <code>ca.crt</code> key:</p>
+<pre><code class="language-sh">kubectl create secret generic zarf-registry-ca \
+  --namespace default \
+  --from-file=ca.crt=registry-ca.crt
+</code></pre>
+<pre><code class="language-yaml">spec:
+  distro:
+    caBundleSecretRef:
+      name: zarf-registry-ca
+</code></pre>
+<p>Three things about it:</p>
+<ul>
+<li><strong>The key must be <code>ca.crt</code></strong>, and the value must be one or more PEM certificates. Any other key is rejected on the <code>Converged</code> condition with the reason <code>CABundleUnusable</code>, rather than falling back to the public roots and failing the pull minutes later with <code>certificate signed by unknown authority</code>.</li>
+<li><strong>It is trusted in addition to the controller’s own roots</strong>, not instead of them. A cluster pulling its distro package from a private registry still reaches anything publicly signed.</li>
+<li><strong>The secret lives in the <code>CargoshipControlPlane</code>’s namespace</strong>, like the pull secret and the SSH key.</li>
+</ul>
+<p><code>insecureSkipTLSVerify: true</code> is the other option, and it is a different thing: it accepts whatever certificate the registry presents without checking it. Reach for it to prove a registry is otherwise reachable, not to run a fleet. It covers the package pull only - the SSH connections and the workload cluster’s API server are not affected by either field.</p>
+<p>What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with <code>mtlsStrategy</code> set to anything requiring one cannot be pulled from by this controller.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
+<p>The unit tests cover everything that can be covered without a fleet: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
+<pre><code class="language-sh">make test
+</code></pre>
+<p>An end-to-end test needs something a converge can actually SSH into, and that is the constraint that shapes the whole suite.</p>
+<h2 id="why-not-the-docker-infrastructure-provider"><a class="header" href="#why-not-the-docker-infrastructure-provider">Why not the Docker infrastructure provider</a></h2>
+<p>The obvious choice for a provider’s e2e suite is CAPD - Cluster API’s Docker provider - because it needs nothing but Docker. <strong>It cannot be used here.</strong> CAPD machines are containers running a kubelet; they run no sshd. Cargoship’s first phase is <code>Connect</code>, and there is nothing to connect to.</p>
+<p>This is worth stating because every other provider’s e2e documentation points at CAPD, and discovering why it does not work here costs an afternoon.</p>
+<h2 id="what-is-used-instead"><a class="header" href="#what-is-used-instead">What is used instead</a></h2>
+<p><code>colonel-byte/cargoship</code>’s microVM fleet, which is importable for exactly this reason - <code>test/microvm</code> and the root <code>test</code> package are exported rather than internal so another module’s suite can drive them, which <code>terraform-provider-cargoship</code> already does.</p>
+<p>The suite:</p>
+<ol>
+<li>Brings up a Rocky VM fleet with <code>test/microvm</code>.</li>
+<li>Creates <code>Machine</code> objects with those static addresses, plus a fake infrastructure provider that marks them ready and does nothing else.</li>
+<li>Drives a real converge and asserts the kubeconfig secret appears and the nodes join.</li>
+</ol>
+<p><code>CARGOSHIP_E2E_EXAMPLE_ROOT</code> points it at a cargoship checkout so it reads the generated distro definitions rather than carrying a copy.</p>
+<p>The microVM backend is also the only one where cargoship’s SELinux, fapolicyd and firewalld phases run as the paths they are rather than as gates that correctly do nothing - so it is a better test of a converge than a container fleet would be even if containers could run sshd.</p>
+<h2 id="reading-a-run"><a class="header" href="#reading-a-run">Reading a run</a></h2>
+<p><strong>Check which steps skipped, not only which failed.</strong> A skip on this suite usually means a capability the backend does not have, and a run with fifteen of them is not a pass. The same rule as cargoship’s own suite, for the same reason.</p>
+<p>The fleet brings itself up and tears itself down, and a whole run needs no elevation. Do not reach for <code>virsh</code> to inspect it: <code>virsh -c qemu:///system</code> goes through polkit and interrupts whoever is at the keyboard to answer a question the run’s own log already answers. A fleet left behind by a killed run comes down with <code>mage dev:vmDown -fleet=&lt;name&gt;</code> from the cargoship checkout.</p>
+<h2 id="what-has-no-coverage-yet"><a class="header" href="#what-has-no-coverage-yet">What has no coverage yet</a></h2>
+<ul>
+<li>The reconcile state machine end to end. It wants envtest with a fake infrastructure provider, asserting the <strong>requeues</strong> rather than any timing: no address yet, SSH not answering, converge in flight, converged. <code>make test-envtest</code> is wired for it and there are no tests behind it.</li>
+<li>The pre-terminate hook’s ordering. The thing worth asserting is that the survivors’ converge happens before the annotation is released, and that is a sequence, not a state.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed"><a class="header" href="#a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed">A tagged distro reference is not re-resolved, and a republished tag is not noticed</a></h1>
+<p><code>spec.distro.ociRef</code> is used exactly as given. The desired-state fingerprint hashes the reference string, so a package rebuilt and republished behind the same tag produces the same fingerprint, and no converge runs. <strong>Pin the reference to a digest where that matters.</strong></p>
+<p>This is a limitation of the current version rather than a decision, and it is written down because the obvious fix looks available and is not.</p>
+<h2 id="why-it-is-not-fixed-yet"><a class="header" href="#why-it-is-not-fixed-yet">Why it is not fixed yet</a></h2>
+<p>The primitive is nearly there. <code>coci.Resolve</code> returns a <code>Resolution</code> whose <code>Reference</code> field is already the reference with its tag replaced by the resolved digest - exactly what is wanted. But it takes a <code>FileSelector</code>, and for a manifest carrying more than one layer it returns <code>ErrLayerRequired</code>:</p>
+<pre><code class="language-go">// pkg/coci/file.go
+var ErrLayerRequired = errors.New("no layer title was selected")
+</code></pre>
+<p>A distro package carries many layers (<code>metadata</code>, <code>images</code>, <code>os</code>, <code>files</code> - see <code>pkg/coci/layers</code>), so calling <code>Resolve</code> with an empty selector fails. <code>Resolve</code> is built for per-file artifacts, which is what its callers in cargoship are.</p>
+<p>What is missing is a cargoship-side “resolve this reference’s root digest, no selector” - the resolution step <code>coci.Resolve</code> already does internally before it goes looking for a layer. That is a change in <code>colonel-byte/cargoship</code>, not here, and it is a one-function addition rather than anything structural.</p>
+<h2 id="what-this-does-and-does-not-break"><a class="header" href="#what-this-does-and-does-not-break">What this does and does not break</a></h2>
+<ul>
+<li><strong>It does not</strong> stop a new package being adopted. Change <code>spec.distro.ociRef</code> and the fingerprint changes. A new tag or a digest both work.</li>
+<li><strong>It does</strong> mean <code>status.distro.digest</code> is empty for a tagged reference, so there is no record of what a fleet actually converged to. An operator who needs that answer has to pin.</li>
+<li><strong>It does not</strong> affect correctness of a converge. Cargoship resolves the reference itself on every apply, so the bytes installed are always whatever the tag points at now. The gap is only in <em>noticing</em> that it changed.</li>
+</ul>
+<p>Do not work around this by folding a timestamp or the reconcile count into the fingerprint. That would make the fingerprint change on every pass, which turns the drift interval into “re-converge the entire fleet over SSH every ten minutes” - the cost control the fingerprint exists to provide, removed.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true"><a class="header" href="#the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true">The SSH key is never written to a file, and nothing had to be added to make that true</a></h1>
+<p>The controller holds a cluster-wide SSH private key - the single most valuable thing in the management cluster, because it opens a root-capable shell on every node of every cluster it manages. It is read from a <code>kubernetes.io/ssh-auth</code> secret, parsed into an in-memory auth method, and handed to rig. It does not touch a filesystem, there is no volume for it, and no <code>emptyDir</code> to shred.</p>
+<p>This looks like it should have required work, because rig’s SSH configuration takes a <em>path</em>:</p>
+<pre><code class="language-go">// vendor/github.com/k0sproject/rig/v2/protocol/ssh/config.go
+KeyPath *string `yaml:"keyPath,omitempty" ...`
+</code></pre>
+<p>It did not. The same struct carries a field that is excluded from both YAML and JSON, and so appears in no generated schema and in no example anybody has read:</p>
+<pre><code class="language-go">AuthMethods []ssh.AuthMethod `yaml:"-" json:"-"`
+</code></pre>
+<p>When it is set, rig’s connection setup short-circuits the entire identity-file path (<code>protocol/ssh/connection.go</code>, <code>if len(c.AuthMethods) &gt; 0 { config.Auth = c.AuthMethods }</code>), and <code>ssh.ParseSSHPrivateKey(keyBytes, nil)</code> is the helper that builds it. <code>pkg/converge.BuildInventory</code> sets it per host.</p>
+<h2 id="do-not-add-an-alternative"><a class="header" href="#do-not-add-an-alternative">Do not add an alternative</a></h2>
+<p>Three things that look like improvements and are not:</p>
+<ul>
+<li><strong>Materializing the key to an <code>emptyDir</code>.</strong> This is what the field above exists to avoid. It puts cluster-admin-equivalent credentials on a filesystem, where a sidecar, a debug container, a core dump or a misconfigured volume mount can read them.</li>
+<li><strong>An <code>ssh-agent</code> sidecar.</strong> More moving parts, a socket in a shared volume, and no security gain over a key that is already only in process memory.</li>
+<li><strong>An exported “give cargoship a key as bytes” hook in <code>colonel-byte/cargoship</code>.</strong> It would be a second way to do what rig already does, and it would have to be kept in step with rig’s auth handling.</li>
+</ul>
+<p>The one thing worth doing is the thing already done: <code>pkg/sshkey.AuthorizedKey</code> <em>derives</em> the public half from the same secret rather than taking it separately, so there is no way for the authorized key and the connecting key to drift apart. A mismatched pair produces a fleet of machines that boot correctly, report ready, and refuse every connection - a failure that looks like a network problem for as long as it takes somebody to compare two keys by hand.</p>
+<p>Encrypted private keys are refused rather than prompted for. There is no terminal here, and a passphrase the controller cannot supply would make every machine unreachable.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="make-for-the-targets-the-ecosystem-names-mage-for-the-generators-behind-them"><a class="header" href="#make-for-the-targets-the-ecosystem-names-mage-for-the-generators-behind-them">Make for the targets the ecosystem names, mage for the generators behind them</a></h1>
+<p>Cargoship drives its builds, tests and generators through mage, and <code>magefiles/AGENTS.md</code> records why. This repository has both: a <code>Makefile</code> holding the target names Cluster API’s tooling depends on, and <code>magefiles/</code> holding the generators those targets call.</p>
+<h2 id="why-the-makefile-owns-the-interface"><a class="header" href="#why-the-makefile-owns-the-interface">Why the Makefile owns the interface</a></h2>
+<p>The Cluster API ecosystem is Makefile-shaped, and not superficially:</p>
+<ul>
+<li>The provider implementers’ documentation, the contributing guide and every reference provider assume <code>make generate</code>, <code>make manifests</code> and <code>make release-manifests</code>. A contributor who has worked on another provider knows those three targets and nothing else about this repository.</li>
+<li><code>clusterctl</code>’s own release conventions are written in terms of a <code>RELEASE_DIR</code> a <code>make release-manifests</code> target fills. <code>.goreleaser.yaml</code> calls that target in its <code>before.hooks</code>, so the release pipeline depends on the name.</li>
+<li>The tooling is kubebuilder’s - <code>controller-gen</code>, <code>kustomize</code>, <code>setup-envtest</code> - and all of it is documented as Makefile variables.</li>
+</ul>
+<p>Those names are an interface, not an implementation detail. Nothing about what is behind them is visible to a contributor who types <code>make generate</code>.</p>
+<h2 id="why-mage-owns-the-generators"><a class="header" href="#why-mage-owns-the-generators">Why mage owns the generators</a></h2>
+<p>This repository started with one generator, <code>controller-gen</code>, which is a single command with flags and belongs in a Makefile recipe. The book is the second one, and it is not that: it reads the docs tree, works out each page’s sidebar label, and writes <code>docs/SUMMARY.md</code> from what it finds, because a page that is added and not listed there is simply missing from the book and <code>mdbook build</code> does not say so.</p>
+<p>That was a <code>cp</code> and two <code>sed</code> expressions, and it could not have grown into the summary generator without becoming unreadable and untestable. It is now <code>magefiles/pkg/gen/docs</code>, an ordinary Go package with tests, called by <code>make docs</code>, which <code>make generate</code> depends on. Shell in a Makefile recipe has no unit tests and no way to get them.</p>
+<p>mage is pinned in <code>go.mod</code> as a tool dependency, the same way <code>controller-gen</code> and <code>kustomize</code> are, so <code>make docs</code> needs nothing installed and Dependabot owns the version - see <a href="#tool-versions-live-in-gomod-except-golangci-lint">choice-tool-dependencies</a>.</p>
+<h2 id="the-rule-for-anything-added-later"><a class="header" href="#the-rule-for-anything-added-later">The rule for anything added later</a></h2>
+<p><strong>A generator that is one command with flags stays a Makefile recipe. A generator that has to read the repository and decide something goes in <code>magefiles/</code>, as a package with tests, and gets a Makefile target that calls it.</strong></p>
+<p>The second half of that matters as much as the first: <code>mage</code> is never the documented way to run anything here. Everything is reachable through <code>make</code>, because that is what the ecosystem’s documentation tells a contributor to type, and a second entry point that only some targets have is worse than either tool on its own.</p>
+<h2 id="what-is-kept-from-cargoships-pattern"><a class="header" href="#what-is-kept-from-cargoships-pattern">What is kept from cargoship’s pattern</a></h2>
+<p>Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, Dependabot with the same grouping and daily cadence, the same pre-commit hooks, a vendored <code>vendor/</code> tree, and <code>.gitattributes</code> grouped by the generator that writes each path. The generator layout is now shared too - <code>magefiles/pkg/gen/...</code>, with the magefile holding no logic of its own.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied"><a class="header" href="#there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied">There is no rollout, and <code>spec.version</code> changes are refused rather than half-applied</a></h1>
+<p><code>CargoshipControlPlane</code> scales up and scales down. It does not replace machines, and it does not upgrade them in place. A change to <code>spec.version</code> against a converged control plane is reported as unsupported rather than acted on.</p>
+<h2 id="why-refusing-is-better-than-trying"><a class="header" href="#why-refusing-is-better-than-trying">Why refusing is better than trying</a></h2>
+<p><code>KubeadmControlPlane</code>’s rollout is the most intricate part of it: surge a new machine, wait for it to join, remove an old one, repeat, while keeping etcd quorum and handling a machine that fails to come up halfway through. Half of that implemented is worse than none of it, because the failure mode is a control plane stuck between two versions with no path forward that the controller knows how to take.</p>
+<p>Cargoship does have the pieces - <code>pkg/phase/65_upgrade_common.go</code> and the engine-config-sync phases upgrade a host in place, draining and waiting for <code>Ready</code> through <code>waitNodeReady</code>. So the shape of an in-place rollout is available and is probably the right one for this provider, since replacing machines throws away the thing cargoship is good at. It is a separate piece of work with its own correctness argument, not an extension of this one.</p>
+<h2 id="what-an-operator-does-meanwhile"><a class="header" href="#what-an-operator-does-meanwhile">What an operator does meanwhile</a></h2>
+<p>Build a new cluster and move workloads, or scale the control plane up with machines created from a template carrying the new version and scale the old ones down - which works, because a scale-up creates a machine with <code>spec.version</code> from the custom resource and the converge installs whatever the package holds.</p>
+<p>The second route is why <code>status.version</code> is set from <code>spec.version</code> rather than observed per machine: with no rollout, every machine that exists was created at the current version. <strong>When rollout lands that stops being true</strong>, and <code>updateStatusCounts</code> has to compare each machine’s version against the desired one to fill in <code>upToDateReplicas</code> honestly. The comment on that function says so; the counts are correct today and will quietly lie the moment a second version can exist.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines"><a class="header" href="#the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines">The control plane owns the whole fleet, not just the control-plane machines</a></h1>
+<p><code>CargoshipControlPlane</code>’s reconcile lists <strong>every</strong> <code>Machine</code> with the cluster’s name label - control plane and <code>MachineDeployment</code> workers alike - and converges all of them in one <code>cargoship apply</code>. <code>KubeadmControlPlane</code> owns only control-plane machines, and the Cluster API control-plane contract is written on that assumption, so this is a deliberate departure from it.</p>
+<h2 id="why"><a class="header" href="#why">Why</a></h2>
+<p>A cargoship fleet is not a set of independent hosts. Three phases write state derived from the <em>whole</em> host list onto <em>every</em> host:</p>
+<ul>
+<li><code>ModifyHosts</code> rewrites each host’s <code>/etc/hosts</code> with every node in the inventory.</li>
+<li><code>ConfigureFirewall</code> opens the cluster’s ports in each host’s own firewall, with rules that name the other hosts.</li>
+<li>Per-profile <code>Concurrency</code> batches hosts across the fleet - a <code>25%</code> profile means a quarter of the hosts sharing that profile, which is not a question one controller can answer about a subset.</li>
+</ul>
+<p>Split across two controllers, each would compute those from half the fleet and overwrite the other half’s answer. The failure is not a race that shows up under load; it is the steady state. A worker joining would rewrite <code>/etc/hosts</code> on the controllers without the other workers in it, and the next control-plane converge would put them back.</p>
+<p>The second reason is cheaper to state: cargoship takes a cluster lock on every host for the duration of an apply (<code>pkg/phase/91_lock.go</code>). Two converges over overlapping hosts do not interleave - the second fails on the lock. So “two controllers, one fleet” is not slower than one controller; it does not work at all.</p>
+<h2 id="what-it-costs"><a class="header" href="#what-it-costs">What it costs</a></h2>
+<ul>
+<li><strong>The contract’s replica counts only describe the control plane.</strong> <code>status.replicas</code>, <code>readyReplicas</code>, <code>availableReplicas</code> and <code>upToDateReplicas</code> count control-plane machines, as the contract requires, and the scale subresource’s selector matches only them. A worker is in the converge and not in the counts, which is correct but reads oddly next to a <code>status.hosts</code> list that includes it.</li>
+<li><strong>A <code>MachineDeployment</code> scale-up waits on the control-plane controller.</strong> Its machines get bootstrap data from the bootstrap provider as usual, but nothing installs anything on them until the control plane’s next converge. The <code>Watches</code> on <code>Machine</code> in <code>SetupWithManager</code> is what keeps that prompt rather than waiting out the drift interval - without it a new worker would sit unconverged for up to ten minutes, which looks exactly like a broken provider.</li>
+<li><strong>RBAC is wider than KubeadmControlPlane’s.</strong> The control-plane controller needs <code>list</code> and <code>watch</code> on all <code>Machine</code> objects, not only the ones it owns.</li>
+</ul>
+<h2 id="what-would-change-it"><a class="header" href="#what-would-change-it">What would change it</a></h2>
+<p>Cargoship growing the ability to converge a declared subset of the inventory while reading the whole of it - so a worker-only run could rewrite that worker and leave the controllers’ <code>/etc/hosts</code> to the control-plane run. <code>ResetOptions.TargetHosts</code> is the shape of that idea for <code>reset</code>; there is no equivalent for <code>apply</code>, and adding one means deciding what <code>ModifyHosts</code> does when it can see hosts it may not write to.</p>
+<p>Until then, do not “fix” this by narrowing the machine list to the control plane. It will appear to work, because a single-node cluster has no other hosts to be wrong about.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="registry-credentials-are-written-to-a-file-and-the-ssh-key-is-not"><a class="header" href="#registry-credentials-are-written-to-a-file-and-the-ssh-key-is-not">Registry credentials are written to a file, and the SSH key is not</a></h1>
+<p><a href="#the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true"><code>choice-in-memory-ssh-key.md</code></a> is emphatic that the SSH key never reaches a filesystem. The registry credentials in <code>spec.distro.pullSecretRef</code> do: the controller writes them into a Docker config file on its cache volume. The difference is not carelessness, and the file is not a fallback for something better.</p>
+<h2 id="there-is-no-in-process-credential-hook-to-use"><a class="header" href="#there-is-no-in-process-credential-hook-to-use">There is no in-process credential hook to use</a></h2>
+<p>Cargoship’s <code>distro.Load</code> builds the oras modifier list itself, inside <code>pullOCI</code>, from the <code>RemoteOptions</code> it was given - <code>PlainHTTP</code> and <code>InsecureSkipTLSVerify</code>, and nothing else. <code>oci.WithCredentialFunc</code> exists upstream in zarf’s OCI package and is exactly the right hook, but a caller cannot reach it through <code>LoadOptions</code>. What is left is the fallback oras takes when no credential function is set: the Docker credential store, read from <code>$DOCKER_CONFIG/config.json</code> each time a remote is built.</p>
+<p>So the choice was a file or a cargoship change, and the file is reversible in an afternoon once <code>LoadOptions</code> can carry a credential function. The SSH key had no such constraint - rig’s <code>AuthMethods</code> takes the bytes - which is why the two are different.</p>
+<h2 id="one-file-merged-rather-than-one-per-resource"><a class="header" href="#one-file-merged-rather-than-one-per-resource">One file, merged, rather than one per resource</a></h2>
+<p><code>$DOCKER_CONFIG</code> is a process-wide variable, and <code>converge.Runner</code> holds one in-flight converge <em>per resource</em>, so two clusters converge at once. A file per <code>CargoshipControlPlane</code> would mean rewriting the variable underneath a pull that is already reading it.</p>
+<p><code>pkg/dockerconfig.Merge</code> writes one file instead, keyed by registry, under a mutex and through a rename. Two clusters pulling from two registries each find their own entry. Two naming the same registry with different credentials are the case this does not serve: the last converge to start wins, which is recorded as a <code>shortcut:</code> comment beside the merge rather than hidden.</p>
+<h2 id="the-blast-radius-is-smaller-than-the-ssh-keys"><a class="header" href="#the-blast-radius-is-smaller-than-the-ssh-keys">The blast radius is smaller than the SSH key’s</a></h2>
+<p>Worth saying plainly, because “a secret on a disk” is where review attention goes. The SSH key opens a root shell on every machine in the fleet; these credentials pull a public artifact from a registry, and Zarf’s <code>zarf-pull</code> user cannot even push to it. The file is <code>0600</code> on a volume only the controller mounts, in a pod running as <code>65532</code> with no shell in the image.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="tool-versions-live-in-gomod-except-golangci-lint"><a class="header" href="#tool-versions-live-in-gomod-except-golangci-lint">Tool versions live in <code>go.mod</code>, except golangci-lint</a></h1>
+<p><code>controller-gen</code>, <code>kustomize</code> and <code>setup-envtest</code> are <code>tool</code> directives in <code>go.mod</code>. The <code>Makefile</code> calls them through <code>go tool</code>, so there is no version to pin in two places, Dependabot owns the bumps, and a vendored checkout resolves them with no network access - which is the same property the rest of this repository has.</p>
+<p><strong><code>golangci-lint</code> is deliberately not one of them.</strong> It runs from <code>.pre-commit-config.yaml</code>, which is also how <code>colonel-byte/cargoship</code> runs it.</p>
+<h2 id="why-golangci-lint-cannot-be-a-tool-dependency-here"><a class="header" href="#why-golangci-lint-cannot-be-a-tool-dependency-here">Why golangci-lint cannot be a tool dependency here</a></h2>
+<p>A tool directive puts the tool’s dependencies in the module’s own graph. golangci-lint’s graph pulls <code>k8s.io/*</code> up to a newer patch release than Cluster API’s, and the two are not compatible:</p>
+<pre><code>k8s.io/apimachinery@v0.37.2 pkg/util/managedfields/internal/typeconverter.go:51:
+  cannot use typeSchema.Types (variable of type []sigs.k8s.io/structured-merge-diff/v7/schema.TypeDef)
+  as []sigs.k8s.io/structured-merge-diff/v6/schema.TypeDef value in struct literal
+</code></pre>
+<p><code>sigs.k8s.io/cluster-api@v1.14.4</code> is built against <code>structured-merge-diff/v6</code>. The newer <code>apimachinery</code> that golangci-lint drags in is built against <code>v7</code>. Both are in the graph, and <code>k8s.io/kube-openapi</code> resolves to a version that hands <code>v7</code> types to a <code>v6</code> signature - so <strong>the whole module stops compiling</strong>, including the two managers, and <code>go mod tidy</code> does not resolve it because tidy is what causes it.</p>
+<p>The symptom is confusing enough to be worth writing down: the first thing that breaks is <code>golangci-lint</code> itself, reporting a <code>typecheck</code> error against <code>pkg/manager/manager.go</code> with ten levels of nested “could not import”. That reads like a problem with the file. It is not.</p>
+<h2 id="if-you-need-to-add-a-tool"><a class="header" href="#if-you-need-to-add-a-tool">If you need to add a tool</a></h2>
+<p>Add it, then check <code>go build ./...</code> <strong>and</strong> <code>grep structured-merge-diff go.mod</code>. If the version moved, the tool is not safe to add here. The <code>k8s.io</code> modules are pinned to the versions <code>cluster-api</code> wants, not to latest, for this reason - a <code>go get -u</code> across them is not a routine upgrade.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
