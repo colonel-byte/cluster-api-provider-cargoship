@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.2...v0.1.3) (2026-11-14)
+
+
+### Documentation
+
+* add the book, guides and decision records ([#7](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/7)) ([5979ae6](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/5979ae6c86582b50421987a9d6d7e642a9638596))
+
+
+### CI/CD
+
+* fix wrong signing secrets ([#30](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/30)) ([b8e56e0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/b8e56e0a67c891db7c4063339a0ce4d3fb73e56d))
+
 ## [0.1.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.1...v0.1.2) (2026-11-14)
 
 
