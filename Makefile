@@ -86,8 +86,15 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 test: ## Run the unit tests.
 	go test -race -coverprofile=cover.out ./...
 
+# Cluster API's own core CRDs, which the envtest API server needs to hold Clusters and Machines.
+# They are YAML in the cluster-api module's source tree, which `go mod vendor` drops, so they are
+# read out of the module cache rather than out of vendor/. Lazily assigned so that no other target
+# pays for the `go list`, and -mod=mod because vendor mode reports no module directory.
+CAPI_CRD_DIR = $(shell go list -mod=mod -m -f '{{.Dir}}' sigs.k8s.io/cluster-api)/core/config/crd/bases
+
 .PHONY: test-envtest
 test-envtest: ## Run the tests that need a real API server.
+	CAPI_CRD_DIR="$(CAPI_CRD_DIR)" \
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" \
 		go test -race -tags=envtest ./...
 

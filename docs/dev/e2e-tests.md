@@ -1,40 +1,64 @@
 # End-to-end tests
 
-The unit tests cover everything that can be covered without a fleet: inventory construction from `Machine` objects, the desired-state fingerprint, the converge runner's concurrency, and cloud-init rendering. They need no cluster and no network.
+The unit tests cover everything that can be covered without an API server: inventory construction
+from `Machine` objects, the desired-state fingerprint, the converge runner's concurrency, and
+cloud-init rendering. They need no cluster and no network.
 
 ```sh
 make test
 ```
 
-An end-to-end test needs something a converge can actually SSH into, and that is the constraint that shapes the whole suite.
+## The reconcile state machine
 
-## Why not the Docker infrastructure provider
+```sh
+make test-envtest
+```
 
-The obvious choice for a provider's e2e suite is CAPD - Cluster API's Docker provider - because it needs nothing but Docker. **It cannot be used here.** CAPD machines are containers running a kubelet; they run no sshd. Cargoship's first phase is `Connect`, and there is nothing to connect to.
+This runs both controllers against a real API server -- `envtest`, the kubebuilder control plane --
+with the cargoship apply stubbed out. It is where the provider's own logic is covered: machines
+created one per pass, the pre-terminate hook claimed at creation and released only after the
+survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the
+bootstrap data rendered once and never again, and every state the reconcile waits in.
 
-This is worth stating because every other provider's e2e documentation points at CAPD, and discovering why it does not work here costs an afternoon.
+**What it asserts is which state a pass lands in, never a duration measured on the clock.** This
+provider's answer to machines and API servers coming up on their own schedules is that nothing
+anywhere gives up, so there is no timing to assert; what is worth pinning down is that "no address
+yet", "ssh not answering", "converging" and "converged" each requeue and say why. A test that waited
+on wall-clock time here would be testing the one thing the design does not do.
 
-## What is used instead
+Two things it needs, and both are why it is `make test-envtest` rather than `go test`:
 
-`colonel-byte/cargoship`'s microVM fleet, which is importable for exactly this reason - `test/microvm` and the root `test` package are exported rather than internal so another module's suite can drive them, which `terraform-provider-cargoship` already does.
+- **The control-plane binaries**, which `make` fetches through `setup-envtest`.
+- **Cluster API's own core CRDs**, for the Clusters and Machines it holds. They are YAML in the
+  `cluster-api` module's source tree, which `go mod vendor` drops, so the Makefile resolves the
+  module directory and passes it in as `CAPI_CRD_DIR`. A bare `go test -tags=envtest` fails saying
+  so rather than failing inside the API server.
 
-The suite:
+The harness is `internal/envtest`, behind the same build tag, so `make test` stays runnable with
+nothing installed.
 
-1. Brings up a Rocky VM fleet with `test/microvm`.
-2. Creates `Machine` objects with those static addresses, plus a fake infrastructure provider that marks them ready and does nothing else.
-3. Drives a real converge and asserts the kubeconfig secret appears and the nodes join.
+The stub is injected through the reconciler's `Converge` field, which `SetupWithManager` fills in
+with `converge.Apply` when it is nil. That is the only seam added for testing, and it exists because
+the alternative is a fleet.
 
-`CARGOSHIP_E2E_EXAMPLE_ROOT` points it at a cargoship checkout so it reads the generated distro definitions rather than carrying a copy.
+## A converge against real hosts
 
-The microVM backend is also the only one where cargoship's SELinux, fapolicyd and firewalld phases run as the paths they are rather than as gates that correctly do nothing - so it is a better test of a converge than a container fleet would be even if containers could run sshd.
+There is no suite for this yet, and the backend to build it on is not the obvious one:
+[todo-e2e-fleet-backends](../agent/todo-e2e-fleet-backends.md) is the plan and the reasoning.
 
-## Reading a run
+The short version. **CAPD cannot be used** -- its machines are containers running a kubelet and no
+sshd, and cargoship's first phase is `Connect` -- which is worth stating because every other
+provider's e2e documentation points at CAPD. **Bootloose containers can**: they run sshd, answer on
+port 22, and attach to the `kind` network the controller pod is already on. **The microVM fleet
+cannot**, from a pod: its nodes are reachable only as per-node forwarded ports on the host's
+loopback, and neither a single inventory-wide SSH port nor a `MachineAddress` can express that.
 
-**Check which steps skipped, not only which failed.** A skip on this suite usually means a capability the backend does not have, and a run with fifteen of them is not a pass. The same rule as cargoship's own suite, for the same reason.
-
-The fleet brings itself up and tears itself down, and a whole run needs no elevation. Do not reach for `virsh` to inspect it: `virsh -c qemu:///system` goes through polkit and interrupts whoever is at the keyboard to answer a question the run's own log already answers. A fleet left behind by a killed run comes down with `mage dev:vmDown -fleet=<name>` from the cargoship checkout.
+Do not reach for `virsh` to inspect anything a run leaves behind. `virsh -c qemu:///system` goes
+through polkit and interrupts whoever is at the keyboard to answer a question the run's own log
+already answers.
 
 ## What has no coverage yet
 
-- The reconcile state machine end to end. It wants envtest with a fake infrastructure provider, asserting the **requeues** rather than any timing: no address yet, SSH not answering, converge in flight, converged. `make test-envtest` is wired for it and there are no tests behind it.
-- The pre-terminate hook's ordering. The thing worth asserting is that the survivors' converge happens before the annotation is released, and that is a sequence, not a state.
+- A converge against real hosts, per the plan above.
+- The bootstrap data actually being consumed by a booting machine. Neither container nor microVM
+  fleets read it, so the first thing that proves it is a real infrastructure provider.

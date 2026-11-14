@@ -25,3 +25,4 @@
 - [choice-registry-credentials](agent/choice-registry-credentials.md)
 - [choice-tool-dependencies](agent/choice-tool-dependencies.md)
 - [choice-zarf-package](agent/choice-zarf-package.md)
+- [todo-e2e-fleet-backends](agent/todo-e2e-fleet-backends.md)
