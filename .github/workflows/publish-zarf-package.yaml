@@ -5,14 +5,18 @@ name: Publish the Zarf package
 # ghcr.io/colonel-byte/zarf/<package>, which `zarf package publish` assembles from the namespace
 # below and the package's own name and version. See docs/guides/install.md.
 #
-# It runs on a published release rather than on the tag push, because `zarf package create` pulls
-# the two controller images the package carries and those are pushed by the goreleaser workflow -
-# which creates the release as its last act. Re-run this workflow to republish; the release event
-# replays with it.
+# `zarf package create` pulls the two controller images the package carries, so it cannot run until
+# goreleaser has pushed them. release.yaml calls this as a reusable workflow in a job that needs
+# goreleaser, and needs is what holds the two apart; keying off the release event instead would
+# race, because release-please publishes the release well before goreleaser has pushed an image. A
+# called workflow runs at its caller's ref, so GITHUB_REF_NAME below is the tag being released.
+#
+# Also on demand from the Actions tab, which is how a release is republished: run it against the
+# tag, rather than re-running a whole release.
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+  workflow_dispatch:
 
 # Read only at the top so that a job has to ask for what it writes.
 permissions:
@@ -39,8 +43,8 @@ jobs:
           - amd64
           - arm64
     steps:
-      # No ref: a release event runs at the tag the release was cut from, which is the only
-      # commit whose zarf.yaml names this release's images.
+      # No ref: the run is already at the tag - the caller's, or the one picked from the Actions
+      # tab - which is the only commit whose zarf.yaml names this release's images.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
