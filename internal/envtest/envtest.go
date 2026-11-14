@@ -43,8 +43,9 @@ import (
 //
 // They are not in this repository and they are not in vendor/ either: `go mod vendor` keeps the
 // Go files a build needs and drops everything else, and the CRDs are YAML in the cluster-api
-// module's source tree. The Makefile resolves the module's directory and passes it in, which is
-// why these tests are run through `make test-envtest` rather than `go test -tags=envtest`.
+// module's source tree. `make envtest-crds` generates them from the vendored types and passes the
+// directory in, which is why these tests are run through `make test-envtest` rather than
+// `go test -tags=envtest`.
 const capiCRDEnvVar = "CAPI_CRD_DIR"
 
 // cfg is the running API server, set by Run before any test starts.

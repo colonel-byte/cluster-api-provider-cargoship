@@ -86,15 +86,25 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 test: ## Run the unit tests.
 	go test -race -coverprofile=cover.out ./...
 
-# Cluster API's own core CRDs, which the envtest API server needs to hold Clusters and Machines.
-# They are YAML in the cluster-api module's source tree, which `go mod vendor` drops, so they are
-# read out of the module cache rather than out of vendor/. Lazily assigned so that no other target
-# pays for the `go list`, and -mod=mod because vendor mode reports no module directory.
-CAPI_CRD_DIR = $(shell go list -mod=mod -m -f '{{.Dir}}' sigs.k8s.io/cluster-api)/core/config/crd/bases
+# Cluster API's own core CRDs, which the envtest API server needs in order to hold Clusters and
+# Machines. Build output, so it lives under out/ and `make clean` takes it away.
+CAPI_CRD_DIR := $(RELEASE_DIR)/envtest-crds
+
+.PHONY: envtest-crds
+envtest-crds: ## Generate the Cluster API CRDs the envtest API server needs.
+	# Generated from the vendored types rather than copied out of the cluster-api module, whose
+	# config/crd directory `go mod vendor` drops: it keeps the Go files a build needs and nothing
+	# else. Generating has two advantages over reaching into the module cache for them -- it needs
+	# no network and no cache, which is the same reason the tree is vendored at all, and the
+	# schemas the tests run against are the ones the vendored types actually describe.
+	$(CONTROLLER_GEN) crd paths=./vendor/sigs.k8s.io/cluster-api/api/core/v1beta2/... \
+		output:crd:artifacts:config=$(CAPI_CRD_DIR)
 
 .PHONY: test-envtest
-test-envtest: ## Run the tests that need a real API server.
-	CAPI_CRD_DIR="$(CAPI_CRD_DIR)" \
+test-envtest: envtest-crds ## Run the tests that need a real API server.
+	# Absolute, because a test binary runs with its own package directory as the working
+	# directory and would resolve a relative path against that.
+	CAPI_CRD_DIR="$(abspath $(CAPI_CRD_DIR))" \
 	KUBEBUILDER_ASSETS="$$($(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" \
 		go test -race -tags=envtest ./...
 
