@@ -23,4 +23,6 @@ What is missing is a cargoship-side "resolve this reference's root digest, no se
 - **It does** mean `status.distro.digest` is empty for a tagged reference, so there is no record of what a fleet actually converged to. An operator who needs that answer has to pin.
 - **It does not** affect correctness of a converge. Cargoship resolves the reference itself on every apply, so the bytes installed are always whatever the tag points at now. The gap is only in *noticing* that it changed.
 
+A package named by `spec.distro.registry` and `spec.distro.name` rather than referenced is a different case, and a partial answer to the same question: the registry's own record of it carries a digest computed over the package's contents, so a version republished with new contents is noticeable without resolving anything. That digest is not a reference you can pull, and following it is gated on an annotation rather than automatic. See [`choice-record-discovery.md`](choice-record-discovery.md).
+
 Do not work around this by folding a timestamp or the reconcile count into the fingerprint. That would make the fingerprint change on every pass, which turns the drift interval into "re-converge the entire fleet over SSH every ten minutes" - the cost control the fingerprint exists to provide, removed.

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/colonel-byte/cargoship/pkg/distro"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,6 +74,9 @@ type CargoshipControlPlaneReconciler struct {
 	Probe Prober
 	// Converge is the apply the Runner runs. Replaced in tests.
 	Converge ConvergeFunc
+	// Records reads what a registry holds, for a spec.distro that names a package rather than
+	// referencing one. Replaced in tests.
+	Records RecordLister
 }
 
 // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=cargoshipcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -209,7 +214,21 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 
 	// 5. Resolve the package reference, and record it. See distroSource for what a tagged
 	//    reference does and does not get you.
-	source, err := distroSource(cp)
+	//
+	//    A spec.distro naming a package rather than referencing one has to read the registry to
+	//    resolve it, so the credentials and the CA that step 7 otherwise stages for the converge
+	//    are staged here instead. Only that form pays for it: a resync of a converged cluster
+	//    then rewrites a Docker configuration file it had no reason to touch, which is the price
+	//    of resolving a name at all.
+	var caBundle []byte
+	staged := cp.Spec.Distro.Name != ""
+	if staged {
+		if caBundle, err = r.stageRegistryAccess(ctx, cp); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	source, err := distroSource(ctx, cp, r.Records, caBundle)
 	if err != nil {
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "DistroUnresolved", err.Error())
 		return ctrl.Result{}, err
@@ -224,7 +243,11 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		ClusterConfig: clusterConfigRaw,
 		Endpoint:      endpoint,
 		DistroRef:     source,
-		Apply:         applyRaw,
+		// Only when an operator asked for it. See AdoptRepublishedPackageAnnotation: the digest
+		// is read and reported either way, and folding it in is what turns a republished package
+		// into a converge nobody triggered.
+		DistroDigest: adoptRepublished(cp),
+		Apply:        applyRaw,
 	}.Fingerprint()
 	if err != nil {
 		return ctrl.Result{}, err
@@ -245,15 +268,10 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	//    cluster that is already converged resyncs for all sorts of reasons and has no business
 	//    rewriting it; the CA bundle is read in the reconcile rather than inside the converge so
 	//    that a missing secret is an error on the resource instead of a failure minutes later.
-	if err := r.writePullSecret(ctx, cp); err != nil {
-		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "PullSecretUnusable", err.Error())
-		return ctrl.Result{}, err
-	}
-
-	caBundle, err := r.caBundle(ctx, cp)
-	if err != nil {
-		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "CABundleUnusable", err.Error())
-		return ctrl.Result{}, err
+	if !staged {
+		if caBundle, err = r.stageRegistryAccess(ctx, cp); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	key := client.ObjectKeyFromObject(cp).String()
@@ -328,6 +346,41 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 // caBundleField is the key a CA bundle is conventionally kept under in a secret -- the same one
 // Kubernetes uses for the cluster's own certificate in a service account's token secret.
 const caBundleField = "ca.crt"
+
+// adoptRepublished is the discovered package's content digest when the annotation asking a
+// converge to follow a republished package is set, and empty otherwise.
+//
+// Empty rather than absent from the fingerprint, which is the same thing: the field is
+// omitempty, so an unannotated resource hashes exactly as it did before discovery existed.
+func adoptRepublished(cp *controlplanev1.CargoshipControlPlane) string {
+	if cp.Annotations[controlplanev1.AdoptRepublishedPackageAnnotation] != "true" {
+		return ""
+	}
+	return cp.Status.Distro.RecordDigest
+}
+
+// stageRegistryAccess puts the credentials and the certificates the registry needs in place, and
+// returns the certificates for whatever is about to talk to it.
+//
+// The two are together because neither is any use without the other and both report themselves
+// the same way: as a condition on the resource rather than as a failure minutes into a converge.
+// It sets the condition and returns the error, so a caller only has to return it.
+func (r *CargoshipControlPlaneReconciler) stageRegistryAccess(
+	ctx context.Context,
+	cp *controlplanev1.CargoshipControlPlane,
+) ([]byte, error) {
+	if err := r.writePullSecret(ctx, cp); err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "PullSecretUnusable", err.Error())
+		return nil, err
+	}
+
+	caBundle, err := r.caBundle(ctx, cp)
+	if err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "CABundleUnusable", err.Error())
+		return nil, err
+	}
+	return caBundle, nil
+}
 
 // caBundle returns the certificates spec.distro.caBundleSecretRef names, and nil when the field is
 // unset, in which case the pull trusts the controller's own roots and nothing more.
@@ -584,6 +637,9 @@ func (r *CargoshipControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) err
 	}
 	if r.Converge == nil {
 		r.Converge = converge.Apply
+	}
+	if r.Records == nil {
+		r.Records = distro.ListMirrored
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
