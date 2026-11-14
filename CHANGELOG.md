@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.1...v0.1.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* **ci:** sign release artifacts with cosign bundles and attest the AI-BOM ([#28](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/28)) ([24964d0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/24964d097c2c858086dece302cb8c0229cc08ab1))
+
 ## [0.1.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.0...v0.1.1) (2026-11-14)
 
 
