@@ -8,6 +8,7 @@
 
 - [install](guides/install.md)
 - [node-removal](guides/node-removal.md)
+- [rancher-turtles](guides/rancher-turtles.md)
 - [registry](guides/registry.md)
 
 # Development
