@@ -270,16 +270,50 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{}, err
 	}
 
-	// 6. Nothing to do: the fleet matches the last successful converge and every machine has
+	// 6. A version change gets a person's attention before it gets a converge.
+	//
+	//    After the fingerprint rather than before it, because the fingerprint is what says
+	//    whether the change could even take effect -- and after resolution, so status.distro
+	//    still reports what the registry holds for an operator deciding what to do about it.
+	if from, changing := versionChange(cp); changing {
+		switch {
+		case cp.Status.LastAppliedHash == fingerprint:
+			// A version with no package behind it. The fleet runs what the package installs,
+			// so this one changes nothing and no approval would make it change anything --
+			// worth its own answer, because the alternative is a resource that reports itself
+			// converged at a version it is not running.
+			setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "VersionChangeInert",
+				fmt.Sprintf("spec.version changed from %s to %s, but spec.distro still names the package "+
+					"installing %s, so a converge would change nothing. Point spec.distro at a package "+
+					"that installs %s.", from, cp.Spec.Version, from, cp.Spec.Version))
+			r.updateStatusCounts(cp, controlPlaneMachines, false)
+			logger.V(1).Info("version change names no new package", "from", from, "to", cp.Spec.Version)
+			return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
+
+		case cp.Annotations[controlplanev1.ApproveVersionChangeAnnotation] != cp.Spec.Version:
+			setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "VersionChangeRefused",
+				fmt.Sprintf("spec.version changed from %s to %s, and this provider has no rollout: "+
+					"a converge would upgrade every host in place, unsupervised. "+
+					"Set the annotation %s=%s to approve it.",
+					from, cp.Spec.Version, controlplanev1.ApproveVersionChangeAnnotation, cp.Spec.Version))
+			r.updateStatusCounts(cp, controlPlaneMachines, false)
+			// Not an error: it is a decision waiting on a person, and an error here would log a
+			// stack trace per retry and back off a reconcile that has nothing to retry.
+			logger.V(1).Info("version change not approved", "from", from, "to", cp.Spec.Version)
+			return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
+		}
+	}
+
+	// 7. Nothing to do: the fleet matches the last successful converge and every machine has
 	//    joined. Requeue slowly to catch drift.
 	if cp.Status.LastAppliedHash == fingerprint && allJoined(machines) {
-		r.updateStatusCounts(cp, controlPlaneMachines)
+		r.updateStatusCounts(cp, controlPlaneMachines, true)
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionTrue, "UpToDate",
 			"the fleet matches the desired state")
 		return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
 	}
 
-	// 7. Read what the registry needs, and start or observe the converge.
+	// 8. Read what the registry needs, and start or observe the converge.
 	//
 	//    Both are done here rather than beside the SSH key. The pull secret writes a file, and a
 	//    cluster that is already converged resyncs for all sorts of reasons and has no business
@@ -312,6 +346,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	case converge.StateRunning:
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "Converging",
 			fmt.Sprintf("converging %d hosts", len(inv.Hosts)))
+		r.updateStatusCounts(cp, controlPlaneMachines, false)
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 
 	case converge.StateFailed:
@@ -344,7 +379,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		// The contract field that releases worker machines to be created. It is set once the
 		// credentials exist, which is the first moment anything could have talked to the API.
 		cp.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
-		r.updateStatusCounts(cp, controlPlaneMachines)
+		r.updateStatusCounts(cp, controlPlaneMachines, true)
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionTrue, "Converged",
 			fmt.Sprintf("converged %d hosts", len(inv.Hosts)))
 		setCondition(cp, controlplanev1.AvailableCondition, metav1.ConditionTrue, "Available",
@@ -653,6 +688,7 @@ func (r *CargoshipControlPlaneReconciler) recordHosts(
 func (r *CargoshipControlPlaneReconciler) updateStatusCounts(
 	cp *controlplanev1.CargoshipControlPlane,
 	controlPlaneMachines []*clusterv1.Machine,
+	upToDate bool,
 ) {
 	var ready, available int32
 	for _, m := range controlPlaneMachines {
@@ -667,10 +703,37 @@ func (r *CargoshipControlPlaneReconciler) updateStatusCounts(
 	cp.Status.Replicas = ptr.To(int32(len(controlPlaneMachines))) //nolint:gosec // a replica count cannot overflow
 	cp.Status.ReadyReplicas = ptr.To(ready)
 	cp.Status.AvailableReplicas = ptr.To(available)
-	// Scale up and down are the only changes this provider makes, so a machine that exists is a
-	// machine at the desired state. When rollout lands this stops being true and has to compare
-	// each machine against the desired version.
-	cp.Status.UpToDateReplicas = cp.Status.Replicas
+
+	// Up to date is a property of the fleet's state rather than of a machine, because this
+	// provider converges hosts in place instead of replacing them: a machine is as current as
+	// the last converge that included it. So the caller passes whether the last successful
+	// converge matches what is wanted now -- the fingerprint comparison it has already made --
+	// and every machine is up to date or none is.
+	//
+	// It used to be the replica count unconditionally, which read as "everything is current"
+	// while a version change sat unapproved or a converge was still running.
+	if upToDate {
+		cp.Status.UpToDateReplicas = cp.Status.Replicas
+	} else {
+		cp.Status.UpToDateReplicas = ptr.To(int32(0))
+	}
+}
+
+// versionChange reports the version the last successful converge installed, when spec.version has
+// moved away from it.
+//
+// status.version rather than the machines' own versions, because a machine's spec.version is
+// fixed when it is created and this provider never replaces a machine -- so after an in-place
+// upgrade the machines would disagree with the fleet forever, and a gate reading them would
+// refuse every converge from then on. status.version is written only by a successful converge,
+// so it is what the hosts last had installed.
+func versionChange(cp *controlplanev1.CargoshipControlPlane) (string, bool) {
+	from := cp.Status.Version
+	// Empty is a control plane that has never converged, where there is nothing to have changed.
+	if from == "" || from == cp.Spec.Version {
+		return "", false
+	}
+	return from, true
 }
 
 // writeKubeConfig publishes the admin credentials as the secret Cluster API expects.

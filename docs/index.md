@@ -113,7 +113,7 @@ The node-removal row is the second. A machine Cluster API is destroying needs no
 
 Stated plainly, because each of these is a thing an operator will reach for:
 
-- **No rollout or in-place upgrade.** Scale up and scale down only. A change to `spec.version` is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.
+- **No rollout.** Nothing is surged and no machine is replaced. A change to `spec.version` is refused on the `Converged` condition unless the `controlplane.cluster.x-k8s.io/approve-version-change` annotation names the new version; approving it lets cargoship's own upgrade phases walk every host in place, unsequenced and unsupervised by this controller. Wiring that to a real Cluster API rollout is its own piece of work - see [`docs/agent/choice-no-rollout.md`](agent/choice-no-rollout.md).
 - **No tag-to-digest resolution.** A republished tag behind an `ociRef` is not noticed. Pin the reference. A package named by `registry` and `name` instead is noticed, because the registry's record of it carries a content digest - but following it still takes the `controlplane.cluster.x-k8s.io/adopt-republished-package` annotation, since this provider has no rollout.
 - **No discovering a version.** `packageVersion` is required alongside `name`: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.
 - **No encrypted registry credentials.** Cargoship's keyring type is not reachable from outside its module.
