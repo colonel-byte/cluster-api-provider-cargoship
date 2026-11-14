@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.0...v0.2.1) (2026-11-14)
+
+
+### CI/CD
+
+* publish the operator artifact and the zarf package on a release ([#34](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/34)) ([94f040a](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/94f040a9ea0ed04594229511c14dd49b05766f5f))
+
 ## [0.2.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.1.3...v0.2.0) (2026-11-14)
 
 
