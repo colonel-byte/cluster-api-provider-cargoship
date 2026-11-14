@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4606b902.js";
+            window.path_to_searchindex_js = "../searchindex-6305979b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-828d1999.js"></script>
@@ -272,19 +272,27 @@ kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provide
 <li><strong>A ConfigMap holds 1 MiB.</strong> These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, <code>gzip</code> the components and annotate the ConfigMap <code>provider.cluster.x-k8s.io/compressed: "true"</code>, without which the operator reads the archive as YAML.</li>
 </ul>
 <h2 id="air-gapped-from-a-registry"><a class="header" href="#air-gapped-from-a-registry">Air-gapped, from a registry</a></h2>
-<p><code>fetchConfig.oci</code> is the third option, and the one to reach for where the air gap already has a registry: the operator pulls <code>metadata.yaml</code> and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step. <code>make oci-artifact</code> builds that artifact, holding both halves of this provider.</p>
-<p>On the connected side:</p>
+<p><code>fetchConfig.oci</code> is the third option, and the one to reach for where the air gap already has a registry: the operator pulls <code>metadata.yaml</code> and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.</p>
+<p>Every release publishes that artifact, holding both halves of this provider, at <strong><code>ghcr.io/colonel-byte/turtle/cargoship</code></strong> - tagged with the release’s own tag, and signed with the same cosign key as the controller images. So on the connected side there is nothing to build:</p>
+<pre><code class="language-sh">oras cp ghcr.io/colonel-byte/turtle/cargoship:v0.1.0 \
+  registry.internal/cargoship/capi-providers:v0.1.0
+
+cosign verify \
+  --key https://raw.githubusercontent.com/colonel-byte/zarf-slim-init/refs/heads/main/cosign.pub \
+  ghcr.io/colonel-byte/turtle/cargoship:v0.1.0
+</code></pre>
+<p>Where the connected side cannot reach the mirror either - which is the usual arrangement - build the artifact as a file to carry in instead:</p>
 <pre><code class="language-sh">make oci-artifact TAG=v0.1.0
 </code></pre>
-<p>That writes an OCI image layout to <code>out/oci</code>, tagged <code>v0.1.0</code>, and tars it as <code>out/cargoship-capi-providers-v0.1.0.oci.tar</code> - which is the file to carry in. Nothing is pushed: the registry this is for is on the other side of the air gap from the machine that builds it.</p>
-<p>Inside, fill the mirror from the tar and point both objects at it:</p>
+<p>That writes an OCI image layout to <code>out/oci</code>, tagged <code>v0.1.0</code>, and tars it as <code>out/cargoship-capi-providers-v0.1.0.oci.tar</code>. Nothing is pushed, deliberately: the target exists for the air gap whose registry the build machine cannot see. Fill the mirror from the tar on the inside:</p>
 <pre><code class="language-sh">oras cp --from-oci-layout ./cargoship-capi-providers-v0.1.0.oci.tar:v0.1.0 \
   registry.internal/cargoship/capi-providers:v0.1.0
 </code></pre>
+<p>Either way, point both objects at the mirror:</p>
 <pre><code class="language-yaml">  fetchConfig:
     oci: registry.internal/cargoship/capi-providers:v0.1.0
 </code></pre>
-<p>Four things worth knowing before you build your own artifact by hand:</p>
+<p>Four things worth knowing about the artifact, and before building one by hand:</p>
 <ul>
 <li><strong>The file names in the artifact are the typed ones</strong> - <code>bootstrap-components.yaml</code>, <code>control-plane-components.yaml</code> and <code>metadata.yaml</code> - carried in each layer’s <code>org.opencontainers.image.title</code> annotation, which is the only thing the operator reads a layer by. The media types do not matter; the operator’s own publisher pushes <code>application/vnd.test.file</code>.</li>
 <li><strong>Do not use the versioned names here.</strong> The operator looks for <code>&lt;type&gt;-&lt;name&gt;-&lt;version&gt;-components.yaml</code> first, and that middle segment is the name of the <em>custom resource</em>, not the provider: with the objects above it would be hunting for <code>bootstrap-cargoship-bootstrap-v0.1.0-components.yaml</code>. The typed names depend on nothing but the provider type, so one artifact works whatever the objects are called.</li>

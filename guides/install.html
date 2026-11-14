@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4606b902.js";
+            window.path_to_searchindex_js = "../searchindex-6305979b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-828d1999.js"></script>
@@ -203,9 +203,14 @@
 </code></pre>
 <p>This installs two controller deployments, into <code>cargoship-bootstrap-system</code> and <code>cargoship-controlplane-system</code>.</p>
 <h2 id="installing-without-a-route-to-ghcrio"><a class="header" href="#installing-without-a-route-to-ghcrio">Installing without a route to ghcr.io</a></h2>
-<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/zarf.yaml"><code>zarf.yaml</code></a> in the repository root is a <a href="https://docs.zarf.dev">Zarf</a> <code>v1beta1</code> package definition carrying both controller images and the same two component manifests <code>clusterctl</code> would download. Build it where the registry is reachable:</p>
+<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/zarf.yaml"><code>zarf.yaml</code></a> in the repository root is a <a href="https://docs.zarf.dev">Zarf</a> <code>v1beta1</code> package definition carrying both controller images and the same two component manifests <code>clusterctl</code> would download.</p>
+<p>Every release publishes it, for <code>amd64</code> and <code>arm64</code>, at <strong><code>ghcr.io/colonel-byte/zarf/cluster-api-provider-cargoship</code></strong> - tagged with the package’s version, which is the release’s tag without the leading <code>v</code>. Pull it where a registry is reachable:</p>
+<pre><code class="language-sh">zarf package pull oci://ghcr.io/colonel-byte/zarf/cluster-api-provider-cargoship:0.2.0
+</code></pre>
+<p>Or build it from the definition, which is what to do for a version that was never released or a definition you have edited:</p>
 <pre><code class="language-sh">make zarf-package     # writes out/zarf-package-cluster-api-provider-cargoship-&lt;arch&gt;-&lt;version&gt;.tar.zst
 </code></pre>
+<p>A build needs the release’s controller images to be pullable, because the package carries them; the version it builds comes from <code>zarf.yaml</code> rather than from a <code>TAG</code>, for the reason <a href="../agent/choice-zarf-package.html">the decision record</a> gives.</p>
 <p>Carry the tarball in, and deploy it to a cluster that has had <code>zarf init</code> run on it - the in-cluster registry it installs is what the controller images are rewritten to point at:</p>
 <pre><code class="language-sh">zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst
 </code></pre>
