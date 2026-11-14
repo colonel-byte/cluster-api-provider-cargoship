@@ -118,6 +118,13 @@ func (r *CargoshipControlPlaneReconciler) reconcileReplicas(
 		if err := r.Delete(ctx, victim); err != nil && !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, false, fmt.Errorf("unable to delete machine %s: %w", victim.Name, err)
 		}
+		// The API server now holds a deletion timestamp for it and this copy does not, and
+		// everything downstream in this pass decides by that field -- above all the inventory
+		// the survivors are converged from, which is the whole point of the window the
+		// pre-terminate hook holds open. Stamped rather than re-read: a machine whose
+		// infrastructure provider set no finalizer is already gone, and a re-read would fail.
+		now := metav1.Now()
+		victim.DeletionTimestamp = &now
 		logger.Info("deleting a control-plane machine", "machine", victim.Name, "have", current, "want", desired)
 		// Deliberately done=true: the converge below has to run with the departing host removed
 		// from the inventory, so the survivors' /etc/hosts and firewall rules are rewritten

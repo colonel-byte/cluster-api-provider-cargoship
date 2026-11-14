@@ -46,3 +46,35 @@ jobs:
           GOPROXY: "off"
           GOSUMDB: "off"
           GOTOOLCHAIN: local
+
+  # A second job rather than more steps on the first: this one downloads the kubebuilder control
+  # plane -- a real kube-apiserver and etcd -- and that is the only thing in this repository's CI
+  # that reaches the network for a test. Keeping it separate means the offline guarantee above
+  # still means something, and a failure here is immediately distinguishable from a unit failure.
+  envtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # The reconcile state machines, against a real API server with the converge stubbed out.
+      # They are behind a build tag, so `go test ./...` does not run them and the job above
+      # proves nothing about them. See docs/dev/e2e-tests.md.
+      #
+      # `make test-envtest` generates the Cluster API CRDs from the vendored types first, so the
+      # only download is setup-envtest's own binaries.
+      - name: Run the envtest suite
+        run: |
+          if [ -z "$(go list -mod=vendor ./... 2>/dev/null)" ]; then
+            echo "::notice::no Go packages in this tree yet; nothing to test"
+            exit 0
+          fi
+          make test-envtest
+        env:
+          GOFLAGS: -mod=vendor
+          GOTOOLCHAIN: local
