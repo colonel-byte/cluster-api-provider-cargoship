@@ -143,6 +143,17 @@ release-manifests: manifests ## Render the component manifests clusterctl instal
 	$(KUSTOMIZE) build controlplane/config/default > $(RELEASE_DIR)/control-plane-components.yaml
 	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
 
+# The version the Zarf package pins, read back out of zarf.yaml so that `make zarf-package`
+# builds the component manifests at the tag the package's images already name. Overriding TAG
+# here would produce a package whose manifests and images disagree, which is why the target
+# does not take one.
+ZARF_VERSION := $(shell sed -n 's/^  version: \([^ ]*\).*/\1/p' zarf.yaml)
+
+.PHONY: zarf-package
+zarf-package: ## Build the air-gapped Zarf package. Needs the release's images to be published.
+	$(MAKE) release-manifests TAG=$(ZARF_VERSION)
+	zarf package create . --confirm --output $(RELEASE_DIR)
+
 .PHONY: clean
 clean: ## Remove build output.
 	rm -rf bin dist $(RELEASE_DIR) cover.out
