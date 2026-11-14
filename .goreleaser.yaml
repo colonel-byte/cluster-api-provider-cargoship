@@ -108,23 +108,77 @@ release:
     - glob: out/control-plane-components.yaml
     - glob: out/metadata.yaml
   prerelease: auto
+  footer: |-
+    ---
+
+    ### Verify release artifacts with Cosign
+
+    The component manifests' checksums, the manager binaries and the controller images are signed with [Cosign](https://docs.sigstore.dev/cosign/).
+
+    Find the public key at [`cosign.pub`](https://raw.githubusercontent.com/colonel-byte/cluster-api-provider-cargoship/refs/tags/{{ .Tag }}/cosign.pub)
+
+    Verify the checksums:
+
+    ```console
+    cosign verify-blob --key cosign.pub --bundle checksums.txt.sigstore.json checksums.txt
+    ```
+
+    Verify an image tag:
+
+    ```console
+    cosign verify --key cosign.pub ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:{{ .Tag }}
+    ```
 
 checksum:
   name_template: checksums.txt
 
-# Cosign, with the same key that signs cargoship's archives, so an operator verifying one
-# verifies the other with the same public key.
+# archives are `formats: [binary]`, so the artifact type is binary rather than archive -- the
+# same reason the archive signing block below filters on binary.
+sboms:
+  - artifacts: binary
+
+# The digest file the release workflow's image attestation reads. Without it that step has no
+# subject and fails after the images are already pushed.
+docker_digest:
+  name_template: "digest.txt"
+
+# Cosign, with the same key that signs cargoship's artifacts, so an operator verifying one
+# verifies the other with the same public key. One sigstore bundle per artifact: cosign's
+# --output-signature and --output-certificate are deprecated and now refuse to run together
+# with the bundle format, which is what failed the v0.1.1 release.
 signs:
-  - cmd: cosign
-    artifacts: checksum
-    certificate: "${artifact}.pem"
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
     args:
-      - sign-blob
+      - "sign-blob"
       - "--key=env://COSIGN_PRIVATE_KEY"
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
+    artifacts: checksum
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
+  - id: binary
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - "sign-blob"
+      - "--key=env://COSIGN_PRIVATE_KEY"
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: binary
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
+
+docker_signs:
+  - id: images
+    cmd: cosign
+    args:
+      - "sign"
+      - "--key=env://COSIGN_PRIVATE_KEY"
+      - "${artifact}@${digest}"
+      - "--yes"
+    stdin: "{{ .Env.COSIGN_PASSWORD }}"
 
 changelog:
   # release-please owns the changelog; see CHANGELOG.md. Letting goreleaser write one too

@@ -1,0 +1,19 @@
+{
+  "aiBomVersion": "1",
+  "subject": {
+    "name": "cluster-api-provider-cargoship",
+    "version": "REPLACED_AT_RELEASE",
+    "commit": "REPLACED_AT_RELEASE"
+  },
+  "generatedAt": "REPLACED_AT_RELEASE",
+  "tools": [
+    {
+      "name": "Claude Code",
+      "vendor": "Anthropic",
+      "purpose": ["code", "documentation", "design records"]
+    }
+  ],
+  "humanReview": "Every change lands through a reviewed pull request and the same CI gates (CodeQL, lint, tests, Scorecard) regardless of authorship.",
+  "provenance": "CLAUDE.md records the operating rules, and docs/agent/choice-*.md record agent-driven design decisions.",
+  "disclosureDoc": "https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/CLAUDE.md"
+}
