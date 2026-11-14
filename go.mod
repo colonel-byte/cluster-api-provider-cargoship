@@ -5,6 +5,7 @@ go 1.27.4
 require (
 	github.com/colonel-byte/cargoship v0.41.2
 	github.com/k0sproject/rig/v2 v2.3.0
+	github.com/magefile/mage v1.17.2
 	golang.org/x/crypto v0.59.0
 	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.2
@@ -264,6 +265,7 @@ require (
 )
 
 tool (
+	github.com/magefile/mage
 	sigs.k8s.io/controller-runtime/tools/setup-envtest
 	sigs.k8s.io/controller-tools/cmd/controller-gen
 	sigs.k8s.io/kustomize/kustomize/v5
