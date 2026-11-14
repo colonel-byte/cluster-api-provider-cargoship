@@ -23,3 +23,4 @@
 - [choice-one-converge](agent/choice-one-converge.md)
 - [choice-registry-credentials](agent/choice-registry-credentials.md)
 - [choice-tool-dependencies](agent/choice-tool-dependencies.md)
+- [choice-zarf-package](agent/choice-zarf-package.md)

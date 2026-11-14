@@ -20,7 +20,8 @@
         { "type": "build", "section": "Build" }
       ],
       "extra-files": [
-        "docs/guides/install.md"
+        "docs/guides/install.md",
+        "zarf.yaml"
       ]
     }
   },
