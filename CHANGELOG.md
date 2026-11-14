@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.1...v0.2.2) (2026-11-14)
+
+
+### CI/CD
+
+* publish the air-gapped artifacts from the release workflow rather than the release event ([#36](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/36)) ([e92362e](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e92362e208ad5802c9e2132e16920cca63c23196))
+
 ## [0.2.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.0...v0.2.1) (2026-11-14)
 
 
