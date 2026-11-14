@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c57c642b.js";
+            window.path_to_searchindex_js = "searchindex-300431eb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-8fec7eb9.js"></script>
+        <script src="toc-dbd6424f.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -281,8 +281,9 @@ spec:
 make test             # unit tests, with the race detector
 make verify           # fail if a generator would change a checked-in file
 make release-manifests  # the three files clusterctl downloads
+make zarf-package     # the air-gapped Zarf package, built from those manifests
 </code></pre>
-<p>The repository vendors its dependencies, so everything above works with no network access. See <a href="dev/e2e-tests.html"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
+<p>The repository vendors its dependencies, so everything above works with no network access - apart from <code>make zarf-package</code>, which pulls the published controller images. See <a href="dev/e2e-tests.html"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>Apache 2.0. See <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE"><code>LICENSE</code></a>.</p>
 

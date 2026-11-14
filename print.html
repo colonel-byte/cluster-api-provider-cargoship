@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c57c642b.js";
+            window.path_to_searchindex_js = "searchindex-300431eb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-8fec7eb9.js"></script>
+        <script src="toc-dbd6424f.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -279,13 +279,15 @@ spec:
 make test             # unit tests, with the race detector
 make verify           # fail if a generator would change a checked-in file
 make release-manifests  # the three files clusterctl downloads
+make zarf-package     # the air-gapped Zarf package, built from those manifests
 </code></pre>
-<p>The repository vendors its dependencies, so everything above works with no network access. See <a href="#end-to-end-tests"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
+<p>The repository vendors its dependencies, so everything above works with no network access - apart from <code>make zarf-package</code>, which pulls the published controller images. See <a href="#end-to-end-tests"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>Apache 2.0. See <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE"><code>LICENSE</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installing-the-provider"><a class="header" href="#installing-the-provider">Installing the provider</a></h1>
 <h2 id="register-it-with-clusterctl"><a class="header" href="#register-it-with-clusterctl">Register it with clusterctl</a></h2>
+<p>On a Rancher Turtles management cluster, skip to <a href="#installing-the-provider-with-rancher-turtles">installing with Rancher Turtles</a> instead - Turtles installs providers through the Cluster API Operator, and the rest of this guide still applies.</p>
 <p>Until the provider is in <code>clusterctl</code>’s built-in list, point it at the releases. Add this to <code>~/.config/cluster-api/clusterctl.yaml</code>:</p>
 <pre><code class="language-yaml">providers:
   - name: cargoship
@@ -303,6 +305,19 @@ make release-manifests  # the three files clusterctl downloads
   --control-plane cargoship
 </code></pre>
 <p>This installs two controller deployments, into <code>cargoship-bootstrap-system</code> and <code>cargoship-controlplane-system</code>.</p>
+<h2 id="installing-without-a-route-to-ghcrio"><a class="header" href="#installing-without-a-route-to-ghcrio">Installing without a route to ghcr.io</a></h2>
+<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/zarf.yaml"><code>zarf.yaml</code></a> in the repository root is a <a href="https://docs.zarf.dev">Zarf</a> <code>v1beta1</code> package definition carrying both controller images and the same two component manifests <code>clusterctl</code> would download. Build it where the registry is reachable:</p>
+<pre><code class="language-sh">make zarf-package     # writes out/zarf-package-cluster-api-provider-cargoship-&lt;arch&gt;-&lt;version&gt;.tar.zst
+</code></pre>
+<p>Carry the tarball in, and deploy it to a cluster that has had <code>zarf init</code> run on it - the in-cluster registry it installs is what the controller images are rewritten to point at:</p>
+<pre><code class="language-sh">zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst
+</code></pre>
+<p>Three things it does not do, each of which will otherwise be found out later:</p>
+<ul>
+<li><strong>It does not install core Cluster API.</strong> <code>clusterctl init</code> is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.</li>
+<li><strong>It does not carry the cargoship distro packages.</strong> The control-plane controller pulls the package named in <code>spec.distro.ociRef</code> over OCI at converge time, from inside the management cluster. Mirror it to a registry the cluster can reach and point the reference there - <a href="#pulling-the-distro-package-from-a-zarf-registry">pulling it from a Zarf registry</a> covers the credentials and the certificate that usually come with one.</li>
+<li><strong><code>clusterctl</code> does not know the provider is installed.</strong> The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the <code>clusterctl.cluster.x-k8s.io</code> bookkeeping <code>clusterctl init</code> adds - so <code>clusterctl upgrade</code> will not see this provider. Upgrade it by deploying the next package.</li>
+</ul>
 <h2 id="the-ssh-key"><a class="header" href="#the-ssh-key">The SSH key</a></h2>
 <p>The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.</p>
 <pre><code class="language-sh">ssh-keygen -t ed25519 -N '' -f cluster-key
@@ -351,6 +366,128 @@ kubectl -n cargoship-bootstrap-system logs deploy/cargoship-bootstrap-controller
 <p>Whether k3s and RKE2 remove the etcd member on <code>Node</code> deletion. Both document that they do, through their own etcd controllers, and the ordering above gives them the chance to: the <code>Node</code> is deleted while the instance is still running and the etcd process is still up.</p>
 <p>If either turns out not to, the hook is the right place to add an explicit member removal - which is a reason to have the hook even if the answer is yes.</p>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installing-the-provider-with-rancher-turtles"><a class="header" href="#installing-the-provider-with-rancher-turtles">Installing the provider with Rancher Turtles</a></h1>
+<p><a href="https://turtles.docs.rancher.com">Rancher Turtles</a> installs Cluster API providers through the Cluster API Operator rather than through <code>clusterctl</code>, so the <a href="#installing-the-provider">install guide</a>’s <code>clusterctl init</code> is not the install path on a Turtles management cluster. Two <code>CAPIProvider</code> objects are, and nothing else in that guide changes: the SSH key secret, the control-plane controller’s storage, and the contract labels on the CRDs are all the same install.</p>
+<h2 id="declare-both-halves"><a class="header" href="#declare-both-halves">Declare both halves</a></h2>
+<p>The namespaces are not created for you, and the operator installs each provider into the namespace of the object that asked for it. Using the two this repository’s manifests already name keeps the log commands in the install guide working:</p>
+<pre><code class="language-sh">kubectl create namespace cargoship-bootstrap-system
+kubectl create namespace cargoship-controlplane-system
+</code></pre>
+<pre><code class="language-yaml">apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: cargoship-bootstrap
+  namespace: cargoship-bootstrap-system
+spec:
+  name: cargoship
+  type: bootstrap
+  version: v0.1.0
+  fetchConfig:
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: cargoship-control-plane
+  namespace: cargoship-controlplane-system
+spec:
+  name: cargoship
+  type: controlPlane
+  version: v0.1.0
+  fetchConfig:
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases
+</code></pre>
+<p>Four things in there are easy to get wrong:</p>
+<ul>
+<li><strong><code>spec.name</code> is the provider name, not <code>metadata.name</code>.</strong> Turtles resolves the provider from <code>spec.name</code> and falls back to <code>metadata.name</code> only when it is unset, so both objects carry <code>cargoship</code> and differ by type - the same shape as the two <code>cargoship</code> entries in the <code>clusterctl.yaml</code> the install guide shows. Two objects in one namespace cannot both be called <code>cargoship</code>, which is why the names above are suffixed.</li>
+<li><strong><code>spec.type</code> is <code>bootstrap</code> and <code>controlPlane</code></strong>, lower-camel. Not <code>BootstrapProvider</code>, which is the spelling the <code>ClusterctlConfig</code> below wants instead.</li>
+<li><strong><code>spec.version</code> must be semver with a leading <code>v</code></strong>, and it names the release tag. A CEL rule on the CRD rejects <code>0.1.0</code>. With <code>fetchConfig.url</code> pointing at the releases page rather than at a file, it is also the only thing telling the operator which release to read, including the <code>metadata.yaml</code> beside the components that carries the contract version.</li>
+<li><strong>Leave <code>variables</code> and <code>configSecret</code> unset.</strong> Both exist to substitute <code>clusterctl</code> variables into a provider’s components, and this provider’s components hold none.</li>
+</ul>
+<h2 id="or-register-it-centrally"><a class="header" href="#or-register-it-centrally">Or register it centrally</a></h2>
+<p>Where the provider should be known to the whole cluster rather than to one <code>CAPIProvider</code> - or where the components come from a mirror rather than from GitHub - put the URLs in Turtles’ <code>ClusterctlConfig</code> and drop <code>fetchConfig</code> from the objects above:</p>
+<pre><code class="language-yaml">apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: ClusterctlConfig
+metadata:
+  name: clusterctl-config
+  namespace: cattle-turtles-system
+spec:
+  providers:
+    - name: cargoship
+      type: BootstrapProvider
+      url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/v0.1.0/bootstrap-components.yaml
+    - name: cargoship
+      type: ControlPlaneProvider
+      url: https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/v0.1.0/control-plane-components.yaml
+</code></pre>
+<p>The name and namespace are not free. Turtles merges this object into the <code>clusterctl-config</code> ConfigMap it ships, and it looks the object up at that ConfigMap’s own name and namespace - <code>clusterctl-config</code>, in whatever namespace Turtles runs in, which defaults to <code>cattle-turtles-system</code> and is <code>rancher-turtles-system</code> on older installs. One created anywhere else is read by nothing, and nothing says so. Ask the cluster rather than guessing:</p>
+<pre><code class="language-sh">kubectl get configmap clusterctl-config --all-namespaces
+</code></pre>
+<p>That ConfigMap is also where the core Cluster API version Turtles installs is written down. This provider declares the <code>v1beta2</code> contract in its <code>metadata.yaml</code>, so the core version there has to be one that speaks it:</p>
+<pre><code class="language-sh">kubectl get configmap clusterctl-config -n cattle-turtles-system -o jsonpath='{.data.clusterctl\.yaml}'
+</code></pre>
+<h2 id="air-gapped-with-nothing-to-fetch"><a class="header" href="#air-gapped-with-nothing-to-fetch">Air-gapped, with nothing to fetch</a></h2>
+<p><code>fetchConfig</code> takes a <code>selector</code> instead of a <code>url</code>, and then the operator reads the components and the metadata out of ConfigMaps in the cluster - so an air-gapped management cluster needs no route to GitHub at all, and no mirror to stand in for it. One ConfigMap per half, carrying the same two files a release does under the keys <code>components</code> and <code>metadata</code>.</p>
+<p>On the connected side:</p>
+<pre><code class="language-sh">gh release download v0.1.0 --repo colonel-byte/cluster-api-provider-cargoship \
+  --pattern 'bootstrap-components.yaml' --pattern 'control-plane-components.yaml' --pattern 'metadata.yaml'
+</code></pre>
+<p>Inside:</p>
+<pre><code class="language-sh">kubectl create configmap v0.1.0 --namespace cargoship-bootstrap-system \
+  --from-file=components=bootstrap-components.yaml \
+  --from-file=metadata=metadata.yaml
+kubectl label configmap v0.1.0 --namespace cargoship-bootstrap-system provider-components=cargoship
+
+kubectl create configmap v0.1.0 --namespace cargoship-controlplane-system \
+  --from-file=components=control-plane-components.yaml \
+  --from-file=metadata=metadata.yaml
+kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provider-components=cargoship
+</code></pre>
+<p>Then both objects lose <code>fetchConfig.url</code> and gain the selector, with everything else unchanged:</p>
+<pre><code class="language-yaml">  fetchConfig:
+    selector:
+      matchLabels:
+        provider-components: cargoship
+</code></pre>
+<ul>
+<li><strong>The ConfigMap’s name is the version the operator offers</strong>, unless it carries a <code>provider.cluster.x-k8s.io/version</code> label saying otherwise - and it has to match the <code>spec.version</code> on the <code>CAPIProvider</code>. Two ConfigMaps both called <code>v0.1.0</code> is fine here only because each sits in its own namespace; in one namespace, give them different names and a version label each.</li>
+<li><strong>The label is yours.</strong> <code>provider-components</code> is only the convention the operator’s own examples use; nothing reads the key, the selector just has to match.</li>
+<li><strong>The components still name <code>ghcr.io</code> images.</strong> Mirror the two controller images and override the registry through the <code>CAPIProvider</code>’s <code>configSecret</code>, whose <code>images</code> key the operator reads as a clusterctl image override - <code>all: {repository: &lt;registry&gt;/&lt;org&gt;}</code>. This is the one part of the air-gapped install that a selector does not cover. The distro package the controller pulls later is separate again: see <a href="#pulling-the-distro-package-from-a-zarf-registry">pulling it from a Zarf registry</a>.</li>
+<li><strong>A ConfigMap holds 1 MiB.</strong> These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, <code>gzip</code> the components and annotate the ConfigMap <code>provider.cluster.x-k8s.io/compressed: "true"</code>, without which the operator reads the archive as YAML.</li>
+</ul>
+<h2 id="air-gapped-from-a-registry"><a class="header" href="#air-gapped-from-a-registry">Air-gapped, from a registry</a></h2>
+<p><code>fetchConfig.oci</code> is the third option, and the one to reach for where the air gap already has a registry: the operator pulls <code>metadata.yaml</code> and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step. <code>make oci-artifact</code> builds that artifact, holding both halves of this provider.</p>
+<p>On the connected side:</p>
+<pre><code class="language-sh">make oci-artifact TAG=v0.1.0
+</code></pre>
+<p>That writes an OCI image layout to <code>out/oci</code>, tagged <code>v0.1.0</code>, and tars it as <code>out/cargoship-capi-providers-v0.1.0.oci.tar</code> - which is the file to carry in. Nothing is pushed: the registry this is for is on the other side of the air gap from the machine that builds it.</p>
+<p>Inside, fill the mirror from the tar and point both objects at it:</p>
+<pre><code class="language-sh">oras cp --from-oci-layout ./cargoship-capi-providers-v0.1.0.oci.tar:v0.1.0 \
+  registry.internal/cargoship/capi-providers:v0.1.0
+</code></pre>
+<pre><code class="language-yaml">  fetchConfig:
+    oci: registry.internal/cargoship/capi-providers:v0.1.0
+</code></pre>
+<p>Four things worth knowing before you build your own artifact by hand:</p>
+<ul>
+<li><strong>The file names in the artifact are the typed ones</strong> - <code>bootstrap-components.yaml</code>, <code>control-plane-components.yaml</code> and <code>metadata.yaml</code> - carried in each layer’s <code>org.opencontainers.image.title</code> annotation, which is the only thing the operator reads a layer by. The media types do not matter; the operator’s own publisher pushes <code>application/vnd.test.file</code>.</li>
+<li><strong>Do not use the versioned names here.</strong> The operator looks for <code>&lt;type&gt;-&lt;name&gt;-&lt;version&gt;-components.yaml</code> first, and that middle segment is the name of the <em>custom resource</em>, not the provider: with the objects above it would be hunting for <code>bootstrap-cargoship-bootstrap-v0.1.0-components.yaml</code>. The typed names depend on nothing but the provider type, so one artifact works whatever the objects are called.</li>
+<li><strong>A reference with no tag takes <code>spec.version</code> as the tag</strong>, so <code>oci: registry.internal/cargoship/capi-providers</code> and a <code>spec.version</code> of <code>v0.1.0</code> resolve to the same artifact as the reference above. A registry served over plain HTTP needs an <code>http://</code> prefix on the reference, which is how the operator decides to skip TLS.</li>
+<li><strong>Credentials come from provider variables, not from a pull secret.</strong> The operator reads <code>OCI_USERNAME</code> and <code>OCI_PASSWORD</code>, or <code>OCI_ACCESS_TOKEN</code> or <code>OCI_REFRESH_TOKEN</code>, out of the <code>CAPIProvider</code>’s <code>configSecret</code> - the same secret the registry override below goes in. A mirror that allows anonymous reads needs none of them.</li>
+</ul>
+<p>The components still name <code>ghcr.io</code> images, exactly as they do when they come from ConfigMaps, so the note above about mirroring the two controller images applies here unchanged.</p>
+<h2 id="check-it-came-up"><a class="header" href="#check-it-came-up">Check it came up</a></h2>
+<pre><code class="language-sh">kubectl get capiproviders --all-namespaces
+</code></pre>
+<p>Both rows reach <code>Ready</code> in <code>Phase</code>, with <code>cargoship</code> as <code>ProviderName</code> and the release tag as <code>InstalledVersion</code>. A row stuck in <code>Provisioning</code> is the operator failing to fetch or apply the components, and its reason is in the Turtles controller’s log rather than on the object.</p>
+<h2 id="importing-the-workload-cluster-into-rancher"><a class="header" href="#importing-the-workload-cluster-into-rancher">Importing the workload cluster into Rancher</a></h2>
+<p>Turtles imports a Cluster API cluster into Rancher when the <code>Cluster</code> - or the namespace holding it - carries the auto-import label:</p>
+<pre><code class="language-sh">kubectl label namespace my-clusters cluster-api.cattle.io/rancher-auto-import=true
+</code></pre>
+<p>Rancher then installs its cluster agent into the workload cluster, which needs a working CNI there and an API endpoint the management cluster can reach. A cargoship cluster that has converged has both; one still waiting on machines has neither, and the import simply happens later. Nothing in this provider is involved in the import either way.</p>
+<h2 id="what-this-does-not-solve"><a class="header" href="#what-this-does-not-solve">What this does not solve</a></h2>
+<p><code>clusterctl</code> and Turtles are two ways to install the same component manifests, and installing with one leaves the other unaware. If the provider was installed with <a href="#installing-without-a-route-to-ghcrio">the Zarf package</a> instead, Turtles does not manage it and <code>kubectl get capiproviders</code> shows nothing - deploy the next package to upgrade, or delete it and declare the <code>CAPIProvider</code> objects to hand it over. On a Turtles cluster the selector above is the better air-gapped route of the two, because what it installs is still a provider Turtles manages.</p>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="pulling-the-distro-package-from-a-zarf-registry"><a class="header" href="#pulling-the-distro-package-from-a-zarf-registry">Pulling the distro package from a Zarf registry</a></h1>
 <p>The control-plane controller pulls <code>spec.distro.ociRef</code> itself, from inside the management cluster, every time it converges a fleet. A Zarf registry is the usual place for that package in an air gap, and it is the awkward one: it wants credentials, and it serves a certificate nothing in the controller trusts. Both are handled on the <code>CargoshipControlPlane</code>.</p>
 <pre><code class="language-yaml">spec:
@@ -391,6 +528,8 @@ kubectl -n cargoship-bootstrap-system logs deploy/cargoship-bootstrap-controller
 </ul>
 <p><code>insecureSkipTLSVerify: true</code> is the other option, and it is a different thing: it accepts whatever certificate the registry presents without checking it. Reach for it to prove a registry is otherwise reachable, not to run a fleet. It covers the package pull only - the SSH connections and the workload cluster’s API server are not affected by either field.</p>
 <p>What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with <code>mtlsStrategy</code> set to anything requiring one cannot be pulled from by this controller.</p>
+<h2 id="why-this-is-not-the-zarf-packages-problem"><a class="header" href="#why-this-is-not-the-zarf-packages-problem">Why this is not the Zarf package’s problem</a></h2>
+<p><a href="#installing-without-a-route-to-ghcrio">The Zarf package</a> installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
 <p>The unit tests cover everything that can be covered without a fleet: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
@@ -531,6 +670,19 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <p>The symptom is confusing enough to be worth writing down: the first thing that breaks is <code>golangci-lint</code> itself, reporting a <code>typecheck</code> error against <code>pkg/manager/manager.go</code> with ten levels of nested “could not import”. That reads like a problem with the file. It is not.</p>
 <h2 id="if-you-need-to-add-a-tool"><a class="header" href="#if-you-need-to-add-a-tool">If you need to add a tool</a></h2>
 <p>Add it, then check <code>go build ./...</code> <strong>and</strong> <code>grep structured-merge-diff go.mod</code>. If the version moved, the tool is not safe to add here. The <code>k8s.io</code> modules are pinned to the versions <code>cluster-api</code> wants, not to latest, for this reason - a <code>go get -u</code> across them is not a routine upgrade.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-zarf-package-is-built-from-out-and-pins-its-version-three-times"><a class="header" href="#the-zarf-package-is-built-from-out-and-pins-its-version-three-times">The Zarf package is built from <code>out/</code>, and pins its version three times</a></h1>
+<p>This repository ships a Zarf <code>v1beta1</code> package definition, <a href="../zarf.yaml"><code>zarf.yaml</code></a>, for management clusters with no route to <code>ghcr.io</code>. Two things about it look like oversights and are not.</p>
+<h2 id="it-deploys-out-componentsyaml-not-the-kustomizations"><a class="header" href="#it-deploys-out-componentsyaml-not-the-kustomizations">It deploys <code>out/*-components.yaml</code>, not the kustomizations</a></h2>
+<p>Zarf can run kustomize itself - a manifest takes <code>kustomize.files</code> as readily as <code>files</code> - so the package could point at <code>bootstrap/config/default</code> and skip <code>make release-manifests</code> entirely. It does not, because then the provider would be assembled two ways: once by <code>make release-manifests</code> for the operator who installs with <code>clusterctl</code>, and once by Zarf for the operator who installs in an air gap. Both would be correct on the day they were written and free to drift afterwards. Pointing at the release artifact means the air-gapped install is the <em>same</em> artifact, and <code>make zarf-package</code> builds it first so there is nothing to forget.</p>
+<h2 id="the-version-and-both-image-tags-are-literals-repeated"><a class="header" href="#the-version-and-both-image-tags-are-literals-repeated">The version and both image tags are literals, repeated</a></h2>
+<p><code>###ZARF_PKG_TMPL_TAG###</code> does not reach an image reference in a <code>v1beta1</code> package. Zarf parses the reference during validation, which runs before <code>--set</code> is applied, and the create fails with <code>invalid reference format</code> - with <code>zarf dev lint</code> reporting the same thing, so this is cheap to re-confirm:</p>
+<pre><code class="language-sh">zarf dev lint . --set TAG=0.1.0
+</code></pre>
+<p>So the tag is written out three times, and release-please rewrites all three on a release: <code>zarf.yaml</code> is in <code>extra-files</code> in <a href="../release-please-config.json"><code>release-please-config.json</code></a>, and each of the three lines carries the <code>x-release-please-version</code> comment it looks for. Removing one of those comments is silent - the package still builds, pinning an image tag a release ago.</p>
+<p><code>make zarf-package</code> reads the version back out of <code>zarf.yaml</code> and renders the component manifests at it, rather than taking a <code>TAG</code> like the other release targets. A <code>TAG</code> there would produce a package whose manifests name one version and whose images carry another, which fails at deploy time against the in-cluster registry rather than at build time.</p>
+<h2 id="what-it-deliberately-leaves-out"><a class="header" href="#what-it-deliberately-leaves-out">What it deliberately leaves out</a></h2>
+<p>Core Cluster API, and the cargoship distro packages the control-plane controller pulls at converge time. Both are somebody else’s artifact with their own cadence, and bundling either would make this package a mirror of the whole air gap rather than of this provider. <a href="#installing-the-provider"><code>docs/guides/install.md</code></a> says so where an operator will read it.</p>
 
                     </main>
 
