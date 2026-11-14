@@ -115,7 +115,39 @@ Then both objects lose `fetchConfig.url` and gain the selector, with everything 
 - **The components still name `ghcr.io` images.** Mirror the two controller images and override the registry through the `CAPIProvider`'s `configSecret`, whose `images` key the operator reads as a clusterctl image override - `all: {repository: <registry>/<org>}`. This is the one part of the air-gapped install that a selector does not cover. The distro package the controller pulls later is separate again: see [pulling it from a Zarf registry](registry.md).
 - **A ConfigMap holds 1 MiB.** These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, `gzip` the components and annotate the ConfigMap `provider.cluster.x-k8s.io/compressed: "true"`, without which the operator reads the archive as YAML.
 
-`fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: it pulls `metadata.yaml` and the typed `bootstrap-components.yaml` and `control-plane-components.yaml` out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.
+## Air-gapped, from a registry
+
+`fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: the operator pulls `metadata.yaml` and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step. `make oci-artifact` builds that artifact, holding both halves of this provider.
+
+On the connected side:
+
+```sh
+make oci-artifact TAG=v0.1.0
+```
+
+That writes an OCI image layout to `out/oci`, tagged `v0.1.0`, and tars it as `out/cargoship-capi-providers-v0.1.0.oci.tar` - which is the file to carry in. Nothing is pushed: the registry this is for is on the other side of the air gap from the machine that builds it.
+
+Inside, fill the mirror from the tar and point both objects at it:
+
+```sh
+oras cp --from-oci-layout ./cargoship-capi-providers-v0.1.0.oci.tar:v0.1.0 \
+  registry.internal/cargoship/capi-providers:v0.1.0
+```
+
+```yaml
+  fetchConfig:
+    oci: registry.internal/cargoship/capi-providers:v0.1.0
+```
+
+Four things worth knowing before you build your own artifact by hand:
+
+- **The file names in the artifact are the typed ones** - `bootstrap-components.yaml`, `control-plane-components.yaml` and `metadata.yaml` - carried in each layer's `org.opencontainers.image.title` annotation, which is the only thing the operator reads a layer by. The media types do not matter; the operator's own publisher pushes `application/vnd.test.file`.
+- **Do not use the versioned names here.** The operator looks for `<type>-<name>-<version>-components.yaml` first, and that middle segment is the name of the *custom resource*, not the provider: with the objects above it would be hunting for `bootstrap-cargoship-bootstrap-v0.1.0-components.yaml`. The typed names depend on nothing but the provider type, so one artifact works whatever the objects are called.
+- **A reference with no tag takes `spec.version` as the tag**, so `oci: registry.internal/cargoship/capi-providers` and a `spec.version` of `v0.1.0` resolve to the same artifact as the reference above. A registry served over plain HTTP needs an `http://` prefix on the reference, which is how the operator decides to skip TLS.
+- **Credentials come from provider variables, not from a pull secret.** The operator reads `OCI_USERNAME` and `OCI_PASSWORD`, or `OCI_ACCESS_TOKEN` or `OCI_REFRESH_TOKEN`, out of the `CAPIProvider`'s `configSecret` - the same secret the registry override below goes in. A mirror that allows anonymous reads needs none of them.
+
+The components still name `ghcr.io` images, exactly as they do when they come from ConfigMaps, so the note above about mirroring the two controller images applies here unchanged.
+
 
 ## Check it came up
 

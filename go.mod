@@ -6,12 +6,14 @@ require (
 	github.com/colonel-byte/cargoship v0.41.2
 	github.com/k0sproject/rig/v2 v2.3.0
 	github.com/magefile/mage v1.17.2
+	github.com/opencontainers/image-spec v1.1.1
 	golang.org/x/crypto v0.59.0
 	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	oras.land/oras-go/v2 v2.7.0
 	sigs.k8s.io/cluster-api v1.14.4
 	sigs.k8s.io/cluster-api/api v1.14.4
 	sigs.k8s.io/controller-runtime v0.25.2
@@ -167,7 +169,6 @@ require (
 	github.com/onsi/ginkgo/v2 v2.34.0 // indirect
 	github.com/onsi/gomega v1.44.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/otiai10/copy v1.14.1 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
@@ -256,7 +257,6 @@ require (
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
-	oras.land/oras-go/v2 v2.7.0 // indirect
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.25.2 // indirect
 	sigs.k8s.io/controller-tools v0.21.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect

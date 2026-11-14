@@ -29,6 +29,7 @@ package main
 
 import (
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/docs"
+	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/ociartifact"
 	"github.com/magefile/mage/mg"
 )
 
@@ -39,4 +40,10 @@ type Generate mg.Namespace
 func (Generate) Document() error {
 	// The repository root: mage runs from it, because the Makefile does.
 	return docs.Generate(".")
+}
+
+// OCIArtifact packs the released component manifests in releaseDir into an OCI image layout
+// tagged with version, for a Cluster API Operator installing from a registry.
+func (Generate) OCIArtifact(releaseDir, version string) error {
+	return ociartifact.Generate(releaseDir, version)
 }
