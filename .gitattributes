@@ -23,5 +23,10 @@ controlplane/config/crd/bases/*.yaml linguist-generated
 bootstrap/config/rbac/role.yaml linguist-generated
 controlplane/config/rbac/role.yaml linguist-generated
 
+# `make docs` (magefiles/pkg/gen/docs). index.md is README.md with its links rewritten and
+# SUMMARY.md is built from the pages on disk; the pages themselves are hand-written.
+docs/index.md linguist-generated
+docs/SUMMARY.md linguist-generated
+
 # release-please
 CHANGELOG.md linguist-generated
