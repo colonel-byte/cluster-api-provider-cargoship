@@ -1,0 +1,121 @@
+---
+name: Check the kustomize hold
+
+# go.mod holds sigs.k8s.io/kustomize/* below the latest patch release. 0.21.3 / 5.8.3 require
+# k8s.io/kube-openapi@20261001230523, which moved to structured-merge-diff v7, while the pinned
+# apimachinery still compiles against v6 -- taking the bump breaks every job on
+# `cannot use typeSchema.Types ... v7/schema.TypeDef as v6/schema.TypeDef`. See PR #32.
+#
+# Nothing in the tree records when that stops being true, and the hold is on tool-only
+# dependencies nobody imports, so it would sit there unnoticed. This job tries the bump every
+# week and opens an issue the week it compiles. It never commits anything: picking versions is
+# Dependabot's job, and the lift wants a human to run the tests.
+on:
+  schedule:
+    # Run at 06:00 UTC every Monday
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-kustomize-hold:
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # No GOFLAGS: -mod=vendor here, unlike every other workflow in this repository. `go get`
+      # and `go mod tidy` have to reach the proxy, which is the whole point of the job.
+      #
+      # kube-openapi is not named: raising kustomize pulls it forward through MVS on its own,
+      # which is exactly how the hold came to exist.
+      - name: Try the bump
+        id: check
+        run: |
+          set -euo pipefail
+
+          go get \
+            sigs.k8s.io/kustomize/api@latest \
+            sigs.k8s.io/kustomize/cmd/config@latest \
+            sigs.k8s.io/kustomize/kustomize/v5@latest \
+            sigs.k8s.io/kustomize/kyaml@latest
+          go mod tidy
+          go mod vendor
+
+          # An unchanged go.mod means kustomize is already at the latest release, so there is
+          # no hold left to lift and nothing to report. Checked before the build, because a
+          # no-op upgrade builds fine and would otherwise open an issue every week.
+          if git diff --quiet go.mod; then
+            echo "::notice::kustomize is already at the latest release; no hold to lift"
+            exit 0
+          fi
+
+          git diff go.mod > gomod.patch
+
+          # The build is the thing the hold exists to protect, so it is the whole test. The
+          # issue asks for the rest of `make verify` to be run by hand on the real change.
+          if go build ./...; then
+            echo "liftable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::the kustomize hold still stands; apimachinery is not on smd v7 yet"
+          fi
+
+      - name: Open or update issue
+        if: steps.check.outputs.liftable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          marker='<!-- kustomize-hold-liftable -->'
+          title="chore(deps): the kustomize hold can be lifted"
+
+          {
+            echo "$marker"
+            echo "\`sigs.k8s.io/kustomize/*\` now builds at its latest release against the pinned"
+            echo "Kubernetes dependencies. The hold described in \`.github/workflows/check-kustomize-hold.yaml\`"
+            echo "and introduced in #32 is no longer needed."
+            echo
+            echo "### Versions that built"
+            echo
+            echo '```diff'
+            cat gomod.patch
+            echo '```'
+            echo
+            echo "Merge Dependabot's next \`tools\` group pull request, or reproduce it locally:"
+            echo
+            echo '```sh'
+            echo "go get sigs.k8s.io/kustomize/api@latest sigs.k8s.io/kustomize/cmd/config@latest \\"
+            echo "  sigs.k8s.io/kustomize/kustomize/v5@latest sigs.k8s.io/kustomize/kyaml@latest"
+            echo "go mod tidy && go mod vendor"
+            echo '```'
+            echo
+            echo "Then run \`make verify\` and the unit tests before committing: this job only checks"
+            echo "that \`go build ./...\` succeeds."
+          } > body.md
+
+          # Look for an existing open issue with the literal marker in the body.
+          issue_number=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --limit 100 \
+            --json number,body |
+            jq -r --arg marker "$marker" '
+              map(select(.body != null and (.body | contains($marker)))) |
+              .[0].number // empty
+            ')
+
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --repo "$REPO" --body-file body.md
+          else
+            gh issue create --repo "$REPO" --title "$title" --body-file body.md
+          fi
