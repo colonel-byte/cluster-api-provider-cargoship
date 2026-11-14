@@ -26,7 +26,6 @@ require (
 	filippo.io/age v1.3.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	filippo.io/hpke v0.4.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.13.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4 // indirect
 	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
@@ -187,7 +186,7 @@ require (
 	github.com/shopspring/decimal v1.6.0 // indirect
 	github.com/sigstore/cosign/v3 v3.1.4 // indirect
 	github.com/sigstore/protobuf-specs v0.5.2 // indirect
-	github.com/sigstore/rekor v1.5.5 // indirect
+	github.com/sigstore/rekor v1.6.0 // indirect
 	github.com/sigstore/rekor-tiles/v2 v2.4.2 // indirect
 	github.com/sigstore/sigstore v1.11.3 // indirect
 	github.com/sigstore/sigstore-go v1.4.0 // indirect
