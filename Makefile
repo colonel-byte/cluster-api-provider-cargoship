@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A Makefile rather than mage, which is what colonel-byte/cargoship uses.
+# Make for the targets the ecosystem names, mage for the generators behind them.
 #
-# The deviation is deliberate. Every Cluster API provider is driven by `make generate`,
-# `make manifests` and `make release-manifests`; the contributing guide, the provider
-# implementers' documentation and clusterctl's own release tooling all assume those targets exist.
-# Cargoship's mage namespaces exist to drive its own generators, which this repository has none of.
-# See docs/agent/choice-makefile-not-mage.md.
+# Every Cluster API provider is driven by `make generate`, `make manifests` and
+# `make release-manifests`; the contributing guide, the provider implementers' documentation and
+# clusterctl's own release tooling all assume those targets exist, so they stay here. A generator
+# with real logic in it lives in magefiles/ instead, in Go, where it can be tested -- and this
+# Makefile calls it. See docs/agent/choice-makefile-not-mage.md.
 
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
@@ -30,6 +30,9 @@ SHELL := /usr/bin/env bash
 CONTROLLER_GEN := go tool controller-gen
 KUSTOMIZE := go tool kustomize
 ENVTEST := go tool setup-envtest
+# mage is pinned the same way, so `make docs` needs nothing installed. It compiles magefiles/
+# itself, which is why the generators there can be ordinary Go packages with tests.
+MAGE := go tool mage
 
 # golangci-lint is deliberately NOT a tool dependency. Adding it to go.mod drags k8s.io/* up to a
 # patch release that wants structured-merge-diff/v7 while cluster-api pins v6, and the module
@@ -61,22 +64,12 @@ generate-deepcopy: ## Regenerate zz_generated.deepcopy.go.
 		paths=./bootstrap/api/... paths=./controlplane/api/...
 
 .PHONY: docs
-docs: ## Copy README.md to the book's landing page, rewriting its links.
-	# A copy rather than a symlink: mdBook's behaviour on a symlinked chapter is not something
-	# to depend on, and a broken landing page is silent -- `mdbook build` does not fail on it.
-	# colonel-byte/cargoship does the same thing from its docs generator.
-	#
-	# The rewrite is the part that is easy to miss. README.md's links are relative to the
-	# repository root, and the copy is read from docs/, so every `docs/...` link in it would
-	# resolve one level too deep and every one of them would be dead in the published book --
-	# silently, because nothing in the build checks a relative link. Stripping the prefix makes
-	# them relative to docs/ instead, and LICENSE becomes absolute because it is outside the
-	# book entirely.
-	cp README.md docs/index.md
-	sed -i \
-		-e 's|](docs/|](|g' \
-		-e 's|](LICENSE)|](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE)|g' \
-		docs/index.md
+docs: ## Write the book's landing page and its table of contents.
+	# Both pages are generated: index.md is README.md with its links rewritten, and SUMMARY.md is
+	# built from whatever pages are on disk, because a page that is added and not listed there is
+	# simply missing from the book and mdBook does not say so. The reasoning for each is on the
+	# functions in magefiles/pkg/gen/docs.
+	$(MAGE) generate:document
 
 .PHONY: manifests
 manifests: ## Regenerate the CRDs and RBAC roles.
@@ -109,7 +102,8 @@ GENERATED_PATHS := \
 	'**/zz_generated.deepcopy.go' \
 	bootstrap/config \
 	controlplane/config \
-	docs/index.md
+	docs/index.md \
+	docs/SUMMARY.md
 
 .PHONY: verify
 verify: generate ## Fail if a generator would change a checked-in file.
