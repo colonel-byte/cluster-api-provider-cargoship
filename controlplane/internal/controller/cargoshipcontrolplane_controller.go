@@ -57,6 +57,12 @@ const (
 	waitForOwner = 2 * time.Second
 )
 
+// ConvergeFunc is the apply itself, as the reconcile calls it.
+//
+// It exists so a test can drive the whole state machine without a fleet to SSH into. The one
+// implementation outside tests is converge.Apply, which SetupWithManager installs.
+type ConvergeFunc func(ctx context.Context, inv *converge.Inventory, opts converge.Options) (*converge.Run, error)
+
 // CargoshipControlPlaneReconciler converges a fleet to a cargoship package.
 type CargoshipControlPlaneReconciler struct {
 	client.Client
@@ -64,6 +70,8 @@ type CargoshipControlPlaneReconciler struct {
 	Runner *converge.Runner
 	// Probe reports whether a host is accepting SSH. Replaced in tests.
 	Probe Prober
+	// Converge is the apply the Runner runs. Replaced in tests.
+	Converge ConvergeFunc
 }
 
 // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=cargoshipcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -250,7 +258,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 
 	key := client.ObjectKeyFromObject(cp).String()
 	run := r.Runner.Start(ctx, key, fingerprint, func(runCtx context.Context) (*converge.Run, error) {
-		return converge.Apply(runCtx, inv, converge.Options{
+		return r.Converge(runCtx, inv, converge.Options{
 			Source:                source,
 			Architecture:          cp.Spec.Distro.Arch,
 			CABundle:              caBundle,
@@ -573,6 +581,9 @@ func (r *CargoshipControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) err
 	}
 	if r.Probe == nil {
 		r.Probe = &DialProbe{}
+	}
+	if r.Converge == nil {
+		r.Converge = converge.Apply
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
