@@ -31,11 +31,21 @@ This installs two controller deployments, into `cargoship-bootstrap-system` and 
 
 ## Installing without a route to ghcr.io
 
-[`zarf.yaml`](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/zarf.yaml) in the repository root is a [Zarf](https://docs.zarf.dev) `v1beta1` package definition carrying both controller images and the same two component manifests `clusterctl` would download. Build it where the registry is reachable:
+[`zarf.yaml`](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/zarf.yaml) in the repository root is a [Zarf](https://docs.zarf.dev) `v1beta1` package definition carrying both controller images and the same two component manifests `clusterctl` would download.
+
+Every release publishes it, for `amd64` and `arm64`, at **`ghcr.io/colonel-byte/zarf/cluster-api-provider-cargoship`** - tagged with the package's version, which is the release's tag without the leading `v`. Pull it where a registry is reachable:
+
+```sh
+zarf package pull oci://ghcr.io/colonel-byte/zarf/cluster-api-provider-cargoship:0.2.0
+```
+
+Or build it from the definition, which is what to do for a version that was never released or a definition you have edited:
 
 ```sh
 make zarf-package     # writes out/zarf-package-cluster-api-provider-cargoship-<arch>-<version>.tar.zst
 ```
+
+A build needs the release's controller images to be pullable, because the package carries them; the version it builds comes from `zarf.yaml` rather than from a `TAG`, for the reason [the decision record](../agent/choice-zarf-package.md) gives.
 
 Carry the tarball in, and deploy it to a cluster that has had `zarf init` run on it - the in-cluster registry it installs is what the controller images are rewritten to point at:
 

@@ -117,29 +117,40 @@ Then both objects lose `fetchConfig.url` and gain the selector, with everything 
 
 ## Air-gapped, from a registry
 
-`fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: the operator pulls `metadata.yaml` and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step. `make oci-artifact` builds that artifact, holding both halves of this provider.
+`fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: the operator pulls `metadata.yaml` and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.
 
-On the connected side:
+Every release publishes that artifact, holding both halves of this provider, at **`ghcr.io/colonel-byte/turtle/cargoship`** - tagged with the release's own tag, and signed with the same cosign key as the controller images. So on the connected side there is nothing to build:
+
+```sh
+oras cp ghcr.io/colonel-byte/turtle/cargoship:v0.1.0 \
+  registry.internal/cargoship/capi-providers:v0.1.0
+
+cosign verify \
+  --key https://raw.githubusercontent.com/colonel-byte/zarf-slim-init/refs/heads/main/cosign.pub \
+  ghcr.io/colonel-byte/turtle/cargoship:v0.1.0
+```
+
+Where the connected side cannot reach the mirror either - which is the usual arrangement - build the artifact as a file to carry in instead:
 
 ```sh
 make oci-artifact TAG=v0.1.0
 ```
 
-That writes an OCI image layout to `out/oci`, tagged `v0.1.0`, and tars it as `out/cargoship-capi-providers-v0.1.0.oci.tar` - which is the file to carry in. Nothing is pushed: the registry this is for is on the other side of the air gap from the machine that builds it.
-
-Inside, fill the mirror from the tar and point both objects at it:
+That writes an OCI image layout to `out/oci`, tagged `v0.1.0`, and tars it as `out/cargoship-capi-providers-v0.1.0.oci.tar`. Nothing is pushed, deliberately: the target exists for the air gap whose registry the build machine cannot see. Fill the mirror from the tar on the inside:
 
 ```sh
 oras cp --from-oci-layout ./cargoship-capi-providers-v0.1.0.oci.tar:v0.1.0 \
   registry.internal/cargoship/capi-providers:v0.1.0
 ```
 
+Either way, point both objects at the mirror:
+
 ```yaml
   fetchConfig:
     oci: registry.internal/cargoship/capi-providers:v0.1.0
 ```
 
-Four things worth knowing before you build your own artifact by hand:
+Four things worth knowing about the artifact, and before building one by hand:
 
 - **The file names in the artifact are the typed ones** - `bootstrap-components.yaml`, `control-plane-components.yaml` and `metadata.yaml` - carried in each layer's `org.opencontainers.image.title` annotation, which is the only thing the operator reads a layer by. The media types do not matter; the operator's own publisher pushes `application/vnd.test.file`.
 - **Do not use the versioned names here.** The operator looks for `<type>-<name>-<version>-components.yaml` first, and that middle segment is the name of the *custom resource*, not the provider: with the objects above it would be hunting for `bootstrap-cargoship-bootstrap-v0.1.0-components.yaml`. The typed names depend on nothing but the provider type, so one artifact works whatever the objects are called.
