@@ -33,8 +33,6 @@ filippo.io/hpke
 filippo.io/hpke/crypto
 filippo.io/hpke/crypto/ecdh
 filippo.io/hpke/internal/byteorder
-# github.com/Azure/azure-sdk-for-go/sdk/internal v1.13.0
-## explicit; go 1.25.0
 # github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4
 ## explicit; go 1.17
 github.com/Azure/go-ansiterm
@@ -992,7 +990,7 @@ github.com/sigstore/protobuf-specs/gen/pb-go/common/v1
 github.com/sigstore/protobuf-specs/gen/pb-go/dsse
 github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1
 github.com/sigstore/protobuf-specs/gen/pb-go/trustroot/v1
-# github.com/sigstore/rekor v1.5.5
+# github.com/sigstore/rekor v1.6.0
 ## explicit; go 1.27
 github.com/sigstore/rekor/internal/pgpv3
 github.com/sigstore/rekor/internal/pgpv3/adapted
