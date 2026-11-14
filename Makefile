@@ -179,10 +179,20 @@ oci-artifact: release-manifests ## Pack the component manifests into an OCI arti
 # does not take one.
 ZARF_VERSION := $(shell sed -n 's/^  version: \([^ ]*\).*/\1/p' zarf.yaml)
 
+# Optional, and empty for an ordinary local build: ZARF_ARCH builds for an architecture other than
+# this host's, and a COSIGN_KEY in the environment signs the package with it. Both exist for the
+# release workflow, which builds one package per architecture and signs each.
+#
+# The passphrase is referenced as a shell variable rather than expanded by make, because make
+# echoes every recipe line it runs and a passphrase spliced into one would be echoed with it.
+ZARF_ARCH ?=
+ZARF_CREATE_FLAGS := $(if $(ZARF_ARCH),--architecture $(ZARF_ARCH))
+ZARF_CREATE_FLAGS += $(if $(COSIGN_KEY),--signing-key env://COSIGN_KEY --signing-key-pass "$$COSIGN_PASS")
+
 .PHONY: zarf-package
 zarf-package: ## Build the air-gapped Zarf package. Needs the release's images to be published.
 	$(MAKE) release-manifests TAG=$(ZARF_VERSION)
-	zarf package create . --confirm --output $(RELEASE_DIR)
+	zarf package create . --confirm --output $(RELEASE_DIR) $(ZARF_CREATE_FLAGS)
 
 .PHONY: clean
 clean: ## Remove build output.
