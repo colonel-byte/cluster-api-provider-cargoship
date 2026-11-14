@@ -203,7 +203,7 @@ github.com/cloudflare/circl/sign/slhdsa
 github.com/cloudflare/circl/simd/keccakf1600
 github.com/cloudflare/circl/xof
 github.com/cloudflare/circl/xof/k12
-# github.com/colonel-byte/cargoship v0.41.2
+# github.com/colonel-byte/cargoship v0.42.2
 ## explicit; go 1.27.4
 github.com/colonel-byte/cargoship/api
 github.com/colonel-byte/cargoship/api/colonel-byte.dev/v1alpha1
@@ -246,6 +246,7 @@ github.com/colonel-byte/cargoship/pkg/packager/load
 github.com/colonel-byte/cargoship/pkg/phase
 github.com/colonel-byte/cargoship/pkg/retry
 github.com/colonel-byte/cargoship/pkg/riglogger
+github.com/colonel-byte/cargoship/pkg/schema
 github.com/colonel-byte/cargoship/pkg/signing
 github.com/colonel-byte/cargoship/pkg/utils
 github.com/colonel-byte/cargoship/pkg/zarfpackage
@@ -1198,8 +1199,8 @@ github.com/xlab/treeprint
 # github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
 ## explicit; go 1.17
 github.com/youmark/pkcs8
-# github.com/zarf-dev/zarf v1.0.0
-## explicit; go 1.26.10
+# github.com/zarf-dev/zarf v1.0.1
+## explicit; go 1.26.11
 github.com/zarf-dev/zarf/src/api
 github.com/zarf-dev/zarf/src/api/convert
 github.com/zarf-dev/zarf/src/api/v1alpha1
