@@ -26,6 +26,7 @@
 package dockerconfig
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,6 +61,48 @@ func Use(dir string) error {
 		return fmt.Errorf("unable to set %s: %w", EnvVar, err)
 	}
 	return nil
+}
+
+// MergeCredential adds one registry's username and password to the config file.
+//
+// It exists because not every credential arrives as a dockerconfigjson secret. A Zarf deployment
+// records its registry's credentials in its own state rather than in a secret of that type, and
+// the pull reads nothing but this file -- see docs/agent/choice-registry-credentials.md. The
+// payload is assembled here rather than by the caller so that the file's shape stays knowledge
+// this package holds alone.
+//
+// host is the registry as a pull will ask for it, which is a host and an optional port and no
+// path: the credential store is keyed by that string, so an entry written under a prefixed
+// registry would never be found.
+func MergeCredential(host, username, password string) error {
+	if host == "" {
+		return errors.New("a registry host is required")
+	}
+	if username == "" || password == "" {
+		return fmt.Errorf("no username and password for the registry %s", host)
+	}
+
+	// All three, because which one a client reads is not ours to decide: oras takes the username
+	// and password, and `auth` is what every docker-shaped tool looks for first. A dockerconfigjson
+	// secret from `kubectl create secret docker-registry` carries all three as well.
+	entry, err := json.Marshal(struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Auth     string `json:"auth"`
+	}{
+		Username: username,
+		Password: password,
+		Auth:     base64.StdEncoding.EncodeToString([]byte(username + ":" + password)),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to serialize the credentials for %s: %w", host, err)
+	}
+
+	payload, err := json.Marshal(config{Auths: map[string]json.RawMessage{host: entry}})
+	if err != nil {
+		return fmt.Errorf("unable to serialize the credentials for %s: %w", host, err)
+	}
+	return Merge(payload)
 }
 
 // Merge adds the registries from a kubernetes.io/dockerconfigjson payload to the config file,

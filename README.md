@@ -61,7 +61,9 @@ spec:
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
     # Or name the package and let the registry's own records say where it is, which is what an
-    # air gap wants - see docs/guides/registry.md:
+    # air gap wants - with fromZarfState, a Zarf registry needs no pull secret and no CA secret
+    # either. See docs/guides/registry.md:
+    #   fromZarfState: true
     #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
     #   name: k3s
     #   packageVersion: 1.34.1
@@ -115,7 +117,7 @@ Stated plainly, because each of these is a thing an operator will reach for:
 - **No tag-to-digest resolution.** A republished tag behind an `ociRef` is not noticed. Pin the reference. A package named by `registry` and `name` instead is noticed, because the registry's record of it carries a content digest - but following it still takes the `controlplane.cluster.x-k8s.io/adopt-republished-package` annotation, since this provider has no rollout.
 - **No discovering a version.** `packageVersion` is required alongside `name`: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.
 - **No encrypted registry credentials.** Cargoship's keyring type is not reachable from outside its module.
-- **No mTLS to the package registry.** A pull secret and the registry's CA are both handled - see [`docs/guides/registry.md`](docs/guides/registry.md) - but the pull presents no client certificate of its own.
+- **No client certificate to the package registry.** A pull secret and the registry's CA are both handled - see [`docs/guides/registry.md`](docs/guides/registry.md) - but nothing presents a client certificate, so a registry that *requires* one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.
 - **No MachineHealthCheck remediation**, etcd backup or restore.
 
 ## Development

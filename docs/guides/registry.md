@@ -61,6 +61,30 @@ What cannot be done at all: a registry configured for mTLS, where the client has
 
 [The Zarf package](install.md#installing-without-a-route-to-ghcrio) installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.
 
+## Letting Zarf's own state answer both
+
+A registry Zarf stood up has already generated the credentials and signed the certificate, and both are in the management cluster as the `zarf-state` and `zarf-registry-server-tls` secrets. `fromZarfState: true` reads them from there, so neither secret above has to be created:
+
+```yaml
+spec:
+  distro:
+    fromZarfState: true
+    registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    name: k3s
+    packageVersion: 1.34.1
+```
+
+That is the whole configuration for an air gap - no `pullSecretRef`, no `caBundleSecretRef`, and the API server refuses the resource if either is set alongside it, rather than leaving two answers to one question.
+
+Four things about it:
+
+- **`registry` is still required.** Zarf records the address a *node* reaches the registry at, which is a NodePort or an external host; a controller inside the cluster wants the service, and the state does not carry it. The credential entry is keyed by whatever is written here, so it has to be the host a pull will ask for.
+- **The pull-only credentials are used**, falling back to the push pair only if the state carries no pull user. Zarf writes both.
+- **A missing CA is not an error.** `zarf-registry-server-tls` exists where Zarf manages the registry's TLS; an external registry serving a publicly signed certificate has none, and there is nothing extra to trust.
+- **A registry Zarf manages mTLS for still works**, with that CA and no client certificate of the controller's own. Zarf configures the registry `clientauth: verify-client-cert-if-given`, so a certificate is verified where one is offered and never demanded - the one Zarf issues belongs to the per-node registry proxy, which presents it for a node. The conditions to expect here are `ZarfStateUnreadable` for a cluster with no Zarf deployment in it, `ZarfStateUnusable` for state that carries no credentials, and `DistroUnresolved` for a package the registry does not hold.
+
+The controller reads both secrets with its own service account, through the `ClusterRole` it already carries; nothing extra is granted for this and the resource does not say which namespace to look in - `zarf` is where Zarf keeps them.
+
 ## Naming the package instead of referencing it
 
 A registry filled by cargoship can be asked what it holds, which saves writing a reference that has to be right. Set `registry`, `name` and `packageVersion` in place of `ociRef`:
