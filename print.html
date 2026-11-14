@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-300431eb.js";
+            window.path_to_searchindex_js = "searchindex-4606b902.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-dbd6424f.js"></script>
+        <script src="toc-828d1999.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -532,30 +532,29 @@ kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provide
 <p><a href="#installing-without-a-route-to-ghcrio">The Zarf package</a> installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
-<p>The unit tests cover everything that can be covered without a fleet: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
+<p>The unit tests cover everything that can be covered without an API server: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
 <pre><code class="language-sh">make test
 </code></pre>
-<p>An end-to-end test needs something a converge can actually SSH into, and that is the constraint that shapes the whole suite.</p>
-<h2 id="why-not-the-docker-infrastructure-provider"><a class="header" href="#why-not-the-docker-infrastructure-provider">Why not the Docker infrastructure provider</a></h2>
-<p>The obvious choice for a provider’s e2e suite is CAPD - Cluster API’s Docker provider - because it needs nothing but Docker. <strong>It cannot be used here.</strong> CAPD machines are containers running a kubelet; they run no sshd. Cargoship’s first phase is <code>Connect</code>, and there is nothing to connect to.</p>
-<p>This is worth stating because every other provider’s e2e documentation points at CAPD, and discovering why it does not work here costs an afternoon.</p>
-<h2 id="what-is-used-instead"><a class="header" href="#what-is-used-instead">What is used instead</a></h2>
-<p><code>colonel-byte/cargoship</code>’s microVM fleet, which is importable for exactly this reason - <code>test/microvm</code> and the root <code>test</code> package are exported rather than internal so another module’s suite can drive them, which <code>terraform-provider-cargoship</code> already does.</p>
-<p>The suite:</p>
-<ol>
-<li>Brings up a Rocky VM fleet with <code>test/microvm</code>.</li>
-<li>Creates <code>Machine</code> objects with those static addresses, plus a fake infrastructure provider that marks them ready and does nothing else.</li>
-<li>Drives a real converge and asserts the kubeconfig secret appears and the nodes join.</li>
-</ol>
-<p><code>CARGOSHIP_E2E_EXAMPLE_ROOT</code> points it at a cargoship checkout so it reads the generated distro definitions rather than carrying a copy.</p>
-<p>The microVM backend is also the only one where cargoship’s SELinux, fapolicyd and firewalld phases run as the paths they are rather than as gates that correctly do nothing - so it is a better test of a converge than a container fleet would be even if containers could run sshd.</p>
-<h2 id="reading-a-run"><a class="header" href="#reading-a-run">Reading a run</a></h2>
-<p><strong>Check which steps skipped, not only which failed.</strong> A skip on this suite usually means a capability the backend does not have, and a run with fifteen of them is not a pass. The same rule as cargoship’s own suite, for the same reason.</p>
-<p>The fleet brings itself up and tears itself down, and a whole run needs no elevation. Do not reach for <code>virsh</code> to inspect it: <code>virsh -c qemu:///system</code> goes through polkit and interrupts whoever is at the keyboard to answer a question the run’s own log already answers. A fleet left behind by a killed run comes down with <code>mage dev:vmDown -fleet=&lt;name&gt;</code> from the cargoship checkout.</p>
+<h2 id="the-reconcile-state-machine"><a class="header" href="#the-reconcile-state-machine">The reconcile state machine</a></h2>
+<pre><code class="language-sh">make test-envtest
+</code></pre>
+<p>This runs both controllers against a real API server - <code>envtest</code>, the kubebuilder control plane - with the cargoship apply stubbed out. It is where the provider’s own logic is covered: machines created one per pass, the pre-terminate hook claimed at creation and released only after the survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the bootstrap data rendered once and never again, and every state the reconcile waits in.</p>
+<p><strong>What it asserts is which state a pass lands in, never a duration measured on the clock.</strong> This provider’s answer to machines and API servers coming up on their own schedules is that nothing anywhere gives up, so there is no timing to assert; what is worth pinning down is that “no address yet”, “ssh not answering”, “converging” and “converged” each requeue and say why. A test that waited on wall-clock time here would be testing the one thing the design does not do.</p>
+<p>Two things it needs, and both are why it is <code>make test-envtest</code> rather than <code>go test</code>:</p>
+<ul>
+<li><strong>The control-plane binaries</strong> - a real <code>kube-apiserver</code> and <code>etcd</code> - which <code>setup-envtest</code> fetches. This is the one thing in this repository that reaches the network for a test.</li>
+<li><strong>Cluster API’s own core CRDs</strong>, for the Clusters and Machines it holds. <code>make envtest-crds</code> generates them from the vendored types into <code>out/</code>, and <code>test-envtest</code> passes the directory in as <code>CAPI_CRD_DIR</code>. Generating beats copying them out of the <code>cluster-api</code> module - whose <code>config/crd</code> directory <code>go mod vendor</code> drops - because it needs neither a network nor a populated module cache, and because the schemas the tests run against are then the ones the vendored types actually describe. A bare <code>go test -tags=envtest</code> fails saying the variable is unset rather than failing inside the API server.</li>
+</ul>
+<p>The harness is <code>internal/envtest</code>, behind the same build tag, so <code>make test</code> stays runnable with nothing installed. CI runs this as its own job in the unit-tests workflow, for the same reason it is a separate target here: the suite is behind a build tag, so the <code>go test ./...</code> job proves nothing about it.</p>
+<p>The stub is injected through the reconciler’s <code>Converge</code> field, which <code>SetupWithManager</code> fills in with <code>converge.Apply</code> when it is nil. That is the only seam added for testing, and it exists because the alternative is a fleet.</p>
+<h2 id="a-converge-against-real-hosts"><a class="header" href="#a-converge-against-real-hosts">A converge against real hosts</a></h2>
+<p>There is no suite for this yet, and the backend to build it on is not the obvious one: <a href="#a-fleet-backed-end-to-end-suite-and-which-backend-can-carry-one">todo-e2e-fleet-backends</a> is the plan and the reasoning.</p>
+<p>The short version. <strong>CAPD cannot be used</strong> - its machines are containers running a kubelet and no sshd, and cargoship’s first phase is <code>Connect</code> - which is worth stating because every other provider’s e2e documentation points at CAPD. <strong>Bootloose containers can</strong>: they run sshd, answer on port 22, and attach to the <code>kind</code> network the controller pod is already on. <strong>The microVM fleet cannot</strong>, from a pod: its nodes are reachable only as per-node forwarded ports on the host’s loopback, and neither a single inventory-wide SSH port nor a <code>MachineAddress</code> can express that.</p>
+<p>Do not reach for <code>virsh</code> to inspect anything a run leaves behind. <code>virsh -c qemu:///system</code> goes through polkit and interrupts whoever is at the keyboard to answer a question the run’s own log already answers.</p>
 <h2 id="what-has-no-coverage-yet"><a class="header" href="#what-has-no-coverage-yet">What has no coverage yet</a></h2>
 <ul>
-<li>The reconcile state machine end to end. It wants envtest with a fake infrastructure provider, asserting the <strong>requeues</strong> rather than any timing: no address yet, SSH not answering, converge in flight, converged. <code>make test-envtest</code> is wired for it and there are no tests behind it.</li>
-<li>The pre-terminate hook’s ordering. The thing worth asserting is that the survivors’ converge happens before the annotation is released, and that is a sequence, not a state.</li>
+<li>A converge against real hosts, per the plan above.</li>
+<li>The bootstrap data actually being consumed by a booting machine. Neither container nor microVM fleets read it, so the first thing that proves it is a real infrastructure provider.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed"><a class="header" href="#a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed">A tagged distro reference is not re-resolved, and a republished tag is not noticed</a></h1>
@@ -683,6 +682,40 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <p><code>make zarf-package</code> reads the version back out of <code>zarf.yaml</code> and renders the component manifests at it, rather than taking a <code>TAG</code> like the other release targets. A <code>TAG</code> there would produce a package whose manifests name one version and whose images carry another, which fails at deploy time against the in-cluster registry rather than at build time.</p>
 <h2 id="what-it-deliberately-leaves-out"><a class="header" href="#what-it-deliberately-leaves-out">What it deliberately leaves out</a></h2>
 <p>Core Cluster API, and the cargoship distro packages the control-plane controller pulls at converge time. Both are somebody else’s artifact with their own cadence, and bundling either would make this package a mirror of the whole air gap rather than of this provider. <a href="#installing-the-provider"><code>docs/guides/install.md</code></a> says so where an operator will read it.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="a-fleet-backed-end-to-end-suite-and-which-backend-can-carry-one"><a class="header" href="#a-fleet-backed-end-to-end-suite-and-which-backend-can-carry-one">A fleet-backed end-to-end suite, and which backend can carry one</a></h1>
+<p>The reconcile state machine is covered: <code>make test-envtest</code> drives both controllers against a real API server with the converge stubbed out, and asserts the requeues and conditions rather than any timing. See <a href="#end-to-end-tests">e2e-tests</a>. What is left is the part that needs hosts a converge can actually SSH into, and the backend that can give them is not the one this repository’s documentation originally assumed.</p>
+<p>This is the plan for that, and the record of why the obvious backend cannot do it.</p>
+<h2 id="what-the-suite-has-to-arrange"><a class="header" href="#what-the-suite-has-to-arrange">What the suite has to arrange</a></h2>
+<p>Four things, and only the last two are difficult:</p>
+<ol>
+<li><strong>A management cluster.</strong> <code>kind</code>, <code>clusterctl init --core cluster-api</code>, <code>make docker-build</code>, <code>kind load docker-image</code>, then the component manifests <code>make release-manifests</code> renders. The provider runs as the two pods an operator would run.</li>
+<li><strong>Hosts with sshd</strong>, on a network the controller pod can reach.</li>
+<li><strong>Machines with addresses.</strong> Something has to play the infrastructure provider: Cluster API’s Machine controller copies <code>status.addresses</code> off the infrastructure machine, and <code>converge.BuildInventory</code> reads nothing else.</li>
+<li><strong>A distro package</strong> the pod can pull.</li>
+</ol>
+<h2 id="tier-2-kind-plus-bootloose-containers"><a class="header" href="#tier-2-kind-plus-bootloose-containers">Tier 2: kind plus bootloose containers</a></h2>
+<p><strong>Bootloose is the backend to use</strong>, not the microVM fleet. Its containers run sshd, each gets a routable Docker address, every one of them answers on port 22, and <code>config.Machine.Networks</code> attaches them to a Docker network that already exists - <code>kind</code>, so the controller pod and the fleet are on the same segment with no port forwarding anywhere.</p>
+<p><code>github.com/k0sproject/bootloose</code> is an ordinary library and already a cargoship dependency. Cargoship’s own provisioning for it lives in <code>test/e2e/cluster/*_test.go</code>, so it is <strong>not importable</strong>: a test file in another module cannot be linked. Reproducing it is roughly fifty lines against <code>pkg/config</code> and <code>pkg/cluster</code>, which is cheaper than asking cargoship to export a backend it has no in-tree reason to export. Cargoship’s <code>test/microvm</code> and root <code>test</code> packages stay importable for the hosts this suite cannot get from containers, which is a separate question from the one above.</p>
+<p><strong>The fake infrastructure provider is a CRD and no controller.</strong> One custom resource definition carrying the contract labels, and the test patches <code>status.addresses</code> and the ready condition on each object the way a real provider would. This provider needs less of it than most: it copies <code>spec.machineTemplate.spec.infrastructureRef</code> verbatim onto every Machine rather than cloning a template (<code>controlplane/internal/controller/machines.go</code>), so there is one stub object per machine and no template-to-clone step to imitate.</p>
+<p><strong>The package is what keeps this out of pull-request CI.</strong> The rke2 example cargoship’s own suite carries is 2.3GB; k3s is smaller but not small. It has to be in a registry the pod can pull from, and <code>converge.SetPaths</code> needs a volume with room for an extracted copy. That makes this a nightly-or-manual <code>make test-e2e</code>, behind its own build tag, rather than something every pull request pays for. Say so in the target’s help text: a suite that is quietly never run is worse than one that is explicitly manual.</p>
+<p>Two things to spike before committing to this, each about twenty minutes: that bootloose’s <code>Networks</code> really does land containers on an existing <code>kind</code> network, and that a controller-less stub CRD satisfies the Cluster API v1beta2 infrastructure-machine contract well enough for the Machine controller to copy addresses off it.</p>
+<h2 id="tier-3-the-microvm-fleet-and-why-not"><a class="header" href="#tier-3-the-microvm-fleet-and-why-not">Tier 3: the microVM fleet, and why not</a></h2>
+<p><a href="https://github.com/colonel-byte/cargoship/blob/main/docs/dev/microvm.md"><code>docs/dev/microvm.md</code></a> in cargoship, and cargoship’s own <code>choice-capi-provider.md</code>, both point this provider’s e2e suite at the microVM fleet, on the grounds that CAPD containers run no sshd. That reasoning is sound and the conclusion does not follow: bootloose containers <em>do</em> run sshd, and CAPD was never the only container option.</p>
+<p>The fleet cannot carry this suite, for three reasons, any one of which is enough:</p>
+<ul>
+<li><strong>Each node is reachable only as <code>127.0.0.1:&lt;its own forwarded port&gt;</code>.</strong> The nodes are qemu user-mode networking (<code>test/microvm/vm.go</code>, <code>hostfwd=tcp:127.0.0.1:&lt;SSHPort&gt;-:22</code>), one host port per node. <code>converge.SSHParams.Port</code> is one port for the whole inventory, and a Cluster API <code>MachineAddress</code> carries no port at all, so a fleet of per-node ports is not expressible.</li>
+<li><strong>The fleet’s own layer 2 is a qemu socket on a multicast group.</strong> The nodes’ <code>10.73.x</code> addresses work between nodes and are not routable from the host, let alone from a pod.</li>
+<li><strong>A pod in kind cannot reach the host’s loopback</strong> regardless of the above.</li>
+</ul>
+<p>Two things would lift the first point, and neither is worth doing for a test:</p>
+<ul>
+<li><strong>A per-machine SSH port</strong>, read by <code>BuildInventory</code> off a Machine annotation. Ten lines, and arguably useful beyond tests - NAT’d fleets with per-host forwarded ports are a real arrangement. It would let a test binary <em>running on the host</em> converge a microVM fleet. It would still not let a pod do it, so it buys a different suite than the one this document is about.</li>
+<li><strong>A bridged or tap mode in cargoship’s microvm package.</strong> That needs root or <code>CAP_NET_ADMIN</code>, which is exactly the promise that package makes a point of keeping (“needs no root, starts no daemon, changes no setting on your machine”). Do not ask for it.</li>
+</ul>
+<p>What the fleet is for is the SELinux, fapolicyd and firewalld phases, which do nothing in a container. Those are cargoship’s phases, cargoship’s suite already runs them against the fleet, and nothing about this provider changes what they do.</p>
+<h2 id="what-no-backend-here-covers"><a class="header" href="#what-no-backend-here-covers">What no backend here covers</a></h2>
+<p><strong>Neither fleet ever consumes this provider’s bootstrap data.</strong> Containers ignore cloud-init entirely - bootloose authorizes the key itself, through <code>config.Machine.PublicKey</code> - and the microVM fleet writes its own seed. So <code>bootstrap/internal/cloudinit</code> is tested by its unit tests and by the envtest assertions on the rendered secret, and the first thing that proves a machine booted reachable <em>because of us</em> is a real infrastructure provider: vSphere, OpenStack, anything with a cloud-init image. That is worth stating plainly, because a green tier 2 run looks like it covers it and does not.</p>
 
                     </main>
 
