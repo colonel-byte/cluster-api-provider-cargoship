@@ -1,0 +1,77 @@
+---
+name: Release guards
+
+# Two checks for things that break a release silently, long after the pull request that caused
+# them. Both are greps and both take seconds; neither is covered by anything else here.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # A `replace` pointing at a path on somebody's laptop builds perfectly for them and for
+      # nobody else, and `vendor/` hides it completely -- CI goes green because it is building
+      # the vendored snapshot. The release that follows is unbuildable from source.
+      #
+      # Module-to-module replaces are left alone: those are legitimate and resolvable.
+      - name: No local-path replace directives
+        run: |
+          cat > "${RUNNER_TEMP}/replaces.py" <<'PY'
+          import json, sys
+          for r in json.load(sys.stdin).get("Replace") or []:
+              old = r["Old"]["Path"]
+              new = r["New"]["Path"]
+              if new.startswith((".", "/")) or "\\" in new:
+                  print(old + " => " + new)
+          PY
+          offenders="$(go mod edit -json | python3 "${RUNNER_TEMP}/replaces.py")"
+          if [ -n "${offenders}" ]; then
+            echo "::error::go.mod replaces a module with a local path; a release built from this cannot be built by anyone else"
+            echo "${offenders}"
+            exit 1
+          fi
+
+      # metadata.yaml tells clusterctl which Cluster API contract a release of this provider
+      # speaks. Nothing derives it from the code, so a cluster-api bump that crosses a contract
+      # boundary leaves it asserting a contract the provider no longer implements -- and
+      # clusterctl believes it.
+      - name: metadata.yaml agrees with the vendored cluster-api
+        run: |
+          declared="$(grep -oE 'contract:[[:space:]]*[^[:space:]]+' metadata.yaml \
+            | awk '{print $2}' | sort -u)"
+
+          # The contract a cluster-api release implements is the storage version of its own core
+          # API, which is the directory its Go types live in. Read from vendor/ rather than from
+          # `go list -m -f {{.Dir}}`, which returns nothing in vendor mode -- the trap that made
+          # the first version of this check pass by comparing against an empty string.
+          actual="$(ls vendor/sigs.k8s.io/cluster-api/api/core/ \
+            | grep -E '^v1beta[0-9]+$' | sort -V | tail -1)"
+
+          if [ -z "${actual}" ]; then
+            echo "::error::could not read the vendored cluster-api core API version"
+            exit 1
+          fi
+
+          echo "metadata.yaml declares: ${declared}"
+          echo "vendored cluster-api newest core contract: ${actual}"
+
+          for d in ${declared}; do
+            if [ "${d}" != "${actual}" ]; then
+              echo "::error::metadata.yaml declares contract ${d} but the vendored cluster-api's newest core API is ${actual}; update metadata.yaml and re-check the field paths in internal/contract/"
+              exit 1
+            fi
+          done

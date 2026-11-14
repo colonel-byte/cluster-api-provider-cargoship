@@ -1,0 +1,110 @@
+---
+name: Vulnerability scan
+
+on:
+  pull_request:
+  merge_group:
+  schedule:
+    # Weekly, off the hour: a scheduled scan reports advisories published after a commit landed,
+    # which is most of them.
+    - cron: "41 6 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scan-vuln-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # go-version-file, so the toolchain floor this scan runs against is the one in go.mod. That
+      # is load-bearing here: the only finding this check has ever produced was a standard
+      # library advisory, cleared by raising that floor rather than by changing a dependency.
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Run directly rather than through golang/govulncheck-action. Its composite steps all
+      # reported "skipped" and the job failed with no output at all, which is what an input it
+      # does not accept looks like -- and the shape of this is two lines, so there is nothing to
+      # be gained by debugging the wrapper.
+      #
+      # -mod=mod, not vendor: govulncheck needs the module graph to decide what is reachable, and
+      # it cannot read one from a vendored tree. This is the one job here that is allowed network
+      # access, because it also fetches the vulnerability database.
+      #
+      # Reachability, not a dependency-list match: an advisory in a package nothing calls does
+      # not fail the build. That matters because the cluster-api and controller-runtime trees are
+      # large and almost entirely unreachable from two managers.
+      - name: Run govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        env:
+          GOFLAGS: -mod=mod
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # One image, not both. They are the same base and the same Go toolchain, differing only in
+      # which static binary is copied in, so scanning the second would report the same findings
+      # and cost another runner.
+      - name: Build an image to scan
+        run: make docker-build REGISTRY=localhost TAG=scan
+        env:
+          GOFLAGS: -mod=vendor
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          GOTOOLCHAIN: local
+
+      # Scanned as a saved tarball rather than by image reference. Given a `localhost/...` name
+      # trivy treats the prefix as a registry host and tries to pull over the network, which
+      # fails in about two seconds with no findings table -- indistinguishable at a glance from
+      # a clean scan that found nothing. A tarball has no registry or daemon ambiguity.
+      - name: Save the image
+        run: docker save -o image.tar localhost/cluster-api-cargoship-controlplane-controller:scan
+
+      # Note what this does and does not add over the govulncheck job above. The image is
+      # Chainguard static plus one static Go binary, so there are no OS packages to find
+      # anything in; what trivy reports is read out of the binary's embedded build info, which
+      # is the same standard library and module set govulncheck already covers -- and covers
+      # better, because it does reachability analysis and trivy does not. If this job starts
+      # reporting findings govulncheck has judged unreachable, delete it rather than growing a
+      # list of ignores.
+      #
+      # The binary is downloaded and run directly rather than through aquasecurity/trivy-action.
+      # That action installed trivy and then exited 1 with its own "Run Trivy" step reported as
+      # skipped and no diagnostic of any kind -- the same shape of failure
+      # golang/govulncheck-action produced in the job above. A wrapper that fails without saying
+      # why is worse than four lines of curl.
+      #
+      # TRIVY_VERSION is a pin no Dependabot ecosystem tracks, so it is bumped by hand. It is
+      # here rather than in a tool manifest because nothing else in this repository needs trivy.
+      - name: Run trivy
+        env:
+          TRIVY_VERSION: "0.76.2"
+        run: |
+          curl -fsSL \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            | tar xz trivy
+          # --scanners vuln, because secret scanning a static Go binary finds nothing and
+          # trivy itself suggests disabling it when it is not wanted.
+          ./trivy image \
+            --input image.tar \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1

@@ -1,0 +1,132 @@
+# Copyright 2026 colonel-byte
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+before:
+  hooks:
+    # The three files clusterctl downloads from a release. They are the actual deliverable here --
+    # the binaries and images below are what they point at, but clusterctl reads these. A release
+    # missing one of them installs nothing, and the error names a 404 rather than a missing file.
+    - make release-manifests RELEASE_DIR=out TAG={{ .Version }}
+
+builds:
+  - id: bootstrap-manager
+    main: ./bootstrap/cmd/manager
+    binary: bootstrap-manager
+    ldflags:
+      - -s
+      - -w
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+  - id: controlplane-manager
+    main: ./controlplane/cmd/manager
+    binary: controlplane-manager
+    ldflags:
+      - -s
+      - -w
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+# linux only, and no archives of the binaries. These managers run as container images in a
+# management cluster and nowhere else -- unlike cargoship, which an operator carries onto an
+# air-gapped network by hand. Publishing tarballs of them would invite somebody to run one outside
+# a cluster, where it has no kubeconfig and no service account.
+archives:
+  - formats:
+      - binary
+
+dockers_v2:
+  - id: bootstrap
+    ids:
+      - bootstrap-manager
+    images:
+      - ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: containers/manager/Dockerfile
+    build_args:
+      MANAGER: bootstrap-manager
+
+  - id: controlplane
+    ids:
+      - controlplane-manager
+    images:
+      - ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: containers/manager/Dockerfile
+    build_args:
+      MANAGER: controlplane-manager
+
+release:
+  github:
+    owner: colonel-byte
+    name: cluster-api-provider-cargoship
+  extra_files:
+    # clusterctl fetches these three by name from the release assets.
+    - glob: out/bootstrap-components.yaml
+    - glob: out/control-plane-components.yaml
+    - glob: out/metadata.yaml
+  prerelease: auto
+
+checksum:
+  name_template: checksums.txt
+
+# Cosign, with the same key that signs cargoship's archives, so an operator verifying one
+# verifies the other with the same public key.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--key=env://COSIGN_PRIVATE_KEY"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
+changelog:
+  # release-please owns the changelog; see CHANGELOG.md. Letting goreleaser write one too
+  # produces two different accounts of the same release.
+  disable: true

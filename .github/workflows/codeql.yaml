@@ -1,0 +1,75 @@
+---
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  schedule:
+    # Weekly, off the hour: scheduled scans keep the security tab current for
+    # advisories published after a commit landed.
+    - cron: "37 5 * * 1"
+
+permissions:
+  contents: read
+
+# Abort prior jobs in the same workflow / PR
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Go is built rather than scanned buildless, so the build step below
+          # is what decides which packages get extracted.
+          - language: go
+            build-mode: manual
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # ./... is correct here: this module has one Go module, no build-tagged dev tooling and
+      # no second module of non-compiling upstream source, so there is nothing to carve out.
+      # (colonel-byte/cargoship spells out package patterns for exactly those two reasons.)
+      - name: Build
+        if: matrix.build-mode == 'manual'
+        run: go build -mod=vendor ./...
+        env:
+          CGO_ENABLED: 0
+          # Everything the build needs is vendored, so make any accidental network access fail
+          # fast.
+          GOFLAGS: -mod=vendor
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          GOTOOLCHAIN: local
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:${{ matrix.language }}"

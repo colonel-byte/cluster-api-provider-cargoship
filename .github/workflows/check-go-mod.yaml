@@ -1,0 +1,43 @@
+---
+name: Check for go mod changes
+
+# Deliberately not at the bottom of a stack with this shape. `go mod vendor` only vendors what
+# something imports, so on a branch carrying the dependency tree and no code it deletes the whole
+# tree, and on a branch carrying only some of the code it deletes whatever the later layers need.
+# It is correct from the branch that holds the last Go package onward, which is this one.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-go-mod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Pinned on purpose rather than left to float: the k8s.io modules are held at the versions
+      # sigs.k8s.io/cluster-api was built against, because a newer patch wants
+      # structured-merge-diff/v7 while cluster-api pins v6 and the module then stops compiling.
+      # If this fails after a dependency bump, read docs/agent/choice-tool-dependencies.md before
+      # raising a pin.
+      - name: Check go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      # vendor/ is committed and every CI job builds with -mod=vendor, so a stale tree means CI
+      # tests different code than go.mod declares -- silently, and in the direction of passing.
+      - name: Check vendor/ matches go.mod
+        run: |
+          go mod vendor
+          git diff --exit-code vendor/

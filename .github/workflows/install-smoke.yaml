@@ -1,0 +1,159 @@
+---
+name: Install smoke test
+
+# The check that matters most in this repository, and the only one that exercises the Cluster API
+# contract rather than the Go code.
+#
+# Everything it catches is silent. A CRD missing the `cluster.x-k8s.io/<contract>` label is
+# ignored rather than rejected, so the provider installs, the controllers start, and nothing ever
+# reconciles. A metadata.yaml that does not name the contract makes `clusterctl init` refuse
+# outright. RBAC that is one verb short fails at the first reconcile, in a log nobody is reading
+# yet. None of those show up in a unit test, a lint run, or a kustomize build.
+#
+# It does not converge anything. A real converge needs hosts that answer SSH, and the Docker
+# infrastructure provider's machines run no sshd -- see docs/dev/e2e-tests.md. What this proves is
+# that the provider installs and comes up, which is a different and cheaper question.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup golang
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      # Through `make docker-build` rather than a hand-written docker invocation, so the
+      # Dockerfile's ${TARGETPLATFORM}/${MANAGER} copy is exercised against the same layout the
+      # release uses and the two cannot drift. The first version of this workflow built the
+      # binaries into dist/ and set the context to the repository root, which fails with
+      # `"/linux/amd64/<manager>": not found`.
+      - name: Build the controller images
+        run: make docker-build REGISTRY=localhost TAG=smoke
+        env:
+          GOFLAGS: -mod=vendor
+          GOPROXY: "off"
+          GOSUMDB: "off"
+          GOTOOLCHAIN: local
+
+      - name: Create a kind cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: smoke
+
+      - name: Load the images into kind
+        run: |
+          kind load docker-image localhost/cluster-api-cargoship-bootstrap-controller:smoke --name smoke
+          kind load docker-image localhost/cluster-api-cargoship-controlplane-controller:smoke --name smoke
+
+      - name: Render the component manifests
+        run: make release-manifests RELEASE_DIR=out TAG=smoke REGISTRY=localhost
+
+      # clusterctl fetches a provider's three files over HTTP from a release, so a local provider
+      # is served from a directory layout it understands: {basepath}/{provider}/{version}/{file}.
+      - name: Lay out a local provider repository
+        run: |
+          base="${RUNNER_TEMP}/providers"
+          for kind in bootstrap-cargoship control-plane-cargoship; do
+            dir="${base}/${kind}/v0.1.0"
+            mkdir -p "${dir}"
+            cp out/metadata.yaml "${dir}/metadata.yaml"
+          done
+          cp out/bootstrap-components.yaml "${base}/bootstrap-cargoship/v0.1.0/bootstrap-components.yaml"
+          cp out/control-plane-components.yaml "${base}/control-plane-cargoship/v0.1.0/control-plane-components.yaml"
+
+          mkdir -p "${HOME}/.config/cluster-api"
+          cat > "${HOME}/.config/cluster-api/clusterctl.yaml" <<YAML
+          providers:
+            - name: cargoship
+              url: ${base}/bootstrap-cargoship/v0.1.0/bootstrap-components.yaml
+              type: BootstrapProvider
+            - name: cargoship
+              url: ${base}/control-plane-cargoship/v0.1.0/control-plane-components.yaml
+              type: ControlPlaneProvider
+          YAML
+
+      - name: Setup clusterctl
+        run: |
+          version="$(go list -m -f '{{.Version}}' sigs.k8s.io/cluster-api)"
+          curl -fsSL -o /usr/local/bin/clusterctl \
+            "https://github.com/kubernetes-sigs/cluster-api/releases/download/${version}/clusterctl-linux-amd64"
+          chmod +x /usr/local/bin/clusterctl
+          clusterctl version
+
+      # --infrastructure docker because core Cluster API will not install without one, and CAPD
+      # needs nothing. No machine is ever created, so the fact that its containers run no sshd
+      # does not matter here.
+      - name: clusterctl init
+        run: |
+          clusterctl init \
+            --infrastructure docker \
+            --bootstrap cargoship:v0.1.0 \
+            --control-plane cargoship:v0.1.0 \
+            --wait-providers
+
+      - name: Check the CRDs were established and carry the contract label
+        run: |
+          for crd in \
+            cargoshipconfigs.bootstrap.cluster.x-k8s.io \
+            cargoshipconfigtemplates.bootstrap.cluster.x-k8s.io \
+            cargoshipcontrolplanes.controlplane.cluster.x-k8s.io; do
+            kubectl wait --for=condition=Established "crd/${crd}" --timeout=120s
+
+            # The label the core controllers read to decide which version of this provider's API
+            # to speak. Absent, everything above still passes and nothing ever reconciles.
+            label="$(kubectl get "crd/${crd}" -o jsonpath='{.metadata.labels.cluster\.x-k8s\.io/v1beta2}')"
+            if [ "${label}" != "v1alpha1" ]; then
+              echo "::error::${crd} has cluster.x-k8s.io/v1beta2=${label:-<unset>}, want v1alpha1"
+              exit 1
+            fi
+          done
+
+      - name: Check both controllers are available
+        run: |
+          kubectl -n cargoship-bootstrap-system wait --for=condition=Available \
+            deploy/cargoship-bootstrap-controller-manager --timeout=180s
+          kubectl -n cargoship-controlplane-system wait --for=condition=Available \
+            deploy/cargoship-controlplane-controller-manager --timeout=180s
+
+      # A controller that crash-loops on a bad flag or an unwritable cache path can still report
+      # Available briefly, so the logs are checked for the two startup failures that are fatal.
+      - name: Check the control-plane manager resolved its paths
+        run: |
+          kubectl -n cargoship-controlplane-system logs \
+            deploy/cargoship-controlplane-controller-manager --tail=200 > cp.log
+          cat cp.log
+          if grep -q "unable to prepare the cargoship cache and temp directories" cp.log; then
+            echo "::error::the control-plane manager could not use its cache or temp path"
+            exit 1
+          fi
+          if ! grep -q "starting the cargoship control-plane provider" cp.log; then
+            echo "::error::the control-plane manager did not reach its start line"
+            exit 1
+          fi
+
+      - name: Dump state on failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl -n cargoship-bootstrap-system describe deploy/cargoship-bootstrap-controller-manager || true
+          kubectl -n cargoship-controlplane-system describe deploy/cargoship-controlplane-controller-manager || true
+          kubectl -n cargoship-bootstrap-system logs deploy/cargoship-bootstrap-controller-manager --tail=200 || true
