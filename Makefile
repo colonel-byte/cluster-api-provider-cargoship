@@ -80,6 +80,19 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 		output:crd:artifacts:config=controlplane/config/crd/bases \
 		output:rbac:artifacts:config=controlplane/config/rbac
 
+.PHONY: vendor
+vendor: ## Re-vendor dependencies. Use this, not `go mod vendor` directly.
+	go mod vendor
+	# `go mod vendor` copies every file sitting beside a vendored package, and for three
+	# dependencies that includes a requirements.txt pinning their own Python test or docs
+	# tooling. Nothing here installs them -- but osv-scanner walks the whole tree, finds them,
+	# and reports their advisories against this repository, which is every finding the OpenSSF
+	# Scorecard Vulnerabilities check has ever produced for us. govulncheck (scan-vuln.yaml) is
+	# what actually covers the Go code. Pruned here rather than ignored in a config, because
+	# osv-scanner only reads an .osv-scanner.toml from the directory a manifest sits in, and
+	# `go mod vendor` deletes vendor/ before it writes it.
+	find vendor -name 'requirements*.txt' -delete
+
 ##@ Test
 
 .PHONY: test

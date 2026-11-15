@@ -37,7 +37,10 @@ jobs:
 
       # vendor/ is committed and every CI job builds with -mod=vendor, so a stale tree means CI
       # tests different code than go.mod declares -- silently, and in the direction of passing.
+      # `make vendor`, not `go mod vendor`: the target prunes the Python requirements files
+      # `go mod vendor` copies out of three dependencies, and the committed tree is pruned, so a
+      # bare `go mod vendor` here would report them as a diff. See the target's comment.
       - name: Check vendor/ matches go.mod
         run: |
-          go mod vendor
+          make vendor
           git diff --exit-code vendor/
