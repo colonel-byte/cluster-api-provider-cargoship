@@ -28,6 +28,7 @@
 - [choice-record-discovery](agent/choice-record-discovery.md)
 - [choice-registry-credentials](agent/choice-registry-credentials.md)
 - [choice-tool-dependencies](agent/choice-tool-dependencies.md)
+- [choice-vendor-lockfile-prune](agent/choice-vendor-lockfile-prune.md)
 - [choice-zarf-package](agent/choice-zarf-package.md)
 - [todo-clusterclass-support](agent/todo-clusterclass-support.md)
 - [todo-e2e-fleet-backends](agent/todo-e2e-fleet-backends.md)
