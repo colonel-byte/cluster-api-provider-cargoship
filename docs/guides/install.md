@@ -60,6 +60,27 @@ Three things it does not do, each of which will otherwise be found out later:
 - **It does not stop a `ClusterClass` working.** The package deploys the same component manifests `clusterctl` would, so all three CRDs come with it - including `CargoshipControlPlaneTemplate`, the kind a class names as its control plane. A class, its templates and a `Cluster` with a topology are ordinary objects an operator applies afterwards; see [Composing a ClusterClass](clusterclass.md), and remember that `CLUSTER_TOPOLOGY` is a flag on core Cluster API, which this package does not install.
 - **`clusterctl` does not know the provider is installed.** The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the `clusterctl.cluster.x-k8s.io` bookkeeping `clusterctl init` adds - so `clusterctl upgrade` will not see this provider. Upgrade it by deploying the next package.
 
+## Installing Cluster API itself on a Zarf-initialized cluster
+
+Worth knowing before `clusterctl init` on the same cluster Zarf runs on, because the failure names nothing to do with either tool. Zarf's mutating webhook rewrites every pod's image to its in-cluster registry, so `clusterctl init` installs cert-manager and the core controllers pointing at images that were never mirrored there:
+
+```
+Error: context deadline exceeded
+# and, on the pods:
+Failed to pull image "127.0.0.1:5000/jetstack/cert-manager-controller:v1.21.3-zarf-1554577349"
+```
+
+Label each namespace Zarf should leave alone before installing into it:
+
+```sh
+for ns in cert-manager capi-system capd-system; do
+  kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl label namespace "${ns}" zarf.dev/agent=ignore
+done
+```
+
+Pods already admitted keep the rewritten reference, so delete them after labelling - the webhook only acts at admission. The alternative, for a cluster with no route out at all, is to mirror core Cluster API's images into the Zarf registry and leave the rewriting in place. Nothing about this provider is involved either way: the namespaces it installs into hold images the Zarf package already pushed.
+
 ## The SSH key
 
 The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.

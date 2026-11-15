@@ -13,12 +13,27 @@ This is what the original plan got wrong, and what is still outstanding.
 - **envtest needed nothing.** `internal/envtest` loads the `crd/bases` directory rather than a file list, so a new CRD is picked up. `make envtest-crds` only generates the Cluster API CRDs, and `ClusterClass` is already among them.
 - The plan cited line numbers for `spec.controlPlaneEndpoint` and the scale subresource. Both moved within a day. Cite symbols.
 
+## What a live topology confirmed
+
+Run against a k3d cluster with core Cluster API 1.14.4, `ClusterTopology=true` and the Docker provider standing in for infrastructure. A `Cluster` with a topology stamped a `CargoshipControlPlane` carrying:
+
+| Stamped field                            | Value                                                | From                                  |
+| ---------------------------------------- | ---------------------------------------------------- | ------------------------------------- |
+| `spec.version`                           | `v1.34.1`                                            | `spec.topology.version`               |
+| `spec.replicas`                          | `3`                                                  | `spec.topology.controlPlane.replicas` |
+| `spec.machineTemplate.spec.infrastructureRef` | the generated `DockerMachineTemplate`           | the class's `machineInfrastructure`   |
+| `spec.distro`, `spec.ssh`, `spec.apply`  | as written                                           | the template                          |
+| the approval annotation                  | `approve-version-change: v1.34.1`                    | `spec.topology.controlPlane.metadata` |
+
+So all three omitted fields are filled in, which is the whole argument for the template spec being its own type, and the annotation route for approving an upgrade works as documented. The existing reconciler then took the stamped object and reported `Available=False WaitingForInfrastructure`, which is correct: the Docker provider cannot provision a cluster in that setup, and no control-plane machine is created until the cluster infrastructure is.
+
+It also settled the profile question measured rather than inferred. The generated `MachineDeployment` is `fleet-one-worker-td5v8`, and its `spec.template.metadata.labels` hold `topology.cluster.x-k8s.io/deployment-name: worker` with **no** `cluster.x-k8s.io/deployment-name` at all - so the label the converge used to read is absent, not merely unhelpful, and every class-based pool would have selected no profile.
+
 ## Still to do
 
-- **A `cluster-template.yaml` flavor.** `clusterctl generate cluster --flavor` reads a template from the release assets, and a class-based cluster is the flavor worth shipping: an operator gets the class, the templates and a `Cluster` with a topology from one command. It belongs in `.goreleaser.yaml`'s `extra_files` beside the three files clusterctl already fetches.
-- **One `clusterctl generate cluster` end to end**, against a class composed with a real infrastructure provider, before any of this is documented as working. The guide's YAML is checked against the CRD schemas and the vendored types, not against a cluster that came up.
-- **Variables and patches are documented but unexercised.** The control-plane-endpoint patch in the guide is the shape a class wants; nothing has run it. Leave the class itself without variables until a second cluster shape needs them - a class with one consumer is indirection with nothing on the other side of it.
-- **Whether the topology controller reads any control-plane contract field this provider does not set.** The table in the original plan was read off this provider's types. `vendor/sigs.k8s.io/cluster-api/` holds only `api` and `util`, so the contract package is not vendored to read - the module cache has the full tree, and `clusterctl generate cluster` against a live topology is the real check.
+- **One end to end against hosts that answer SSH.** Everything above stops at the infrastructure provider: nothing has converged a fleet from a class. The Docker provider cannot, for the reason [`docs/dev/e2e-tests.md`](../dev/e2e-tests.md) gives, so this wants the microvm fleet or real machines.
+- **The patches are rendered but not applied.** `clusterctl generate cluster --from` substitutes the variables in [`examples/cluster-template-clusterclass-vsphere.yaml`](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml) and the output is valid, but no topology has run the endpoint or package-version patch, so the paths they write to are checked against the CRD schema and nothing else.
+- **Whether the topology controller reads any control-plane contract field this provider does not set.** Nothing complained for a three-replica class with a machine infrastructure template, which covers the fields the contract lists; a class with `rollout` or a `healthCheck` is unexercised.
 
 ## Not this repository's to fix
 

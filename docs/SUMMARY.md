@@ -15,6 +15,7 @@
 # Development
 
 - [e2e-tests](dev/e2e-tests.md)
+- [manual-verification](dev/manual-verification.md)
 
 # Decision records
 

@@ -1,5 +1,7 @@
 # End-to-end tests
 
+For driving the provider by hand against a real cluster - a build of a branch deployed with Zarf, a registry read, a `ClusterClass` stamping a control plane - see [`manual-verification.md`](manual-verification.md). This page is the automated suites.
+
 The unit tests cover everything that can be covered without an API server: inventory construction from `Machine` objects, the desired-state fingerprint, the converge runner's concurrency, and cloud-init rendering. They need no cluster and no network.
 
 ```sh
