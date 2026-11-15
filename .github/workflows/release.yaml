@@ -136,7 +136,8 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    needs: goreleaser
+    needs:
+      - goreleaser
     if: startsWith(github.ref_name, 'v')
     uses: ./.github/workflows/publish-oci-artifact.yaml
     secrets: inherit
@@ -146,7 +147,9 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    needs: goreleaser
+    needs:
+      - goreleaser
+      - publish-oci-artifact
     if: startsWith(github.ref_name, 'v')
     uses: ./.github/workflows/publish-zarf-package.yaml
     secrets: inherit
