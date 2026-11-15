@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-84a23d42.js";
+            window.path_to_searchindex_js = "searchindex-0f28ec67.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2c3941cc.js"></script>
+        <script src="toc-096af09a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,6 +183,10 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="cluster-api-provider-cargoship"><a class="header" href="#cluster-api-provider-cargoship">cluster-api-provider-cargoship</a></h1>
+<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/releases"><img src="https://img.shields.io/github/v/release/colonel-byte/cluster-api-provider-cargoship" alt="Latest Release"></a>
+<a href="https://pkg.go.dev/github.com/colonel-byte/cluster-api-provider-cargoship"><img src="https://img.shields.io/github/go-mod/go-version/colonel-byte/cluster-api-provider-cargoship?filename=go.mod" alt="Go version"></a>
+<a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/actions/workflows/release.yaml"><img src="https://img.shields.io/github/actions/workflow/status/colonel-byte/cluster-api-provider-cargoship/release.yaml" alt="Build Status"></a>
+<a href="https://securityscorecards.dev/viewer/?uri=github.com/colonel-byte/cluster-api-provider-cargoship"><img src="https://api.scorecard.dev/projects/github.com/colonel-byte/cluster-api-provider-cargoship/badge" alt="OpenSSF Scorecard"></a></p>
 <p>A Cluster API bootstrap and control-plane provider that stands up Kubernetes with <a href="https://github.com/colonel-byte/cargoship">cargoship</a> instead of kubeadm.</p>
 <p>Cargoship builds offline K3s, RKE2 and upstream Kubernetes packages and installs them over SSH from a management node. This provider does the same thing from a management <em>cluster</em>: it creates the <code>Machine</code> objects, waits for an infrastructure provider to give them addresses, and then converges the whole fleet - control plane and workers together - with one <code>cargoship apply</code>. Rancher Turtles imports the result like any other Cluster API cluster, with no cargoship-specific configuration on the Turtles side.</p>
 <h2 id="why-not-a-timer"><a class="header" href="#why-not-a-timer">Why not a timer</a></h2>

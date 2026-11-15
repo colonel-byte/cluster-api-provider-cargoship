@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-84a23d42.js";
+            window.path_to_searchindex_js = "../searchindex-0f28ec67.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2c3941cc.js"></script>
+        <script src="../toc-096af09a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -194,12 +194,29 @@
 <li><strong>envtest needed nothing.</strong> <code>internal/envtest</code> loads the <code>crd/bases</code> directory rather than a file list, so a new CRD is picked up. <code>make envtest-crds</code> only generates the Cluster API CRDs, and <code>ClusterClass</code> is already among them.</li>
 <li>The plan cited line numbers for <code>spec.controlPlaneEndpoint</code> and the scale subresource. Both moved within a day. Cite symbols.</li>
 </ul>
+<h2 id="what-a-live-topology-confirmed"><a class="header" href="#what-a-live-topology-confirmed">What a live topology confirmed</a></h2>
+<p>Run against a k3d cluster with core Cluster API 1.14.4, <code>ClusterTopology=true</code> and the Docker provider standing in for infrastructure. A <code>Cluster</code> with a topology stamped a <code>CargoshipControlPlane</code> carrying:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Stamped field</th><th>Value</th><th>From</th></tr>
+</thead>
+<tbody>
+<tr><td><code>spec.version</code></td><td><code>v1.34.1</code></td><td><code>spec.topology.version</code></td></tr>
+<tr><td><code>spec.replicas</code></td><td><code>3</code></td><td><code>spec.topology.controlPlane.replicas</code></td></tr>
+<tr><td><code>spec.machineTemplate.spec.infrastructureRef</code></td><td>the generated <code>DockerMachineTemplate</code></td><td>the class’s <code>machineInfrastructure</code></td></tr>
+<tr><td><code>spec.distro</code>, <code>spec.ssh</code>, <code>spec.apply</code></td><td>as written</td><td>the template</td></tr>
+<tr><td>the approval annotation</td><td><code>approve-version-change: v1.34.1</code></td><td><code>spec.topology.controlPlane.metadata</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>So all three omitted fields are filled in, which is the whole argument for the template spec being its own type, and the annotation route for approving an upgrade works as documented. The existing reconciler then took the stamped object and reported <code>Available=False WaitingForInfrastructure</code>, which is correct: the Docker provider cannot provision a cluster in that setup, and no control-plane machine is created until the cluster infrastructure is.</p>
+<p>It also settled the profile question measured rather than inferred. The generated <code>MachineDeployment</code> is <code>fleet-one-worker-td5v8</code>, and its <code>spec.template.metadata.labels</code> hold <code>topology.cluster.x-k8s.io/deployment-name: worker</code> with <strong>no</strong> <code>cluster.x-k8s.io/deployment-name</code> at all - so the label the converge used to read is absent, not merely unhelpful, and every class-based pool would have selected no profile.</p>
 <h2 id="still-to-do"><a class="header" href="#still-to-do">Still to do</a></h2>
 <ul>
-<li><strong>A <code>cluster-template.yaml</code> flavor.</strong> <code>clusterctl generate cluster --flavor</code> reads a template from the release assets, and a class-based cluster is the flavor worth shipping: an operator gets the class, the templates and a <code>Cluster</code> with a topology from one command. It belongs in <code>.goreleaser.yaml</code>’s <code>extra_files</code> beside the three files clusterctl already fetches.</li>
-<li><strong>One <code>clusterctl generate cluster</code> end to end</strong>, against a class composed with a real infrastructure provider, before any of this is documented as working. The guide’s YAML is checked against the CRD schemas and the vendored types, not against a cluster that came up.</li>
-<li><strong>Variables and patches are documented but unexercised.</strong> The control-plane-endpoint patch in the guide is the shape a class wants; nothing has run it. Leave the class itself without variables until a second cluster shape needs them - a class with one consumer is indirection with nothing on the other side of it.</li>
-<li><strong>Whether the topology controller reads any control-plane contract field this provider does not set.</strong> The table in the original plan was read off this provider’s types. <code>vendor/sigs.k8s.io/cluster-api/</code> holds only <code>api</code> and <code>util</code>, so the contract package is not vendored to read - the module cache has the full tree, and <code>clusterctl generate cluster</code> against a live topology is the real check.</li>
+<li><strong>One end to end against hosts that answer SSH.</strong> Everything above stops at the infrastructure provider: nothing has converged a fleet from a class. The Docker provider cannot, for the reason <a href="../dev/e2e-tests.html"><code>docs/dev/e2e-tests.md</code></a> gives, so this wants the microvm fleet or real machines.</li>
+<li><strong>The patches are rendered but not applied.</strong> <code>clusterctl generate cluster --from</code> substitutes the variables in <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml"><code>examples/cluster-template-clusterclass-vsphere.yaml</code></a> and the output is valid, but no topology has run the endpoint or package-version patch, so the paths they write to are checked against the CRD schema and nothing else.</li>
+<li><strong>Whether the topology controller reads any control-plane contract field this provider does not set.</strong> Nothing complained for a three-replica class with a machine infrastructure template, which covers the fields the contract lists; a class with <code>rollout</code> or a <code>healthCheck</code> is unexercised.</li>
 </ul>
 <h2 id="not-this-repositorys-to-fix"><a class="header" href="#not-this-repositorys-to-fix">Not this repository’s to fix</a></h2>
 <ul>

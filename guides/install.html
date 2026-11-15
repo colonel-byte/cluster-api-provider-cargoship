@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-84a23d42.js";
+            window.path_to_searchindex_js = "../searchindex-0f28ec67.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2c3941cc.js"></script>
+        <script src="../toc-096af09a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -221,6 +221,19 @@
 <li><strong>It does not stop a <code>ClusterClass</code> working.</strong> The package deploys the same component manifests <code>clusterctl</code> would, so all three CRDs come with it - including <code>CargoshipControlPlaneTemplate</code>, the kind a class names as its control plane. A class, its templates and a <code>Cluster</code> with a topology are ordinary objects an operator applies afterwards; see <a href="clusterclass.html">Composing a ClusterClass</a>, and remember that <code>CLUSTER_TOPOLOGY</code> is a flag on core Cluster API, which this package does not install.</li>
 <li><strong><code>clusterctl</code> does not know the provider is installed.</strong> The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the <code>clusterctl.cluster.x-k8s.io</code> bookkeeping <code>clusterctl init</code> adds - so <code>clusterctl upgrade</code> will not see this provider. Upgrade it by deploying the next package.</li>
 </ul>
+<h2 id="installing-cluster-api-itself-on-a-zarf-initialized-cluster"><a class="header" href="#installing-cluster-api-itself-on-a-zarf-initialized-cluster">Installing Cluster API itself on a Zarf-initialized cluster</a></h2>
+<p>Worth knowing before <code>clusterctl init</code> on the same cluster Zarf runs on, because the failure names nothing to do with either tool. Zarf’s mutating webhook rewrites every pod’s image to its in-cluster registry, so <code>clusterctl init</code> installs cert-manager and the core controllers pointing at images that were never mirrored there:</p>
+<pre><code>Error: context deadline exceeded
+# and, on the pods:
+Failed to pull image "127.0.0.1:5000/jetstack/cert-manager-controller:v1.21.3-zarf-1554577349"
+</code></pre>
+<p>Label each namespace Zarf should leave alone before installing into it:</p>
+<pre><code class="language-sh">for ns in cert-manager capi-system capd-system; do
+  kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl label namespace "${ns}" zarf.dev/agent=ignore
+done
+</code></pre>
+<p>Pods already admitted keep the rewritten reference, so delete them after labelling - the webhook only acts at admission. The alternative, for a cluster with no route out at all, is to mirror core Cluster API’s images into the Zarf registry and leave the rewriting in place. Nothing about this provider is involved either way: the namespaces it installs into hold images the Zarf package already pushed.</p>
 <h2 id="the-ssh-key"><a class="header" href="#the-ssh-key">The SSH key</a></h2>
 <p>The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.</p>
 <pre><code class="language-sh">ssh-keygen -t ed25519 -N '' -f cluster-key

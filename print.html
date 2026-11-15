@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-84a23d42.js";
+            window.path_to_searchindex_js = "searchindex-0f28ec67.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2c3941cc.js"></script>
+        <script src="toc-096af09a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,6 +181,10 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="cluster-api-provider-cargoship"><a class="header" href="#cluster-api-provider-cargoship">cluster-api-provider-cargoship</a></h1>
+<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/releases"><img src="https://img.shields.io/github/v/release/colonel-byte/cluster-api-provider-cargoship" alt="Latest Release"></a>
+<a href="https://pkg.go.dev/github.com/colonel-byte/cluster-api-provider-cargoship"><img src="https://img.shields.io/github/go-mod/go-version/colonel-byte/cluster-api-provider-cargoship?filename=go.mod" alt="Go version"></a>
+<a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/actions/workflows/release.yaml"><img src="https://img.shields.io/github/actions/workflow/status/colonel-byte/cluster-api-provider-cargoship/release.yaml" alt="Build Status"></a>
+<a href="https://securityscorecards.dev/viewer/?uri=github.com/colonel-byte/cluster-api-provider-cargoship"><img src="https://api.scorecard.dev/projects/github.com/colonel-byte/cluster-api-provider-cargoship/badge" alt="OpenSSF Scorecard"></a></p>
 <p>A Cluster API bootstrap and control-plane provider that stands up Kubernetes with <a href="https://github.com/colonel-byte/cargoship">cargoship</a> instead of kubeadm.</p>
 <p>Cargoship builds offline K3s, RKE2 and upstream Kubernetes packages and installs them over SSH from a management node. This provider does the same thing from a management <em>cluster</em>: it creates the <code>Machine</code> objects, waits for an infrastructure provider to give them addresses, and then converges the whole fleet - control plane and workers together - with one <code>cargoship apply</code>. Rancher Turtles imports the result like any other Cluster API cluster, with no cargoship-specific configuration on the Turtles side.</p>
 <h2 id="why-not-a-timer"><a class="header" href="#why-not-a-timer">Why not a timer</a></h2>
@@ -499,6 +503,19 @@ clusterctl generate cluster fleet-one \
 <li><strong>It does not stop a <code>ClusterClass</code> working.</strong> The package deploys the same component manifests <code>clusterctl</code> would, so all three CRDs come with it - including <code>CargoshipControlPlaneTemplate</code>, the kind a class names as its control plane. A class, its templates and a <code>Cluster</code> with a topology are ordinary objects an operator applies afterwards; see <a href="#composing-a-clusterclass">Composing a ClusterClass</a>, and remember that <code>CLUSTER_TOPOLOGY</code> is a flag on core Cluster API, which this package does not install.</li>
 <li><strong><code>clusterctl</code> does not know the provider is installed.</strong> The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the <code>clusterctl.cluster.x-k8s.io</code> bookkeeping <code>clusterctl init</code> adds - so <code>clusterctl upgrade</code> will not see this provider. Upgrade it by deploying the next package.</li>
 </ul>
+<h2 id="installing-cluster-api-itself-on-a-zarf-initialized-cluster"><a class="header" href="#installing-cluster-api-itself-on-a-zarf-initialized-cluster">Installing Cluster API itself on a Zarf-initialized cluster</a></h2>
+<p>Worth knowing before <code>clusterctl init</code> on the same cluster Zarf runs on, because the failure names nothing to do with either tool. Zarf’s mutating webhook rewrites every pod’s image to its in-cluster registry, so <code>clusterctl init</code> installs cert-manager and the core controllers pointing at images that were never mirrored there:</p>
+<pre><code>Error: context deadline exceeded
+# and, on the pods:
+Failed to pull image "127.0.0.1:5000/jetstack/cert-manager-controller:v1.21.3-zarf-1554577349"
+</code></pre>
+<p>Label each namespace Zarf should leave alone before installing into it:</p>
+<pre><code class="language-sh">for ns in cert-manager capi-system capd-system; do
+  kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl label namespace "${ns}" zarf.dev/agent=ignore
+done
+</code></pre>
+<p>Pods already admitted keep the rewritten reference, so delete them after labelling - the webhook only acts at admission. The alternative, for a cluster with no route out at all, is to mirror core Cluster API’s images into the Zarf registry and leave the rewriting in place. Nothing about this provider is involved either way: the namespaces it installs into hold images the Zarf package already pushed.</p>
 <h2 id="the-ssh-key"><a class="header" href="#the-ssh-key">The SSH key</a></h2>
 <p>The only secret the provider needs. The controller connects to every node with it, so it is cluster-admin-equivalent - treat it accordingly.</p>
 <pre><code class="language-sh">ssh-keygen -t ed25519 -N '' -f cluster-key
@@ -782,6 +799,7 @@ stringData:
 <p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="#composing-a-clusterclass">Composing a ClusterClass</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
+<p>For driving the provider by hand against a real cluster - a build of a branch deployed with Zarf, a registry read, a <code>ClusterClass</code> stamping a control plane - see <a href="#driving-the-provider-by-hand"><code>manual-verification.md</code></a>. This page is the automated suites.</p>
 <p>The unit tests cover everything that can be covered without an API server: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
 <pre><code class="language-sh">make test
 </code></pre>
@@ -806,6 +824,155 @@ stringData:
 <li>A converge against real hosts, per the plan above.</li>
 <li>The bootstrap data actually being consumed by a booting machine. Neither container nor microVM fleets read it, so the first thing that proves it is a real infrastructure provider.</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="driving-the-provider-by-hand"><a class="header" href="#driving-the-provider-by-hand">Driving the provider by hand</a></h1>
+<p><a href="#end-to-end-tests"><code>e2e-tests.md</code></a> covers what the suites cover and why the Docker infrastructure provider cannot converge a fleet. This is the other half: how to put the provider on a real cluster, make a reconcile reach the step you want to look at, and check the parts no suite reaches - a registry read, a <code>ClusterClass</code> stamping a control plane, a <code>clusterctl</code> template rendering.</p>
+<p>None of it needs hosts that answer SSH. All of it stops short of a converge, which is the point: the expensive thing to verify is the part before cargoship takes over.</p>
+<h2 id="a-cluster-to-work-on"><a class="header" href="#a-cluster-to-work-on">A cluster to work on</a></h2>
+<p>A <code>zarf init</code>-ed k3d cluster is the useful shape, because it is also the environment the provider is aimed at - an in-cluster registry with a private CA, credentials in a state secret, and a mutating webhook rewriting images.</p>
+<pre><code class="language-sh">k3d cluster create zarf
+zarf init --confirm
+</code></pre>
+<h3 id="zarfs-webhook-rewrites-every-image-including-the-ones-you-install-next"><a class="header" href="#zarfs-webhook-rewrites-every-image-including-the-ones-you-install-next">Zarf’s webhook rewrites every image, including the ones you install next</a></h3>
+<p>This bites once and is unrecognisable the first time. Zarf’s agent rewrites each pod’s image to the in-cluster registry, so anything installed afterwards that was not mirrored there fails to pull:</p>
+<pre><code>Failed to pull image "127.0.0.1:5000/jetstack/cert-manager-controller:v1.21.3-zarf-1554577349"
+</code></pre>
+<p>Label the namespaces Zarf should leave alone <strong>before</strong> installing into them, and delete any pod already admitted - the webhook only acts at admission:</p>
+<pre><code class="language-sh">for ns in cert-manager capi-system capd-system; do
+  kubectl create namespace "${ns}" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl label namespace "${ns}" zarf.dev/agent=ignore
+done
+</code></pre>
+<p>The same label is what a scratch namespace wants for anything you run by hand. <a href="#installing-the-provider"><code>../guides/install.md</code></a> says this where an operator will read it.</p>
+<h3 id="a-k3d-node-may-not-reach-a-public-registry-as-fast-as-the-host-does"><a class="header" href="#a-k3d-node-may-not-reach-a-public-registry-as-fast-as-the-host-does">A k3d node may not reach a public registry as fast as the host does</a></h3>
+<p>If a pod sits in <code>ContainerCreating</code> on <code>Pulling image</code>, pull on the host and hand the image to the cluster rather than waiting:</p>
+<pre><code class="language-sh">docker pull registry.k8s.io/cluster-api/cluster-api-controller:v1.14.4
+k3d image import registry.k8s.io/cluster-api/cluster-api-controller:v1.14.4 -c zarf
+kubectl delete pod -n capi-system -l cluster.x-k8s.io/provider=cluster-api
+</code></pre>
+<p>The deployment’s <code>imagePullPolicy</code> is <code>IfNotPresent</code>, so the imported image is used.</p>
+<h2 id="installing-a-build-of-your-branch"><a class="header" href="#installing-a-build-of-your-branch">Installing a build of your branch</a></h2>
+<p>The released Zarf package carries released images, so a branch needs its own. Build the images, then point a throwaway edit of <code>zarf.yaml</code> at the local daemon:</p>
+<pre><code class="language-sh">make docker-build TAG=0.3.0-dev
+</code></pre>
+<pre><code class="language-yaml"># zarf.yaml, uncommitted: the version and both image tags, plus one line per image
+metadata:
+  version: 0.3.0-dev
+components:
+  - name: bootstrap-provider
+    images:
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.3.0-dev
+        source: daemon
+</code></pre>
+<p><code>source: daemon</code> is the part worth knowing: without it <code>zarf package create</code> resolves every image against a registry and fails with <code>not found</code> before any fallback. With it the images come out of the local Docker daemon.</p>
+<pre><code class="language-sh">make zarf-package
+zarf package deploy out/zarf-package-cluster-api-provider-cargoship-amd64-0.3.0-dev.tar.zst --confirm
+</code></pre>
+<p>Restore <code>zarf.yaml</code> and both <code>config/manager/kustomization.yaml</code> files afterwards - <code>make release-manifests</code> rewrites the latter through <code>kustomize edit set image</code>.</p>
+<p>To check the air-gapped path actually happened, read the image off the running pod rather than the deployment: Zarf’s webhook rewrote it, so a pod serving from <code>127.0.0.1:5000/...</code> is the proof.</p>
+<pre><code class="language-sh">kubectl get pod -n cargoship-controlplane-system -o jsonpath='{.items[0].spec.containers[0].image}'
+</code></pre>
+<h2 id="making-the-controllers-start-at-all"><a class="header" href="#making-the-controllers-start-at-all">Making the controllers start at all</a></h2>
+<p>Both managers watch <code>clusterv1.Machine</code>, so without Cluster API’s CRDs the manager cannot start its informers. Core Cluster API is not needed for that - the CRDs are:</p>
+<pre><code class="language-sh">make envtest-crds
+kubectl apply -f out/envtest-crds/
+</code></pre>
+<p>That is enough to create a <code>Cluster</code>, a <code>CargoshipControlPlane</code> and the <code>Machine</code> objects the controller makes, and to watch every requeue. What it cannot do is provision anything, because nothing is running the Cluster API controllers.</p>
+<h2 id="reaching-a-step-the-reconcile-guards"><a class="header" href="#reaching-a-step-the-reconcile-guards">Reaching a step the reconcile guards</a></h2>
+<p>The reconcile is a sequence of waits, and each one stops everything after it. To look at a later step, satisfy the earlier ones by hand - which is what the envtest fixture does, and what <code>kubectl</code> can do against a real cluster.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>To reach</th><th>Satisfy</th></tr>
+</thead>
+<tbody>
+<tr><td>machine creation</td><td>the <code>Cluster</code> owner reference, and <code>status.initialization.infrastructureProvisioned</code></td></tr>
+<tr><td>the inventory</td><td><code>status.addresses</code> on each <code>Machine</code></td></tr>
+<tr><td>the SSH probe</td><td>an address and port that accept TCP</td></tr>
+<tr><td>package resolution, the version gate</td><td>all of the above</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-sh"># Cluster API's own controller writes these two; nothing else will.
+kubectl patch cluster fleet --subresource=status --type=merge \
+  -p '{"status":{"initialization":{"infrastructureProvisioned":true}}}'
+kubectl patch cargoshipcontrolplane fleet --type=json \
+  -p "[{\"op\":\"add\",\"path\":\"/metadata/ownerReferences\",\"value\":[{\"apiVersion\":\"cluster.x-k8s.io/v1beta2\",\"kind\":\"Cluster\",\"name\":\"fleet\",\"uid\":\"$(kubectl get cluster fleet -o jsonpath='{.metadata.uid}')\"}]}]"
+
+# An address the probe can dial. The API service answers TCP on 443, so spec.ssh.port: 443 and
+# this address get a reconcile past the probe with no host to run.
+kubectl patch machine "$(kubectl get machines -o jsonpath='{.items[0].metadata.name}')" \
+  --subresource=status --type=merge \
+  -p '{"status":{"addresses":[{"type":"InternalIP","address":"10.43.0.1"}]}}'
+</code></pre>
+<p>Then read the answer off the conditions rather than the log:</p>
+<pre><code class="language-sh">kubectl get cargoshipcontrolplane fleet \
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}'
+</code></pre>
+<p>A converge will not succeed this way - there is no host - but everything up to and including the registry read, the version gate and the fingerprint comparison will.</p>
+<h2 id="checking-the-registry-read"><a class="header" href="#checking-the-registry-read">Checking the registry read</a></h2>
+<p>The package resolution path is the one worth driving against a real registry, because its failures are all about credentials and certificates. Point a <code>CargoshipControlPlane</code> at the Zarf registry with <code>fromZarfState: true</code> and walk it to the resolution step as above; the condition says what happened:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Reason</th><th>Means</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ZarfStateUnreadable</code></td><td>no Zarf deployment, or the controller cannot read its secrets</td></tr>
+<tr><td><code>ZarfStateUnusable</code></td><td>the state carries no credentials</td></tr>
+<tr><td><code>DistroUnresolved</code></td><td>the registry answered, and holds no such package or version</td></tr>
+<tr><td><code>Converging</code></td><td>resolution succeeded and the apply started</td></tr>
+</tbody>
+</table>
+</div>
+<p>A <code>DistroUnresolved</code> naming the versions the registry <em>does</em> hold is the read working. The same answer from outside the cluster, which is quicker to iterate on:</p>
+<pre><code class="language-sh">cargoship ls --via-kube                      # tunnels to the service through the API server
+cargoship ls --via-kube --name rke2 -o json
+</code></pre>
+<p>Note what the records say: a <code>mirror</code> record is content a node pulls, and a <code>package</code> record is an artifact to install from. A registry holding only the first cannot be converged from, and that is the message the controller gives.</p>
+<h2 id="checking-a-clusterclass"><a class="header" href="#checking-a-clusterclass">Checking a ClusterClass</a></h2>
+<p>A template is stamped by Cluster API’s topology controller, which envtest does not run, so this one needs core Cluster API and an infrastructure provider. The Docker provider does fine here: nothing has to provision, because what is being checked is the stamping.</p>
+<pre><code class="language-sh">version="$(go list -m -f '{{.Version}}' sigs.k8s.io/cluster-api)"
+curl -fsSL -o /usr/local/bin/clusterctl \
+  "https://github.com/kubernetes-sigs/cluster-api/releases/download/${version}/clusterctl-linux-amd64"
+chmod +x /usr/local/bin/clusterctl
+
+CLUSTER_TOPOLOGY=true clusterctl init --core cluster-api --bootstrap - --control-plane - --infrastructure docker
+</code></pre>
+<p><code>--bootstrap -</code> and <code>--control-plane -</code> install neither, which leaves the provider you deployed with Zarf in place. Confirm the gate reached the manager, since a <code>ClusterClass</code> is simply ignored without it:</p>
+<pre><code class="language-sh">kubectl get deploy -n capi-system capi-controller-manager \
+  -o jsonpath='{range .spec.template.spec.containers[0].args[*]}{@}{"\n"}{end}' | grep ClusterTopology
+</code></pre>
+<p>Then apply a class whose control plane is a <code>CargoshipControlPlaneTemplate</code> and whose infrastructure is CAPD’s, with a <code>Cluster</code> carrying a topology, and read what was stamped:</p>
+<pre><code class="language-sh">kubectl get cargoshipcontrolplane -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{.spec.version}{"\n"}{.spec.replicas}{"\n"}{.spec.machineTemplate.spec.infrastructureRef}{"\n"}{.metadata.annotations}{"\n"}{end}'
+</code></pre>
+<p>Three things to look for, because they are the three the template deliberately omits: <code>spec.version</code> from the topology, <code>spec.replicas</code> from the topology, and <code>spec.machineTemplate.spec.infrastructureRef</code> from the class’s <code>machineInfrastructure</code>. An annotation set under <code>spec.topology.controlPlane.metadata</code> should be there too - that is the route an upgrade approval takes.</p>
+<p>The worker side is worth one look as well, because the labels differ from a hand-wired <code>MachineDeployment</code>:</p>
+<pre><code class="language-sh">kubectl get machinedeployment -o jsonpath='{range .items[*]}{.metadata.name}{"\n  topology="}{.spec.template.metadata.labels.topology\.cluster\.x-k8s\.io/deployment-name}{"\n  capi="}{.spec.template.metadata.labels.cluster\.x-k8s\.io/deployment-name}{"\n"}{end}'
+</code></pre>
+<p>The object’s name is generated, <code>topology.cluster.x-k8s.io/deployment-name</code> holds the class name, and <code>cluster.x-k8s.io/deployment-name</code> is absent - which is why the converge reads the first for a host’s profile.</p>
+<h2 id="rendering-the-clusterctl-template"><a class="header" href="#rendering-the-clusterctl-template">Rendering the clusterctl template</a></h2>
+<pre><code class="language-sh">CLUSTER_CLASS_NAME=cargoship NAMESPACE=default \
+CARGOSHIP_REGISTRY=zarf-docker-registry.zarf.svc.cluster.local:5000 \
+CARGOSHIP_PACKAGE=k3s CARGOSHIP_PACKAGE_VERSION=1.34.1 \
+CARGOSHIP_SSH_USER=rocky CARGOSHIP_SSH_SECRET=fleet-ssh \
+CONTROL_PLANE_ENDPOINT_IP=10.0.0.10 \
+VSPHERE_SERVER=vc.example VSPHERE_TLS_THUMBPRINT=aa VSPHERE_TEMPLATE=rocky9 \
+VSPHERE_DATACENTER=dc VSPHERE_DATASTORE=ds VSPHERE_FOLDER=f \
+VSPHERE_RESOURCE_POOL=rp VSPHERE_NETWORK=net \
+clusterctl generate cluster fleet-one \
+  --kubernetes-version v1.34.1 --control-plane-machine-count 3 --worker-machine-count 2 \
+  --from examples/cluster-template-clusterclass-vsphere.yaml
+</code></pre>
+<p>clusterctl refuses while any variable is unset and lists the ones it is missing. <strong>It substitutes comments as well as values</strong>, so a comment in a template that mentions a variable by name makes the render fail asking for it - which is how that was found.</p>
+<h2 id="clearing-up"><a class="header" href="#clearing-up">Clearing up</a></h2>
+<pre><code class="language-sh">kubectl delete cluster --all -A                 # before the providers, so finalizers run
+kubectl delete ns cc-test cargoship-demo
+clusterctl delete --all --include-crd
+zarf package remove cluster-api-provider-cargoship --confirm
+kubectl delete -f out/envtest-crds/
+</code></pre>
+<p>Deleting a <code>Cluster</code> while the control-plane controller is gone leaves a finalizer nothing will remove, which is a stuck namespace rather than a lost cluster - delete the clusters first, or patch the finalizer off afterwards.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec"><a class="header" href="#cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec"><code>CargoshipControlPlaneTemplate</code>’s spec is not <code>CargoshipControlPlaneSpec</code></a></h1>
 <p>A <code>ClusterClass</code> names a control plane through <code>spec.controlPlane.templateRef</code>, which has to be a <em>template</em> kind, so <code>CargoshipControlPlaneTemplate</code> exists. The obvious way to write it is the way <a href="../bootstrap/api/v1alpha1/cargoshipconfigtemplate_types.go"><code>CargoshipConfigTemplate</code></a> is written - wrap the live spec and be done in twenty-five lines - and that is wrong here. This records why, because it will look like gratuitous duplication to the next person.</p>
@@ -1070,12 +1237,29 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <li><strong>envtest needed nothing.</strong> <code>internal/envtest</code> loads the <code>crd/bases</code> directory rather than a file list, so a new CRD is picked up. <code>make envtest-crds</code> only generates the Cluster API CRDs, and <code>ClusterClass</code> is already among them.</li>
 <li>The plan cited line numbers for <code>spec.controlPlaneEndpoint</code> and the scale subresource. Both moved within a day. Cite symbols.</li>
 </ul>
+<h2 id="what-a-live-topology-confirmed"><a class="header" href="#what-a-live-topology-confirmed">What a live topology confirmed</a></h2>
+<p>Run against a k3d cluster with core Cluster API 1.14.4, <code>ClusterTopology=true</code> and the Docker provider standing in for infrastructure. A <code>Cluster</code> with a topology stamped a <code>CargoshipControlPlane</code> carrying:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Stamped field</th><th>Value</th><th>From</th></tr>
+</thead>
+<tbody>
+<tr><td><code>spec.version</code></td><td><code>v1.34.1</code></td><td><code>spec.topology.version</code></td></tr>
+<tr><td><code>spec.replicas</code></td><td><code>3</code></td><td><code>spec.topology.controlPlane.replicas</code></td></tr>
+<tr><td><code>spec.machineTemplate.spec.infrastructureRef</code></td><td>the generated <code>DockerMachineTemplate</code></td><td>the class’s <code>machineInfrastructure</code></td></tr>
+<tr><td><code>spec.distro</code>, <code>spec.ssh</code>, <code>spec.apply</code></td><td>as written</td><td>the template</td></tr>
+<tr><td>the approval annotation</td><td><code>approve-version-change: v1.34.1</code></td><td><code>spec.topology.controlPlane.metadata</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>So all three omitted fields are filled in, which is the whole argument for the template spec being its own type, and the annotation route for approving an upgrade works as documented. The existing reconciler then took the stamped object and reported <code>Available=False WaitingForInfrastructure</code>, which is correct: the Docker provider cannot provision a cluster in that setup, and no control-plane machine is created until the cluster infrastructure is.</p>
+<p>It also settled the profile question measured rather than inferred. The generated <code>MachineDeployment</code> is <code>fleet-one-worker-td5v8</code>, and its <code>spec.template.metadata.labels</code> hold <code>topology.cluster.x-k8s.io/deployment-name: worker</code> with <strong>no</strong> <code>cluster.x-k8s.io/deployment-name</code> at all - so the label the converge used to read is absent, not merely unhelpful, and every class-based pool would have selected no profile.</p>
 <h2 id="still-to-do"><a class="header" href="#still-to-do">Still to do</a></h2>
 <ul>
-<li><strong>A <code>cluster-template.yaml</code> flavor.</strong> <code>clusterctl generate cluster --flavor</code> reads a template from the release assets, and a class-based cluster is the flavor worth shipping: an operator gets the class, the templates and a <code>Cluster</code> with a topology from one command. It belongs in <code>.goreleaser.yaml</code>’s <code>extra_files</code> beside the three files clusterctl already fetches.</li>
-<li><strong>One <code>clusterctl generate cluster</code> end to end</strong>, against a class composed with a real infrastructure provider, before any of this is documented as working. The guide’s YAML is checked against the CRD schemas and the vendored types, not against a cluster that came up.</li>
-<li><strong>Variables and patches are documented but unexercised.</strong> The control-plane-endpoint patch in the guide is the shape a class wants; nothing has run it. Leave the class itself without variables until a second cluster shape needs them - a class with one consumer is indirection with nothing on the other side of it.</li>
-<li><strong>Whether the topology controller reads any control-plane contract field this provider does not set.</strong> The table in the original plan was read off this provider’s types. <code>vendor/sigs.k8s.io/cluster-api/</code> holds only <code>api</code> and <code>util</code>, so the contract package is not vendored to read - the module cache has the full tree, and <code>clusterctl generate cluster</code> against a live topology is the real check.</li>
+<li><strong>One end to end against hosts that answer SSH.</strong> Everything above stops at the infrastructure provider: nothing has converged a fleet from a class. The Docker provider cannot, for the reason <a href="#end-to-end-tests"><code>docs/dev/e2e-tests.md</code></a> gives, so this wants the microvm fleet or real machines.</li>
+<li><strong>The patches are rendered but not applied.</strong> <code>clusterctl generate cluster --from</code> substitutes the variables in <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml"><code>examples/cluster-template-clusterclass-vsphere.yaml</code></a> and the output is valid, but no topology has run the endpoint or package-version patch, so the paths they write to are checked against the CRD schema and nothing else.</li>
+<li><strong>Whether the topology controller reads any control-plane contract field this provider does not set.</strong> Nothing complained for a three-replica class with a machine infrastructure template, which covers the fields the contract lists; a class with <code>rollout</code> or a <code>healthCheck</code> is unexercised.</li>
 </ul>
 <h2 id="not-this-repositorys-to-fix"><a class="header" href="#not-this-repositorys-to-fix">Not this repository’s to fix</a></h2>
 <ul>
