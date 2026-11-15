@@ -115,7 +115,8 @@ jobs:
           for crd in \
             cargoshipconfigs.bootstrap.cluster.x-k8s.io \
             cargoshipconfigtemplates.bootstrap.cluster.x-k8s.io \
-            cargoshipcontrolplanes.controlplane.cluster.x-k8s.io; do
+            cargoshipcontrolplanes.controlplane.cluster.x-k8s.io \
+            cargoshipcontrolplanetemplates.controlplane.cluster.x-k8s.io; do
             kubectl wait --for=condition=Established "crd/${crd}" --timeout=120s
 
             # The label the core controllers read to decide which version of this provider's API

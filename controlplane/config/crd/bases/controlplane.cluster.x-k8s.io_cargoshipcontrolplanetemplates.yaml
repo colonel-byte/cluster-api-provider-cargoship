@@ -1,0 +1,389 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.23.0
+  name: cargoshipcontrolplanetemplates.controlplane.cluster.x-k8s.io
+spec:
+  group: controlplane.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: CargoshipControlPlaneTemplate
+    listKind: CargoshipControlPlaneTemplateList
+    plural: cargoshipcontrolplanetemplates
+    shortNames:
+    - cscpt
+    singular: cargoshipcontrolplanetemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Time since creation
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          CargoshipControlPlaneTemplate is a template for CargoshipControlPlane, referenced by a
+          ClusterClass so each cluster built from that class gets its own control plane.
+
+          It has no status and no controller: a template is never reconciled, only stamped by Cluster
+          API's topology controller, and what it stamps is an ordinary CargoshipControlPlane that the
+          existing reconciler handles with no change at all.
+
+          A ClusterClass names it through spec.controlPlane.templateRef, which carries a kind, a name and
+          an apiVersion and no namespace -- so a template lives in the same namespace as the class that
+          refers to it.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec is the desired state of CargoshipControlPlaneTemplate.
+            properties:
+              template:
+                description: template is the CargoshipControlPlane to create per cluster.
+                properties:
+                  metadata:
+                    description: metadata is the labels and annotations stamped onto
+                      the created CargoshipControlPlane.
+                    minProperties: 1
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          annotations is an unstructured key value map stored with a resource that may be
+                          set by external tools to store and retrieve arbitrary metadata. They are not
+                          queryable and should be preserved when modifying objects.
+                          More info: http://kubernetes.io/docs/user-guide/annotations
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          labels is a map of string keys and values that can be used to organize and categorize
+                          (scope and select) objects. May match selectors of replication controllers
+                          and services.
+                          More info: http://kubernetes.io/docs/user-guide/labels
+                        type: object
+                    type: object
+                  spec:
+                    description: spec is the CargoshipControlPlane spec to stamp.
+                    properties:
+                      apply:
+                        description: apply tunes the converge.
+                        properties:
+                          allowDowngrade:
+                            description: |-
+                              allowDowngrade lets a converge continue against a host already running a version newer than
+                              the package, rather than refusing.
+                            type: boolean
+                          concurrency:
+                            description: concurrency caps how many hosts a phase acts
+                              on at once. Zero is unlimited.
+                            format: int32
+                            minimum: 0
+                            type: integer
+                          driftIntervalSeconds:
+                            description: |-
+                              driftIntervalSeconds is how often a converged fleet is re-converged to catch drift. Zero
+                              takes 600.
+                            format: int32
+                            minimum: 0
+                            type: integer
+                          labelNodes:
+                            description: labelNodes adds the node-role.kubernetes.io/<profile>
+                              label to each node.
+                            type: boolean
+                          modifyFirewall:
+                            description: modifyFirewall lets cargoship open the ports
+                              the cluster needs in the host's own firewall.
+                            type: boolean
+                          modifyHosts:
+                            description: modifyHosts lets cargoship write every node
+                              into each host's /etc/hosts.
+                            type: boolean
+                          timeoutSeconds:
+                            description: |-
+                              timeoutSeconds bounds the retry loops inside each phase. Zero takes cargoship's own
+                              default, which is 15 minutes.
+
+                              This is not a budget for the whole converge: it is how long one phase waits for one host to
+                              get where it is going. Nothing in this controller bounds the total, on purpose -- a machine
+                              that takes eleven minutes to boot is not an error, and the reconcile that is waiting for it
+                              costs nothing.
+                            format: int32
+                            minimum: 0
+                            type: integer
+                          workerConcurrent:
+                            description: workerConcurrent is the worker batch size,
+                              a count ("5") or a percentage ("25%").
+                            maxLength: 8
+                            type: string
+                        type: object
+                      clusterConfig:
+                        description: clusterConfig is the cargoship cluster configuration's
+                          spec.config, verbatim.
+                        x-kubernetes-preserve-unknown-fields: true
+                      controlPlaneEndpoint:
+                        description: |-
+                          controlPlaneEndpoint is the host clients reach the API through.
+
+                          Worth setting through a class rather than here: a kube-vip or load-balancer address is per
+                          cluster, and a topology variable with a patch onto this field is how one value reaches both
+                          this and wherever the vip is configured. See docs/guides/clusterclass.md.
+                        minProperties: 1
+                        properties:
+                          host:
+                            description: host is the hostname on which the API server
+                              is serving.
+                            maxLength: 512
+                            minLength: 1
+                            type: string
+                          port:
+                            description: port is the port on which the API server
+                              is serving.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                        type: object
+                      distro:
+                        description: distro is the cargoship package the fleet is
+                          converged to.
+                        properties:
+                          arch:
+                            description: |-
+                              arch is the package architecture to pull, "amd64" or "arm64". Empty takes the package's
+                              sole architecture, and fails if it carries more than one.
+                            enum:
+                            - amd64
+                            - arm64
+                            type: string
+                          caBundleSecretRef:
+                            description: |-
+                              caBundleSecretRef is a secret holding PEM-encoded certificates to trust when pulling the
+                              package, in its "ca.crt" key. They are trusted in addition to the controller's own roots,
+                              so a registry with a private CA does not stop the controller reaching anything else.
+
+                              This is the way to pull from a registry serving a certificate nothing public signed - a
+                              Zarf registry, usually. Prefer it to insecureSkipTLSVerify, which verifies nothing at all.
+                            properties:
+                              name:
+                                description: name of the referenced object.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          fromZarfState:
+                            description: |-
+                              fromZarfState reads the registry's credentials and its certificate authority out of the
+                              Zarf deployment in the controller's own cluster, instead of from pullSecretRef and
+                              caBundleSecretRef.
+
+                              This is the air-gapped case with nothing to wire up: Zarf generated the credentials and
+                              signed the registry's certificate itself, and both are already in the management cluster
+                              as the `zarf-state` and `zarf-registry-server-tls` secrets. The pull-only credentials are
+                              preferred over the push pair, and a registry Zarf manages mTLS for is reached with that
+                              CA and no client certificate: Zarf requires one only where it is offered, and the one it
+                              issues belongs to the per-node registry proxy.
+
+                              registry is still named here rather than read from that state. Zarf records the address a
+                              node reaches the registry at - a NodePort or an external host - and a controller inside
+                              the cluster wants the service, which the state does not carry. See
+                              docs/agent/choice-registry-credentials.md.
+                            type: boolean
+                          insecureSkipTLSVerify:
+                            description: |-
+                              insecureSkipTLSVerify accepts the registry's certificate without verifying it, rather than
+                              trusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH
+                              connections to the fleet nor the workload cluster's API server.
+                            type: boolean
+                          name:
+                            description: |-
+                              name is the cargoship package to converge to, as the package declares itself - "k3s",
+                              "rancher-rke2-multi-cilium".
+                            maxLength: 64
+                            minLength: 1
+                            type: string
+                          ociRef:
+                            description: |-
+                              ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
+
+                              A tag is resolved to a digest once and the digest is recorded in status.distro.digest.
+                              Every later reconcile uses the digest, so a tag that moves underneath a running cluster
+                              does not silently change what the fleet converges to; change the reference to adopt it.
+                            maxLength: 2048
+                            minLength: 1
+                            type: string
+                          packageVersion:
+                            description: |-
+                              packageVersion is the package's own version to take, which is not spec.version: a package
+                              declares its own, and only the package knows which Kubernetes version that installs.
+
+                              Required alongside name, rather than defaulting to the newest version recorded. Taking the
+                              newest would make the registry the desired state and this resource a follower of it, so
+                              publishing a package on a Friday afternoon would move a cluster nobody touched. The
+                              version a fleet runs is decided here; discovery resolves it to a reference and says what
+                              else is on offer when it is wrong.
+                            maxLength: 64
+                            minLength: 1
+                            type: string
+                          pullSecretRef:
+                            description: |-
+                              pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses
+                              anonymous access.
+
+                              The secret must be of type kubernetes.io/dockerconfigjson, which is what
+                              `kubectl create secret docker-registry` produces. Its registries are merged into a Docker
+                              config file the controller keeps on its cache volume, because that file is the only place
+                              the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
+                            properties:
+                              name:
+                                description: name of the referenced object.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          registry:
+                            description: |-
+                              registry is where to discover the package, as a host with an optional path prefix -
+                              "zarf-docker-registry.zarf.svc.cluster.local:5000" or "ghcr.io/example". No scheme.
+
+                              The records are read from <registry>/cargoship, which is one tag listing rather than a
+                              catalogue read, so the pull credentials pullSecretRef names are enough. See
+                              docs/agent/choice-record-discovery.md.
+                            maxLength: 2048
+                            minLength: 1
+                            type: string
+                        type: object
+                        x-kubernetes-validations:
+                        - message: set either ociRef, or both registry and name
+                          rule: has(self.ociRef) != (has(self.registry) && has(self.name))
+                        - message: a discovered package needs both name and packageVersion
+                          rule: has(self.name) == has(self.packageVersion)
+                        - message: fromZarfState needs registry, which is the host
+                            its credentials are stored under
+                          rule: '!has(self.fromZarfState) || !self.fromZarfState ||
+                            has(self.registry)'
+                        - message: fromZarfState supplies the credentials and the
+                            CA, so pullSecretRef and caBundleSecretRef must be unset
+                          rule: '!has(self.fromZarfState) || !self.fromZarfState ||
+                            (!has(self.pullSecretRef) && !has(self.caBundleSecretRef))'
+                      machineTemplate:
+                        description: machineTemplate is the metadata and placement
+                          each control-plane machine is created with.
+                        properties:
+                          metadata:
+                            description: metadata is the labels and annotations stamped
+                              onto each machine.
+                            minProperties: 1
+                            properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  annotations is an unstructured key value map stored with a resource that may be
+                                  set by external tools to store and retrieve arbitrary metadata. They are not
+                                  queryable and should be preserved when modifying objects.
+                                  More info: http://kubernetes.io/docs/user-guide/annotations
+                                type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  labels is a map of string keys and values that can be used to organize and categorize
+                                  (scope and select) objects. May match selectors of replication controllers
+                                  and services.
+                                  More info: http://kubernetes.io/docs/user-guide/labels
+                                type: object
+                            type: object
+                          spec:
+                            description: spec is the machine template's own spec.
+                            properties:
+                              failureDomains:
+                                description: |-
+                                  failureDomains are the failure domains to spread control-plane machines across, in order.
+                                  Empty lets the infrastructure provider choose.
+                                items:
+                                  type: string
+                                maxItems: 64
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            type: object
+                        type: object
+                      ssh:
+                        description: ssh is how the controller reaches the machines.
+                        properties:
+                          port:
+                            description: port is the SSH port. Zero means 22.
+                            format: int32
+                            maximum: 65535
+                            minimum: 1
+                            type: integer
+                          privateKeySecretRef:
+                            description: |-
+                              privateKeySecretRef is a secret holding the private key, in the "ssh-privatekey" key of a
+                              kubernetes.io/ssh-auth secret.
+
+                              The key is read into memory and handed to the SSH client as an auth method. It is never
+                              written to the pod's filesystem, so the controller needs no writable mount for it and a
+                              container compromise has to read process memory rather than a file.
+                            properties:
+                              name:
+                                description: name of the referenced object.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          useSudo:
+                            default: true
+                            description: |-
+                              useSudo runs privileged commands through sudo rather than as the login user. Needed for any
+                              user that is not root, which should be every user.
+                            type: boolean
+                          user:
+                            description: user is the login to connect as.
+                            maxLength: 32
+                            minLength: 1
+                            type: string
+                        required:
+                        - privateKeySecretRef
+                        - user
+                        type: object
+                    required:
+                    - distro
+                    - ssh
+                    type: object
+                type: object
+            required:
+            - template
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}

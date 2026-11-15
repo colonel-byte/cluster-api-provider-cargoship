@@ -6,6 +6,7 @@
 
 # Guides
 
+- [clusterclass](guides/clusterclass.md)
 - [install](guides/install.md)
 - [node-removal](guides/node-removal.md)
 - [rancher-turtles](guides/rancher-turtles.md)
@@ -17,6 +18,7 @@
 
 # Decision records
 
+- [choice-clusterclass-template](agent/choice-clusterclass-template.md)
 - [choice-distro-pinning](agent/choice-distro-pinning.md)
 - [choice-in-memory-ssh-key](agent/choice-in-memory-ssh-key.md)
 - [choice-makefile-not-mage](agent/choice-makefile-not-mage.md)
@@ -26,4 +28,5 @@
 - [choice-registry-credentials](agent/choice-registry-credentials.md)
 - [choice-tool-dependencies](agent/choice-tool-dependencies.md)
 - [choice-zarf-package](agent/choice-zarf-package.md)
+- [todo-clusterclass-support](agent/todo-clusterclass-support.md)
 - [todo-e2e-fleet-backends](agent/todo-e2e-fleet-backends.md)

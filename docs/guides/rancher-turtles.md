@@ -168,6 +168,26 @@ kubectl get capiproviders --all-namespaces
 
 Both rows reach `Ready` in `Phase`, with `cargoship` as `ProviderName` and the release tag as `InstalledVersion`. A row stuck in `Provisioning` is the operator failing to fetch or apply the components, and its reason is in the Turtles controller's log rather than on the object.
 
+## Declaring clusters with a ClusterClass
+
+Turtles installs the provider; a `ClusterClass` is how you then declare clusters with it, and the two are independent - a class, its templates and a `Cluster` with a topology are ordinary Cluster API objects that Turtles neither reads nor manages. [Composing a ClusterClass](clusterclass.md) is the whole of it; two things matter specifically on a Turtles cluster.
+
+**The feature gate belongs to core Cluster API, not to this provider.** `ClusterClass` needs `CLUSTER_TOPOLOGY=true`, which `clusterctl init` takes from the environment and the operator takes from a provider's `configSecret` - the same mechanism the air-gapped section above uses for `OCI_USERNAME`. It goes on the **core** provider:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-api-core
+  namespace: capi-system
+stringData:
+  CLUSTER_TOPOLOGY: "true"
+```
+
+and that secret is named by the core `CAPIProvider`'s `spec.configSecret.name`. Which object that is depends on how core was installed - Turtles' own chart declares one, so on most clusters this is an edit to an existing object rather than a new one, and the chart's values are the durable place to set it. Neither `CAPIProvider` for cargoship is involved: a control-plane provider does not read the gate.
+
+**A topology version bump is an in-place upgrade here, and Rancher's UI will not say so.** Everywhere else in the ecosystem, editing a topology's `version` rolls the control plane by replacing machines. A cargoship cluster converges hosts over SSH instead, so the same edit walks the existing hosts through cargoship's upgrade phases - and this provider refuses it until the `controlplane.cluster.x-k8s.io/approve-version-change` annotation names the new version, which a topology can carry under `controlPlane.metadata.annotations`. Until it does, the control plane reports `VersionChangeRefused` and does not move, which from Rancher looks like a cluster that has stopped rather than one waiting for a person. See [`choice-no-rollout.md`](../agent/choice-no-rollout.md) before offering this to anyone through the UI.
+
 ## Importing the workload cluster into Rancher
 
 Turtles imports a Cluster API cluster into Rancher when the `Cluster` - or the namespace holding it - carries the auto-import label:
