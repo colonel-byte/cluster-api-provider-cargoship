@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.3.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.3...v0.3.0) (2026-11-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* build the zarf package after the artifact it pulls ([#51](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/51))
+
+### Features
+
+* **controlplane:** add CargoshipControlPlaneTemplate, the kind a ClusterClass names ([#44](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/44)) ([a981f00](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/a981f0099f56085b9ac1b30589bc3bd698f9f5c2))
+* **examples:** publish a renderable ClusterClass for clusterctl to generate from ([#46](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/46)) ([e76d0bd](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e76d0bdf05fc4cb783522fb257f8908228dd5e41))
+
+
+### Bug Fixes
+
+* **converge:** read a worker's profile from the class a topology generated it from ([#45](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/45)) ([ef5620b](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/ef5620bc081e85b68e20d88986b4958aa7e72320))
+
+
+### Documentation
+
+* add badges to the README ([#50](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/50)) ([5b10f48](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/5b10f48af6baeec31df2f64d1315c005fa5d26f6))
+* record how the provider is driven by hand, and what zarf's webhook does to clusterctl ([#48](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/48)) ([756dcb0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/756dcb08b012e35cdff22d3915894837dcbd1f72))
+
+
+### CI/CD
+
+* build the zarf package after the artifact it pulls ([#51](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/51)) ([5aec657](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/5aec657702ca267b82e676bb7d4ca47523b71656))
+
 ## [0.2.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.2...v0.2.3) (2026-11-15)
 
 
