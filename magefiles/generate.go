@@ -30,6 +30,7 @@ package main
 import (
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/docs"
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/ociartifact"
+	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/osv"
 	"github.com/magefile/mage/mg"
 )
 
@@ -46,4 +47,17 @@ func (Generate) Document() error {
 // tagged with version, for a Cluster API Operator installing from a registry.
 func (Generate) OCIArtifact(releaseDir, version string) error {
 	return ociartifact.Generate(releaseDir, version)
+}
+
+// OSVOverrides writes the osv-scanner.toml files that sit beside the non-Go dependency manifests
+// `go mod vendor` copies into vendor/ and deletes along with the rest of the tree every time it
+// runs. See docs/agent/choice-osv-vendor-overrides.md.
+func (Generate) OSVOverrides() error {
+	return osv.WriteOverrides()
+}
+
+// VerifyOSVOverrides fails if a declared override is missing or has drifted, or if vendor/ holds
+// a non-Go dependency manifest that no override covers.
+func (Generate) VerifyOSVOverrides() error {
+	return osv.VerifyVendor()
 }

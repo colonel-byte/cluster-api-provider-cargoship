@@ -83,15 +83,22 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 .PHONY: vendor
 vendor: ## Re-vendor dependencies. Use this, not `go mod vendor` directly.
 	go mod vendor
-	# `go mod vendor` copies every file sitting beside a vendored package, and for three
-	# dependencies that includes a requirements.txt pinning their own Python test or docs
-	# tooling. Nothing here installs them -- but osv-scanner walks the whole tree, finds them,
-	# and reports their advisories against this repository, which is every finding the OpenSSF
-	# Scorecard Vulnerabilities check has ever produced for us. govulncheck (scan-vuln.yaml) is
-	# what actually covers the Go code. Pruned here rather than ignored in a config, because
-	# osv-scanner only reads an .osv-scanner.toml from the directory a manifest sits in, and
-	# `go mod vendor` deletes vendor/ before it writes it.
-	find vendor -name 'requirements*.txt' -delete
+	$(MAGE) generate:osvOverrides
+
+.PHONY: vendor-osv
+vendor-osv: ## Rewrite the vendored osv-scanner.toml overrides without re-vendoring.
+	# `go mod vendor` copies every file that sits in the directory of a package this module
+	# imports, which for three dependencies means a requirements.txt pinning their own Python
+	# test or docs tooling. Nothing here installs them, but osv-scanner walks the whole tree and
+	# scores what it finds there against this repository. The generated overrides tell it to skip
+	# that ecosystem, and they have to sit beside each manifest because that is the only place
+	# osv-scanner reads configuration from. Separate from `vendor` because
+	# .github/workflows/fix-vendor-osv.yaml runs this against a tree it must not re-vendor.
+	$(MAGE) generate:osvOverrides
+
+.PHONY: verify-vendor
+verify-vendor: ## Fail if an override is missing or a new non-Go manifest is uncovered.
+	$(MAGE) generate:verifyOSVOverrides
 
 ##@ Test
 
