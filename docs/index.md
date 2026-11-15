@@ -2,6 +2,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/colonel-byte/cluster-api-provider-cargoship)](https://github.com/colonel-byte/cluster-api-provider-cargoship/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/colonel-byte/cluster-api-provider-cargoship?filename=go.mod)](https://pkg.go.dev/github.com/colonel-byte/cluster-api-provider-cargoship)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/colonel-byte/cluster-api-provider-cargoship/release.yaml)](https://github.com/colonel-byte/cluster-api-provider-cargoship/actions/workflows/release.yaml)
+[![Unit tests](https://img.shields.io/github/actions/workflow/status/colonel-byte/cluster-api-provider-cargoship/unit-tests.yaml?label=unit%20tests)](https://github.com/colonel-byte/cluster-api-provider-cargoship/actions/workflows/unit-tests.yaml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/colonel-byte/cluster-api-provider-cargoship/badge)](https://securityscorecards.dev/viewer/?uri=github.com/colonel-byte/cluster-api-provider-cargoship)
 
 A Cluster API bootstrap and control-plane provider that stands up Kubernetes with [cargoship](https://github.com/colonel-byte/cargoship) instead of kubeadm.
