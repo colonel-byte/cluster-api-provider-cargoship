@@ -16,11 +16,11 @@ That is the half-applied upgrade this document exists to refuse, reachable by ac
 
 `versionChange` compares `status.version` - which only a successful converge writes, so it is what the hosts last had installed - against `spec.version`. When they differ, one of three things happens:
 
-| State                                                     | Reason on `Converged`  | What happens                                                      |
-| --------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------- |
-| The package has not moved (fingerprint unchanged)         | `VersionChangeInert`   | Nothing. The message names `spec.distro` as the field to change    |
-| The package moved, and no annotation approves the version | `VersionChangeRefused` | Nothing. The message names the annotation and the value to set     |
-| The package moved and the annotation names `spec.version` | -                      | The converge runs, and upgrades every host in place               |
+| State                                                     | Reason on `Converged`  | What happens                                                    |
+| --------------------------------------------------------- | ---------------------- | --------------------------------------------------------------- |
+| The package has not moved (fingerprint unchanged)         | `VersionChangeInert`   | Nothing. The message names `spec.distro` as the field to change |
+| The package moved, and no annotation approves the version | `VersionChangeRefused` | Nothing. The message names the annotation and the value to set  |
+| The package moved and the annotation names `spec.version` | -                      | The converge runs, and upgrades every host in place             |
 
 The annotation's **value** is compared with `spec.version` rather than its presence being checked, so an approval left behind from one change cannot wave through the next.
 
