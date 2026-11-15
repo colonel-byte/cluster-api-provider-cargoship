@@ -84,7 +84,7 @@ spec:
 
 A `templateRef` carries a kind, a name and an apiVersion and **no namespace**, so every template lives in the class's namespace.
 
-**A worker pool's cargoship profile does not yet come from the class.** For a hand-wired `MachineDeployment` the profile is the deployment's own name, so one called `gpu` selects `clusterConfig.profiles.gpu` - its labels, taints, firewall rules and concurrency. A topology does not name its deployments that way: Cluster API generates the name and tracks the class in a label instead, so a pool declared `class: gpu` currently selects no profile and its hosts take the defaults, silently, because a profile the configuration does not define is not an error. Until the converge reads that label, keep per-pool settings out of a class.
+**The machine-deployment class name is the cargoship profile.** `class: gpu` selects `clusterConfig.profiles.gpu` - its node labels, taints, firewall rules and concurrency - which is the same join a hand-wired `MachineDeployment` makes by being *named* `gpu`. A class reaches it by a different route: Cluster API generates the deployment's object name per cluster and puts the class name in `topology.cluster.x-k8s.io/deployment-name`, which it propagates to each machine, and the converge reads that label first. A profile the configuration does not define is not an error, so a pool needs an entry only where it should differ from the defaults.
 
 ## The cluster
 

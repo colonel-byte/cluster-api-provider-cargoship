@@ -399,3 +399,69 @@ func TestBuildInventoryLeavesOutMachinesBeingDeleted(t *testing.T) {
 		t.Errorf("Skipped = %v, want empty", inv.Skipped)
 	}
 }
+
+// TestProfile covers the label the profile is read from, which decides whether a worker pool gets
+// its node labels, taints, firewall rules and concurrency or silently takes the defaults.
+//
+// Two labels carry two different things. For a hand-wired MachineDeployment the object's own name
+// is the profile. For one a ClusterClass generated, the object's name is generated per cluster and
+// the class name - the thing an operator wrote - is in the topology label, which Cluster API also
+// propagates to each Machine.
+func TestProfile(t *testing.T) {
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   string
+	}{
+		{
+			name: "a hand-wired deployment, named after the profile",
+			labels: map[string]string{
+				clusterv1.MachineDeploymentNameLabel: "gpu",
+			},
+			want: "gpu",
+		},
+		{
+			name: "a deployment a class generated, where only the topology label is the class name",
+			labels: map[string]string{
+				clusterv1.ClusterTopologyMachineDeploymentNameLabel: "gpu",
+			},
+			want: "gpu",
+		},
+		{
+			name: "both, which is the class name against a generated object name",
+			labels: map[string]string{
+				clusterv1.ClusterTopologyMachineDeploymentNameLabel: "gpu",
+				clusterv1.MachineDeploymentNameLabel:                "fleet-one-gpu-x7k2p",
+			},
+			want: "gpu",
+		},
+		{
+			name: "an empty topology label falls through rather than winning",
+			labels: map[string]string{
+				clusterv1.ClusterTopologyMachineDeploymentNameLabel: "",
+				clusterv1.MachineDeploymentNameLabel:                "gpu",
+			},
+			want: "gpu",
+		},
+		{
+			name:   "a control-plane machine, stamped from no deployment",
+			labels: nil,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &clusterv1.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "fleet-worker",
+					Labels: tt.labels,
+				},
+			}
+
+			if got := profile(m); got != tt.want {
+				t.Errorf("profile() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

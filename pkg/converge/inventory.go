@@ -265,7 +265,24 @@ func role(m *clusterv1.Machine) string {
 // firewall rules and concurrency. A profile the config does not define is not an error -- the host
 // just takes the defaults -- so a deployment needs a profile entry only when it should differ.
 // Control-plane machines take no profile; they are not stamped from a deployment.
+//
+// The topology label is read first, and is not an alternative spelling of the second: for a
+// deployment a ClusterClass generated, the two hold different things. Cluster API sets
+// topology.cluster.x-k8s.io/deployment-name to the *class* name -- "gpu" -- while the object's own
+// name, which cluster.x-k8s.io/deployment-name would carry, is generated per cluster and looks
+// like "fleet-one-gpu-x7k2p". It also stops its webhook adding that second label to a managed
+// deployment at all, calling it "redundant for managed MachineDeployments given that we already
+// have topology.cluster.x-k8s.io/deployment-name"
+// (exp/topology/desiredstate/desired_state.go, cluster-api v1.14.4), and sets the topology label
+// in .spec.template.labels so it reaches each Machine.
+//
+// So reading only the second label means every pool declared through a class selects no profile
+// at all, and takes the defaults without saying so -- which is why this is a fallback rather than
+// the answer. A hand-wired MachineDeployment carries only the second and is unaffected.
 func profile(m *clusterv1.Machine) string {
+	if class, ok := m.Labels[clusterv1.ClusterTopologyMachineDeploymentNameLabel]; ok && class != "" {
+		return class
+	}
 	return m.Labels[clusterv1.MachineDeploymentNameLabel]
 }
 
