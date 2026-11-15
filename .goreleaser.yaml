@@ -107,6 +107,10 @@ release:
     - glob: out/bootstrap-components.yaml
     - glob: out/control-plane-components.yaml
     - glob: out/metadata.yaml
+    # A renderable ClusterClass, reached with `clusterctl generate cluster --from <url>`. Not with
+    # --flavor: that reads a template from the infrastructure provider's repository, which this is
+    # not. See docs/guides/clusterclass.md.
+    - glob: examples/cluster-template-clusterclass-vsphere.yaml
   prerelease: auto
   footer: |-
     ---

@@ -157,11 +157,37 @@ spec:
           jsonPatches:
             - op: add
               path: /spec/template/spec/controlPlaneEndpoint/host
-              value:
+              valueFrom:
                 variable: controlPlaneEndpointIP
 ```
 
+`valueFrom.variable`, not `value` - a `value` holding a `variable` key is a literal object and the patch would write it as one.
+
 The class is also what guarantees the same value reaches both this field and wherever the vip's own address is configured, which is the half of it that is easy to get wrong by hand.
+
+## Rendering one with clusterctl
+
+[`examples/cluster-template-clusterclass-vsphere.yaml`](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml) is all of the above as one renderable document: the class, both cargoship templates, a `Cluster` with a topology, and a vSphere infrastructure half to adapt. Every release publishes it.
+
+**`--flavor` cannot reach it.** clusterctl reads a flavoured template from the *infrastructure* provider's repository - `ProviderRepositorySourceOptions.InfrastructureProvider` is "InfrastructureProvider to read the workload cluster template from" - so a control-plane provider cannot ship one. `--from` takes a URL or a path instead:
+
+```sh
+export CLUSTER_CLASS_NAME=cargoship NAMESPACE=default
+export CARGOSHIP_REGISTRY=zarf-docker-registry.zarf.svc.cluster.local:5000
+export CARGOSHIP_PACKAGE=k3s CARGOSHIP_PACKAGE_VERSION=1.34.1
+export CARGOSHIP_SSH_USER=rocky CARGOSHIP_SSH_SECRET=fleet-ssh
+export CONTROL_PLANE_ENDPOINT_IP=10.0.0.10
+# ...and the VSPHERE_* set the infrastructure half names.
+
+clusterctl generate cluster fleet-one \
+  --kubernetes-version v1.34.1 \
+  --control-plane-machine-count 3 \
+  --worker-machine-count 2 \
+  --from https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/download/cluster-template-clusterclass-vsphere.yaml \
+  > fleet-one.yaml
+```
+
+clusterctl refuses to render while any `${VARIABLE}` is unset and lists the ones it is missing, which is the fastest way to read the file. `--kubernetes-version` has to name a version the package installs; nothing checks that.
 
 ## What a class does not do
 
