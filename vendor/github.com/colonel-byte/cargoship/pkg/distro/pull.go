@@ -23,7 +23,6 @@ package distro
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -37,6 +36,7 @@ import (
 	"github.com/colonel-byte/cargoship/pkg/coci"
 	"github.com/colonel-byte/cargoship/pkg/coci/layers"
 	"github.com/colonel-byte/cargoship/pkg/helpers"
+	"github.com/colonel-byte/cargoship/pkg/images"
 	"github.com/colonel-byte/cargoship/pkg/packager/layout"
 	"github.com/colonel-byte/cargoship/pkg/signing"
 	"github.com/gabriel-vasile/mimetype"
@@ -64,6 +64,9 @@ type PullOptions struct {
 	types.RemoteOptions
 	// CABundle is trusted in addition to the system roots. See LoadOptions.CABundle.
 	CABundle []byte
+	// ClientCertificate is presented to a registry that requires one. See
+	// LoadOptions.ClientCertificate.
+	ClientCertificate images.ClientCertificate
 	// VerificationStrategy for explicit definition
 	layout.VerificationStrategy
 }
@@ -105,6 +108,7 @@ func Pull(ctx context.Context, source, destination string, opts PullOptions) (st
 		OCIConcurrency:       opts.OCIConcurrency,
 		RemoteOptions:        opts.RemoteOptions,
 		CABundle:             opts.CABundle,
+		ClientCertificate:    opts.ClientCertificate,
 		CachePath:            opts.CachePath,
 	})
 	if err != nil {
@@ -134,6 +138,9 @@ type pullOCIOptions struct {
 	types.RemoteOptions
 	// CABundle is trusted in addition to the system roots. See LoadOptions.CABundle.
 	CABundle []byte
+	// ClientCertificate is presented to a registry that requires one. See
+	// LoadOptions.ClientCertificate.
+	ClientCertificate images.ClientCertificate
 	layout.VerificationStrategy
 }
 
@@ -147,17 +154,18 @@ func pullOCI(ctx context.Context, opts pullOCIOptions) (*layout.DistroLayout, er
 	}
 	platform := oci.PlatformForArch(opts.Architecture)
 	mods := []oci.Modifier{oci.WithPlainHTTP(opts.PlainHTTP), oci.WithInsecureSkipVerify(opts.InsecureSkipTLSVerify), cacheMod}
-	if len(opts.CABundle) > 0 {
-		pool, err := certPool(opts.CABundle)
+	// Either one needs a transport of its own: a CA to trust the server with, a certificate to
+	// present when the server asks for one, or both. Built by images.Transport, which is what
+	// a push and a registry listing build theirs with too.
+	clientOptions := images.ClientOptions{
+		CABundle:          opts.CABundle,
+		ClientCertificate: opts.ClientCertificate,
+	}
+	if !clientOptions.IsZero() {
+		transport, err := images.Transport(clientOptions)
 		if err != nil {
 			return nil, err
 		}
-		base, ok := http.DefaultTransport.(*http.Transport)
-		if !ok {
-			return nil, errors.New("could not get default transport")
-		}
-		transport := base.Clone()
-		transport.TLSClientConfig = &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
 		// Modifier order does not matter: WithTransport re-applies an insecure flag that was
 		// already set, so --insecure-skip-tls-verify still wins over a bundle given with it.
 		mods = append(mods, oci.WithTransport(transport))
@@ -292,7 +300,7 @@ func pullHTTPFile(ctx context.Context, src, tarPath string, insecureTLSSkipVerif
 	transport = transport.Clone()
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureTLSSkipVerify} //nolint:gosec // the caller asked for it
 	if len(caBundle) > 0 {
-		pool, err := certPool(caBundle)
+		pool, err := images.CertPool(caBundle)
 		if err != nil {
 			return err
 		}
@@ -318,20 +326,4 @@ func pullHTTPFile(ctx context.Context, src, tarPath string, insecureTLSSkipVerif
 		return err
 	}
 	return nil
-}
-
-// certPool returns the system roots with caBundle added.
-//
-// Added to them rather than replacing them: a management node that trusts one registry's private
-// CA still resolves every other source through the system roots, and a bundle that replaced them
-// would break those with nothing in the error to say why.
-func certPool(caBundle []byte) (*x509.CertPool, error) {
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, fmt.Errorf("unable to read the system certificate pool: %w", err)
-	}
-	if !pool.AppendCertsFromPEM(caBundle) {
-		return nil, errors.New("no certificate found in the CA bundle: it must hold one or more PEM-encoded certificates")
-	}
-	return pool, nil
 }
