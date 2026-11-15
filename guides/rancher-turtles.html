@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-fbfbe9a3.js";
+            window.path_to_searchindex_js = "../searchindex-84a23d42.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-1ea4ed26.js"></script>
+        <script src="../toc-2c3941cc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -304,6 +304,19 @@ cosign verify \
 <pre><code class="language-sh">kubectl get capiproviders --all-namespaces
 </code></pre>
 <p>Both rows reach <code>Ready</code> in <code>Phase</code>, with <code>cargoship</code> as <code>ProviderName</code> and the release tag as <code>InstalledVersion</code>. A row stuck in <code>Provisioning</code> is the operator failing to fetch or apply the components, and its reason is in the Turtles controller’s log rather than on the object.</p>
+<h2 id="declaring-clusters-with-a-clusterclass"><a class="header" href="#declaring-clusters-with-a-clusterclass">Declaring clusters with a ClusterClass</a></h2>
+<p>Turtles installs the provider; a <code>ClusterClass</code> is how you then declare clusters with it, and the two are independent - a class, its templates and a <code>Cluster</code> with a topology are ordinary Cluster API objects that Turtles neither reads nor manages. <a href="clusterclass.html">Composing a ClusterClass</a> is the whole of it; two things matter specifically on a Turtles cluster.</p>
+<p><strong>The feature gate belongs to core Cluster API, not to this provider.</strong> <code>ClusterClass</code> needs <code>CLUSTER_TOPOLOGY=true</code>, which <code>clusterctl init</code> takes from the environment and the operator takes from a provider’s <code>configSecret</code> - the same mechanism the air-gapped section above uses for <code>OCI_USERNAME</code>. It goes on the <strong>core</strong> provider:</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-api-core
+  namespace: capi-system
+stringData:
+  CLUSTER_TOPOLOGY: "true"
+</code></pre>
+<p>and that secret is named by the core <code>CAPIProvider</code>‘s <code>spec.configSecret.name</code>. Which object that is depends on how core was installed - Turtles’ own chart declares one, so on most clusters this is an edit to an existing object rather than a new one, and the chart’s values are the durable place to set it. Neither <code>CAPIProvider</code> for cargoship is involved: a control-plane provider does not read the gate.</p>
+<p><strong>A topology version bump is an in-place upgrade here, and Rancher’s UI will not say so.</strong> Everywhere else in the ecosystem, editing a topology’s <code>version</code> rolls the control plane by replacing machines. A cargoship cluster converges hosts over SSH instead, so the same edit walks the existing hosts through cargoship’s upgrade phases - and this provider refuses it until the <code>controlplane.cluster.x-k8s.io/approve-version-change</code> annotation names the new version, which a topology can carry under <code>controlPlane.metadata.annotations</code>. Until it does, the control plane reports <code>VersionChangeRefused</code> and does not move, which from Rancher looks like a cluster that has stopped rather than one waiting for a person. See <a href="../agent/choice-no-rollout.html"><code>choice-no-rollout.md</code></a> before offering this to anyone through the UI.</p>
 <h2 id="importing-the-workload-cluster-into-rancher"><a class="header" href="#importing-the-workload-cluster-into-rancher">Importing the workload cluster into Rancher</a></h2>
 <p>Turtles imports a Cluster API cluster into Rancher when the <code>Cluster</code> - or the namespace holding it - carries the auto-import label:</p>
 <pre><code class="language-sh">kubectl label namespace my-clusters cluster-api.cattle.io/rancher-auto-import=true

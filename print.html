@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-fbfbe9a3.js";
+            window.path_to_searchindex_js = "searchindex-84a23d42.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-1ea4ed26.js"></script>
+        <script src="toc-2c3941cc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -254,7 +254,7 @@ spec:
     modifyFirewall: true
     labelNodes: true
 </code></pre>
-<p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together.</p>
+<p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a <a href="#composing-a-clusterclass"><code>ClusterClass</code></a> it is the machine-deployment class name instead, because Cluster API generates the object’s name and carries the class in a label.</p>
 <h2 id="how-it-differs-from-kubeadmcontrolplane"><a class="header" href="#how-it-differs-from-kubeadmcontrolplane">How it differs from KubeadmControlPlane</a></h2>
 <div class="table-wrapper">
 <table>
@@ -281,6 +281,7 @@ spec:
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
 <li><strong>No client certificate to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> - but nothing presents a client certificate, so a registry that <em>requires</em> one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
+<li><strong>A <code>ClusterClass</code> composes, but a topology upgrade is still in place.</strong> <code>CargoshipControlPlaneTemplate</code> and <code>CargoshipConfigTemplate</code> are the two halves a class needs - see <a href="#composing-a-clusterclass"><code>docs/guides/clusterclass.md</code></a> - and editing <code>version:</code> in a topology means an unsequenced in-place upgrade rather than a rollout, approved through the topology’s own annotations. There is no <code>clusterctl generate cluster</code> flavor yet.</li>
 </ul>
 <h2 id="development"><a class="header" href="#development">Development</a></h2>
 <pre><code class="language-sh">make generate         # CRDs, RBAC and deepcopy functions
@@ -292,6 +293,172 @@ make zarf-package     # the air-gapped Zarf package, built from those manifests
 <p>The repository vendors its dependencies, so everything above works with no network access - apart from <code>make zarf-package</code>, which pulls the published controller images. See <a href="#end-to-end-tests"><code>docs/dev/e2e-tests.md</code></a> for the end-to-end suite, which drives a real fleet of virtual machines - the Docker infrastructure provider’s containers run no sshd, so they cannot be used to test a converge.</p>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>Apache 2.0. See <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE"><code>LICENSE</code></a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="composing-a-clusterclass"><a class="header" href="#composing-a-clusterclass">Composing a ClusterClass</a></h1>
+<p>A <code>ClusterClass</code> is one object per cluster <em>shape</em>, and a <code>Cluster</code> with a <code>spec.topology</code> block per cluster. Without one an operator wires four objects together by hand and keeps the cross-references straight themselves - a <code>CargoshipControlPlane</code>, a <code>CargoshipConfigTemplate</code>, an infrastructure cluster and one machine template per pool, each naming the others. With one, the shape is written once.</p>
+<p>This provider supplies two of the four kinds a class needs: <code>CargoshipControlPlaneTemplate</code> for the control plane and <code>CargoshipConfigTemplate</code> for the workers. The infrastructure halves come from an infrastructure provider - the examples here name CAPV’s <code>VSphereClusterTemplate</code> and <code>VSphereMachineTemplate</code>.</p>
+<p><strong><code>ClusterClass</code> needs the <code>CLUSTER_TOPOLOGY</code> feature gate on the management cluster, and it is off by default.</strong> <code>clusterctl init</code> takes it as <code>CLUSTER_TOPOLOGY=true</code> in the environment, or set it on the core controller’s deployment.</p>
+<h2 id="the-control-plane-template"><a class="header" href="#the-control-plane-template">The control-plane template</a></h2>
+<pre><code class="language-yaml">apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+kind: CargoshipControlPlaneTemplate
+metadata:
+  name: fleet
+spec:
+  template:
+    spec:
+      distro:
+        fromZarfState: true
+        registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+        name: k3s
+        packageVersion: 1.34.1
+      ssh:
+        user: rocky
+        privateKeySecretRef:
+          name: fleet-ssh
+      clusterConfig:
+        values:
+          cni: cilium
+      apply:
+        modifyHosts: true
+        modifyFirewall: true
+        labelNodes: true
+</code></pre>
+<p>Three fields a live <code>CargoshipControlPlane</code> requires are deliberately absent, because the class and the topology supply them:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Not in the template</th><th>Comes from</th></tr>
+</thead>
+<tbody>
+<tr><td><code>version</code></td><td><code>Cluster.spec.topology.version</code></td></tr>
+<tr><td><code>replicas</code></td><td><code>Cluster.spec.topology.controlPlane.replicas</code></td></tr>
+<tr><td><code>machineTemplate.spec.infrastructureRef</code></td><td><code>ClusterClass.spec.controlPlane.machineInfrastructure.templateRef</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Everything else a <code>CargoshipControlPlane</code> takes is here, and <a href="#cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec">the decision record</a> covers why the two specs are separate types and what keeps them in step.</p>
+<h2 id="the-class"><a class="header" href="#the-class">The class</a></h2>
+<pre><code class="language-yaml">apiVersion: cluster.x-k8s.io/v1beta2
+kind: ClusterClass
+metadata:
+  name: cargoship
+spec:
+  infrastructure:
+    templateRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: VSphereClusterTemplate
+      name: fleet
+  controlPlane:
+    templateRef:
+      apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+      kind: CargoshipControlPlaneTemplate
+      name: fleet
+    machineInfrastructure:
+      templateRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: VSphereMachineTemplate
+        name: fleet-cp
+  workers:
+    machineDeployments:
+      - class: gpu
+        bootstrap:
+          templateRef:
+            apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+            kind: CargoshipConfigTemplate
+            name: fleet-worker
+        infrastructure:
+          templateRef:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+            kind: VSphereMachineTemplate
+            name: fleet-gpu
+</code></pre>
+<p>A <code>templateRef</code> carries a kind, a name and an apiVersion and <strong>no namespace</strong>, so every template lives in the class’s namespace.</p>
+<p><strong>The machine-deployment class name is the cargoship profile.</strong> <code>class: gpu</code> selects <code>clusterConfig.profiles.gpu</code> - its node labels, taints, firewall rules and concurrency - which is the same join a hand-wired <code>MachineDeployment</code> makes by being <em>named</em> <code>gpu</code>. A class reaches it by a different route: Cluster API generates the deployment’s object name per cluster and puts the class name in <code>topology.cluster.x-k8s.io/deployment-name</code>, which it propagates to each machine, and the converge reads that label first. A profile the configuration does not define is not an error, so a pool needs an entry only where it should differ from the defaults.</p>
+<h2 id="the-cluster"><a class="header" href="#the-cluster">The cluster</a></h2>
+<pre><code class="language-yaml">apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: fleet-one
+spec:
+  topology:
+    classRef:
+      name: cargoship
+    version: v1.34.1
+    controlPlane:
+      replicas: 3
+    workers:
+      machineDeployments:
+        - class: gpu
+          name: gpu
+          replicas: 2
+</code></pre>
+<p><code>version</code> has to agree with what the package installs. Nothing checks that - the package is the authority on what lands on a host - so a topology version that disagrees makes <code>status.version</code> wrong rather than failing.</p>
+<h2 id="upgrading-a-class-based-cluster"><a class="header" href="#upgrading-a-class-based-cluster">Upgrading a class-based cluster</a></h2>
+<p>This is where a cargoship cluster and a Cluster API operator’s expectations part company, and it is worth reading before anyone drives this from Rancher Turtles.</p>
+<p>Editing <code>version:</code> in a topology normally rolls the control plane: a new machine is surged, it joins, an old one goes, and so on. <strong>Nothing is replaced here.</strong> Cargoship converges hosts in place, so the same edit would walk every existing host through cargoship’s upgrade phases - which is refused until an operator approves it. Request and approve in one edit:</p>
+<pre><code class="language-yaml">spec:
+  topology:
+    version: v1.35.4
+    controlPlane:
+      metadata:
+        annotations:
+          controlplane.cluster.x-k8s.io/approve-version-change: v1.35.4
+</code></pre>
+<p>The topology’s <code>controlPlane.metadata</code> is applied to the control-plane object, which is what carries the annotation through. The value has to name the version being asked for, so it is not a standing permission and the next upgrade needs its own.</p>
+<p>Two further things:</p>
+<ul>
+<li>The package has to move as well. <code>spec.version</code> is not part of the desired-state fingerprint, so bumping the topology’s version alone converges nothing and reports <code>VersionChangeInert</code> - point <code>distro.packageVersion</code> at a package that installs the new version in the same change. With a class, that is a variable and a patch, or an edit to the template.</li>
+<li><code>spec.topology.controlPlane.rollout.after</code> does nothing. There is no rollout to schedule.</li>
+</ul>
+<p>See <a href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><code>choice-no-rollout.md</code></a> for what the gate is protecting against.</p>
+<h2 id="variables-and-patches"><a class="header" href="#variables-and-patches">Variables and patches</a></h2>
+<p>A class can expose per-cluster values. The one most clusters need is the control-plane endpoint: a kube-vip or load-balancer address has to be chosen before the first node boots, and neither Cluster API nor an IPAM pool allocates it, because nothing creates an <code>IPAddressClaim</code> for an endpoint that is not a machine.</p>
+<pre><code class="language-yaml">spec:
+  variables:
+    - name: controlPlaneEndpointIP
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+  patches:
+    - name: control-plane-endpoint
+      definitions:
+        - selector:
+            apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+            kind: CargoshipControlPlaneTemplate
+            matchResources:
+              controlPlane: true
+          jsonPatches:
+            - op: add
+              path: /spec/template/spec/controlPlaneEndpoint/host
+              valueFrom:
+                variable: controlPlaneEndpointIP
+</code></pre>
+<p><code>valueFrom.variable</code>, not <code>value</code> - a <code>value</code> holding a <code>variable</code> key is a literal object and the patch would write it as one.</p>
+<p>The class is also what guarantees the same value reaches both this field and wherever the vip’s own address is configured, which is the half of it that is easy to get wrong by hand.</p>
+<h2 id="rendering-one-with-clusterctl"><a class="header" href="#rendering-one-with-clusterctl">Rendering one with clusterctl</a></h2>
+<p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml"><code>examples/cluster-template-clusterclass-vsphere.yaml</code></a> is all of the above as one renderable document: the class, both cargoship templates, a <code>Cluster</code> with a topology, and a vSphere infrastructure half to adapt. Every release publishes it.</p>
+<p><strong><code>--flavor</code> cannot reach it.</strong> clusterctl reads a flavoured template from the <em>infrastructure</em> provider’s repository - <code>ProviderRepositorySourceOptions.InfrastructureProvider</code> is “InfrastructureProvider to read the workload cluster template from” - so a control-plane provider cannot ship one. <code>--from</code> takes a URL or a path instead:</p>
+<pre><code class="language-sh">export CLUSTER_CLASS_NAME=cargoship NAMESPACE=default
+export CARGOSHIP_REGISTRY=zarf-docker-registry.zarf.svc.cluster.local:5000
+export CARGOSHIP_PACKAGE=k3s CARGOSHIP_PACKAGE_VERSION=1.34.1
+export CARGOSHIP_SSH_USER=rocky CARGOSHIP_SSH_SECRET=fleet-ssh
+export CONTROL_PLANE_ENDPOINT_IP=10.0.0.10
+# ...and the VSPHERE_* set the infrastructure half names.
+
+clusterctl generate cluster fleet-one \
+  --kubernetes-version v1.34.1 \
+  --control-plane-machine-count 3 \
+  --worker-machine-count 2 \
+  --from https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/latest/download/cluster-template-clusterclass-vsphere.yaml \
+  &gt; fleet-one.yaml
+</code></pre>
+<p>clusterctl refuses to render while any <code>${VARIABLE}</code> is unset and lists the ones it is missing, which is the fastest way to read the file. <code>--kubernetes-version</code> has to name a version the package installs; nothing checks that.</p>
+<h2 id="what-a-class-does-not-do"><a class="header" href="#what-a-class-does-not-do">What a class does not do</a></h2>
+<ul>
+<li><strong>Adopting an existing hand-wired cluster into a topology is a manual migration</strong>, and a cluster created from a class cannot be un-managed without one either.</li>
+<li><strong>The components still name <code>ghcr.io</code> images.</strong> Mirroring the two controller images and overriding the registry is the same job it is without a class - see <a href="#installing-the-provider-with-rancher-turtles">the Rancher Turtles guide</a>.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installing-the-provider"><a class="header" href="#installing-the-provider">Installing the provider</a></h1>
 <h2 id="register-it-with-clusterctl"><a class="header" href="#register-it-with-clusterctl">Register it with clusterctl</a></h2>
@@ -329,6 +496,7 @@ make zarf-package     # the air-gapped Zarf package, built from those manifests
 <ul>
 <li><strong>It does not install core Cluster API.</strong> <code>clusterctl init</code> is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.</li>
 <li><strong>It does not carry the cargoship distro packages.</strong> The control-plane controller pulls the package named in <code>spec.distro.ociRef</code> over OCI at converge time, from inside the management cluster. Mirror it to a registry the cluster can reach and point the reference there - <a href="#pulling-the-distro-package-from-a-zarf-registry">pulling it from a Zarf registry</a> covers the credentials and the certificate that usually come with one.</li>
+<li><strong>It does not stop a <code>ClusterClass</code> working.</strong> The package deploys the same component manifests <code>clusterctl</code> would, so all three CRDs come with it - including <code>CargoshipControlPlaneTemplate</code>, the kind a class names as its control plane. A class, its templates and a <code>Cluster</code> with a topology are ordinary objects an operator applies afterwards; see <a href="#composing-a-clusterclass">Composing a ClusterClass</a>, and remember that <code>CLUSTER_TOPOLOGY</code> is a flag on core Cluster API, which this package does not install.</li>
 <li><strong><code>clusterctl</code> does not know the provider is installed.</strong> The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the <code>clusterctl.cluster.x-k8s.io</code> bookkeeping <code>clusterctl init</code> adds - so <code>clusterctl upgrade</code> will not see this provider. Upgrade it by deploying the next package.</li>
 </ul>
 <h2 id="the-ssh-key"><a class="header" href="#the-ssh-key">The SSH key</a></h2>
@@ -501,6 +669,19 @@ cosign verify \
 <pre><code class="language-sh">kubectl get capiproviders --all-namespaces
 </code></pre>
 <p>Both rows reach <code>Ready</code> in <code>Phase</code>, with <code>cargoship</code> as <code>ProviderName</code> and the release tag as <code>InstalledVersion</code>. A row stuck in <code>Provisioning</code> is the operator failing to fetch or apply the components, and its reason is in the Turtles controller’s log rather than on the object.</p>
+<h2 id="declaring-clusters-with-a-clusterclass"><a class="header" href="#declaring-clusters-with-a-clusterclass">Declaring clusters with a ClusterClass</a></h2>
+<p>Turtles installs the provider; a <code>ClusterClass</code> is how you then declare clusters with it, and the two are independent - a class, its templates and a <code>Cluster</code> with a topology are ordinary Cluster API objects that Turtles neither reads nor manages. <a href="#composing-a-clusterclass">Composing a ClusterClass</a> is the whole of it; two things matter specifically on a Turtles cluster.</p>
+<p><strong>The feature gate belongs to core Cluster API, not to this provider.</strong> <code>ClusterClass</code> needs <code>CLUSTER_TOPOLOGY=true</code>, which <code>clusterctl init</code> takes from the environment and the operator takes from a provider’s <code>configSecret</code> - the same mechanism the air-gapped section above uses for <code>OCI_USERNAME</code>. It goes on the <strong>core</strong> provider:</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-api-core
+  namespace: capi-system
+stringData:
+  CLUSTER_TOPOLOGY: "true"
+</code></pre>
+<p>and that secret is named by the core <code>CAPIProvider</code>‘s <code>spec.configSecret.name</code>. Which object that is depends on how core was installed - Turtles’ own chart declares one, so on most clusters this is an edit to an existing object rather than a new one, and the chart’s values are the durable place to set it. Neither <code>CAPIProvider</code> for cargoship is involved: a control-plane provider does not read the gate.</p>
+<p><strong>A topology version bump is an in-place upgrade here, and Rancher’s UI will not say so.</strong> Everywhere else in the ecosystem, editing a topology’s <code>version</code> rolls the control plane by replacing machines. A cargoship cluster converges hosts over SSH instead, so the same edit walks the existing hosts through cargoship’s upgrade phases - and this provider refuses it until the <code>controlplane.cluster.x-k8s.io/approve-version-change</code> annotation names the new version, which a topology can carry under <code>controlPlane.metadata.annotations</code>. Until it does, the control plane reports <code>VersionChangeRefused</code> and does not move, which from Rancher looks like a cluster that has stopped rather than one waiting for a person. See <a href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><code>choice-no-rollout.md</code></a> before offering this to anyone through the UI.</p>
 <h2 id="importing-the-workload-cluster-into-rancher"><a class="header" href="#importing-the-workload-cluster-into-rancher">Importing the workload cluster into Rancher</a></h2>
 <p>Turtles imports a Cluster API cluster into Rancher when the <code>Cluster</code> - or the namespace holding it - carries the auto-import label:</p>
 <pre><code class="language-sh">kubectl label namespace my-clusters cluster-api.cattle.io/rancher-auto-import=true
@@ -598,6 +779,7 @@ cosign verify \
   controlplane.cluster.x-k8s.io/adopt-republished-package=true
 </code></pre>
 <p>Both are explained in <a href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue">the decision record</a>.</p>
+<p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="#composing-a-clusterclass">Composing a ClusterClass</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
 <p>The unit tests cover everything that can be covered without an API server: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
@@ -623,6 +805,59 @@ cosign verify \
 <ul>
 <li>A converge against real hosts, per the plan above.</li>
 <li>The bootstrap data actually being consumed by a booting machine. Neither container nor microVM fleets read it, so the first thing that proves it is a real infrastructure provider.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec"><a class="header" href="#cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec"><code>CargoshipControlPlaneTemplate</code>’s spec is not <code>CargoshipControlPlaneSpec</code></a></h1>
+<p>A <code>ClusterClass</code> names a control plane through <code>spec.controlPlane.templateRef</code>, which has to be a <em>template</em> kind, so <code>CargoshipControlPlaneTemplate</code> exists. The obvious way to write it is the way <a href="../bootstrap/api/v1alpha1/cargoshipconfigtemplate_types.go"><code>CargoshipConfigTemplate</code></a> is written - wrap the live spec and be done in twenty-five lines - and that is wrong here. This records why, because it will look like gratuitous duplication to the next person.</p>
+<h2 id="three-fields-belong-to-the-topology-controller"><a class="header" href="#three-fields-belong-to-the-topology-controller">Three fields belong to the topology controller</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>On the live type</th><th>Who fills it in when a class stamps one</th></tr>
+</thead>
+<tbody>
+<tr><td><code>version</code></td><td><code>+required</code></td><td><code>Cluster.spec.topology.version</code></td></tr>
+<tr><td><code>replicas</code></td><td>defaulted to 1</td><td><code>Cluster.spec.topology.controlPlane.replicas</code></td></tr>
+<tr><td><code>machineTemplate.spec.infrastructureRef</code></td><td><code>+required</code></td><td><code>ClusterClass.spec.controlPlane.machineInfrastructure.templateRef</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Wrapping <code>CargoshipControlPlaneSpec</code> carries all three into the template, where two are required. So an operator authoring a class would have to write a version and an infrastructure reference that the topology controller then overwrites, and the API server would refuse the template until they did. The bootstrap half has no such fields, which is why its template <em>can</em> wrap its spec and is not the precedent to follow.</p>
+<h2 id="measured-against-cluster-apis-own-template-not-inferred"><a class="header" href="#measured-against-cluster-apis-own-template-not-inferred">Measured against Cluster API’s own template, not inferred</a></h2>
+<p><code>KubeadmControlPlaneTemplate</code> takes exactly this shape. From the CRDs in the <code>sigs.k8s.io/cluster-api@v1.14.4</code> module, <code>v1beta2</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>CRD</th><th><code>spec</code> required</th><th><code>machineTemplate.spec</code> holds</th></tr>
+</thead>
+<tbody>
+<tr><td><code>kubeadmcontrolplanes</code></td><td><code>machineTemplate</code>, <code>version</code></td><td><code>deletion</code>, <strong><code>infrastructureRef</code></strong> (required), <code>readinessGates</code>, <code>taints</code></td></tr>
+<tr><td><code>kubeadmcontrolplanetemplates</code></td><td>nothing</td><td><code>deletion</code>, <code>taints</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>The template drops <code>version</code>, drops <code>replicas</code>, drops <code>infrastructureRef</code>, and requires nothing. <code>CargoshipControlPlaneTemplateResourceSpec</code> and <code>CargoshipControlPlaneTemplateMachineTemplateSpec</code> are the same subtraction applied to this provider’s fields.</p>
+<h2 id="nothing-converts-between-them-so-a-test-holds-them-together"><a class="header" href="#nothing-converts-between-them-so-a-test-holds-them-together">Nothing converts between them, so a test holds them together</a></h2>
+<p>There is no conversion function and there should not be one: the topology controller copies <code>spec.template.spec</code> onto the new object as it is, matching by field name. That makes the duplication cheap and the drift silent - a field added to the live spec and not to the template is a field a class cannot set, and nothing fails. The resource validates, the cluster stamps, and the setting is absent.</p>
+<p><code>TestTemplateSpecCoversTheLiveSpec</code> compares the two field sets in both directions and fails unless a field is in both or declared in <code>topologyOwned</code> with what sets it. Adding a field to <code>CargoshipControlPlaneSpec</code> therefore fails a test until it is either carried in the template or written down as somebody else’s to fill in. That is the whole mechanism keeping these two in step.</p>
+<h2 id="no-controller-and-no-rbac"><a class="header" href="#no-controller-and-no-rbac">No controller, and no RBAC</a></h2>
+<p>A template is never reconciled. Cluster API’s topology controller reads it and stamps a <code>CargoshipControlPlane</code>, which the existing reconciler handles with no change at all - the stamped object is an ordinary one. Nothing in this repository reads a template, so no RBAC is added for it either: the topology controller runs in the core manager with its own permissions, and the contract label the kustomize <code>labels</code> block already applies to everything under <code>config/crd</code> is what makes the kind visible to it.</p>
+<h2 id="what-a-topology-version-bump-means-here-which-is-not-what-it-means-elsewhere"><a class="header" href="#what-a-topology-version-bump-means-here-which-is-not-what-it-means-elsewhere">What a topology version bump means here, which is not what it means elsewhere</a></h2>
+<p>ClusterClass’s headline behaviour is that an operator edits <code>version:</code> in the topology and the control plane rolls. This provider has no rollout - see <a href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><code>choice-no-rollout.md</code></a> - and since that document’s gate landed, a topology version bump does <strong>not</strong> quietly re-converge the fleet either: the stamped object’s <code>spec.version</code> moves away from <code>status.version</code>, and the reconcile stops with <code>VersionChangeRefused</code> until an annotation approves it. Under a managed topology that reads as a cluster that will not move.</p>
+<p>The approval can be delivered through the topology rather than by hand, which is the composition worth knowing: <code>Cluster.spec.topology.controlPlane.metadata</code> is applied to the control plane object, so</p>
+<pre><code class="language-yaml">spec:
+  topology:
+    version: v1.35.4
+    controlPlane:
+      metadata:
+        annotations:
+          controlplane.cluster.x-k8s.io/approve-version-change: v1.35.4
+</code></pre>
+<p>requests the upgrade and approves it in the same edit - and the annotation’s value has to be restated for the next one, so it does not become a standing permission.</p>
+<p>Two things a topology asks for that this provider cannot do, neither of which fails loudly:</p>
+<ul>
+<li><code>spec.topology.controlPlane.rollout.after</code> asks for a rollout after a timestamp. Nothing replaces machines here, so nothing happens.</li>
+<li>A topology that changes the package without changing the version converges the fleet with no approval needed, because the gate reads the version rather than the package. That is the same behaviour a hand-wired resource has.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed"><a class="header" href="#a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed">A tagged distro reference is not re-resolved, and a republished tag is not noticed</a></h1>
@@ -822,6 +1057,31 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <p><code>make zarf-package</code> reads the version back out of <code>zarf.yaml</code> and renders the component manifests at it, rather than taking a <code>TAG</code> like the other release targets. A <code>TAG</code> there would produce a package whose manifests name one version and whose images carry another, which fails at deploy time against the in-cluster registry rather than at build time.</p>
 <h2 id="what-it-deliberately-leaves-out"><a class="header" href="#what-it-deliberately-leaves-out">What it deliberately leaves out</a></h2>
 <p>Core Cluster API, and the cargoship distro packages the control-plane controller pulls at converge time. Both are somebody else’s artifact with their own cadence, and bundling either would make this package a mirror of the whole air gap rather than of this provider. <a href="#installing-the-provider"><code>docs/guides/install.md</code></a> says so where an operator will read it.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="clusterclass-support-what-landed-and-what-is-left"><a class="header" href="#clusterclass-support-what-landed-and-what-is-left">ClusterClass support: what landed, and what is left</a></h1>
+<p>The kind a <code>ClusterClass</code> needs now exists. <code>CargoshipControlPlaneTemplate</code> is in <code>controlplane/api/v1alpha1/cargoshipcontrolplanetemplate_types.go</code>, with a CRD, a scheme registration, the field-coverage test that keeps it in step with the live spec, and an envtest that a real <code>ClusterClass</code> referencing it validates. <a href="#cargoshipcontrolplanetemplates-spec-is-not-cargoshipcontrolplanespec"><code>choice-clusterclass-template.md</code></a> records why its spec is a separate type, and <a href="#composing-a-clusterclass"><code>docs/guides/clusterclass.md</code></a> is the operator-facing half.</p>
+<p>This is what the original plan got wrong, and what is still outstanding.</p>
+<h2 id="corrections-to-the-original-plan"><a class="header" href="#corrections-to-the-original-plan">Corrections to the original plan</a></h2>
+<ul>
+<li><strong><code>spec.controlPlane.ref</code> is the v1beta1 spelling.</strong> The pinned <code>api/core/v1beta2</code> is <code>spec.controlPlane.templateRef</code>, of type <code>ClusterClassTemplateReference{kind, name, apiVersion}</code> - no namespace, so a template lives in its class’s namespace.</li>
+<li><strong>The template spec is not the live spec</strong>, which was the plan’s central assumption. <code>version</code>, <code>replicas</code> and <code>machineTemplate.spec.infrastructureRef</code> are the topology controller’s to fill in and are required or defaulted on the live type. Measured against <code>kubeadmcontrolplanetemplates</code> in <code>sigs.k8s.io/cluster-api@v1.14.4</code>, which drops exactly those three and requires nothing.</li>
+<li><strong>No RBAC was needed.</strong> Nothing in this repository reads a template; the topology controller runs in the core manager with its own permissions.</li>
+<li><strong>The contract label needed nothing either.</strong> The kustomize <code>labels</code> block in <code>controlplane/config/default/kustomization.yaml</code> applies <code>cluster.x-k8s.io/v1beta2: v1alpha1</code> to everything under <code>../crd</code>, so a new CRD inherits it. The explicit resource list in <code>controlplane/config/crd/kustomization.yaml</code> did need the new line.</li>
+<li><strong>envtest needed nothing.</strong> <code>internal/envtest</code> loads the <code>crd/bases</code> directory rather than a file list, so a new CRD is picked up. <code>make envtest-crds</code> only generates the Cluster API CRDs, and <code>ClusterClass</code> is already among them.</li>
+<li>The plan cited line numbers for <code>spec.controlPlaneEndpoint</code> and the scale subresource. Both moved within a day. Cite symbols.</li>
+</ul>
+<h2 id="still-to-do"><a class="header" href="#still-to-do">Still to do</a></h2>
+<ul>
+<li><strong>A <code>cluster-template.yaml</code> flavor.</strong> <code>clusterctl generate cluster --flavor</code> reads a template from the release assets, and a class-based cluster is the flavor worth shipping: an operator gets the class, the templates and a <code>Cluster</code> with a topology from one command. It belongs in <code>.goreleaser.yaml</code>’s <code>extra_files</code> beside the three files clusterctl already fetches.</li>
+<li><strong>One <code>clusterctl generate cluster</code> end to end</strong>, against a class composed with a real infrastructure provider, before any of this is documented as working. The guide’s YAML is checked against the CRD schemas and the vendored types, not against a cluster that came up.</li>
+<li><strong>Variables and patches are documented but unexercised.</strong> The control-plane-endpoint patch in the guide is the shape a class wants; nothing has run it. Leave the class itself without variables until a second cluster shape needs them - a class with one consumer is indirection with nothing on the other side of it.</li>
+<li><strong>Whether the topology controller reads any control-plane contract field this provider does not set.</strong> The table in the original plan was read off this provider’s types. <code>vendor/sigs.k8s.io/cluster-api/</code> holds only <code>api</code> and <code>util</code>, so the contract package is not vendored to read - the module cache has the full tree, and <code>clusterctl generate cluster</code> against a live topology is the real check.</li>
+</ul>
+<h2 id="not-this-repositorys-to-fix"><a class="header" href="#not-this-repositorys-to-fix">Not this repository’s to fix</a></h2>
+<ul>
+<li><code>ClusterClass</code> needs the <code>CLUSTER_TOPOLOGY</code> feature gate, which is off by default.</li>
+<li>Adopting a hand-wired cluster into a topology is a manual migration, and so is leaving one.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-fleet-backed-end-to-end-suite-and-which-backend-can-carry-one"><a class="header" href="#a-fleet-backed-end-to-end-suite-and-which-backend-can-carry-one">A fleet-backed end-to-end suite, and which backend can carry one</a></h1>
 <p>The reconcile state machine is covered: <code>make test-envtest</code> drives both controllers against a real API server with the converge stubbed out, and asserts the requeues and conditions rather than any timing. See <a href="#end-to-end-tests">e2e-tests</a>. What is left is the part that needs hosts a converge can actually SSH into, and the backend that can give them is not the one this repository’s documentation originally assumed.</p>

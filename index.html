@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-fbfbe9a3.js";
+            window.path_to_searchindex_js = "searchindex-84a23d42.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-1ea4ed26.js"></script>
+        <script src="toc-2c3941cc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -256,7 +256,7 @@ spec:
     modifyFirewall: true
     labelNodes: true
 </code></pre>
-<p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together.</p>
+<p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a <a href="guides/clusterclass.html"><code>ClusterClass</code></a> it is the machine-deployment class name instead, because Cluster API generates the object’s name and carries the class in a label.</p>
 <h2 id="how-it-differs-from-kubeadmcontrolplane"><a class="header" href="#how-it-differs-from-kubeadmcontrolplane">How it differs from KubeadmControlPlane</a></h2>
 <div class="table-wrapper">
 <table>
@@ -283,6 +283,7 @@ spec:
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
 <li><strong>No client certificate to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="guides/registry.html"><code>docs/guides/registry.md</code></a> - but nothing presents a client certificate, so a registry that <em>requires</em> one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
+<li><strong>A <code>ClusterClass</code> composes, but a topology upgrade is still in place.</strong> <code>CargoshipControlPlaneTemplate</code> and <code>CargoshipConfigTemplate</code> are the two halves a class needs - see <a href="guides/clusterclass.html"><code>docs/guides/clusterclass.md</code></a> - and editing <code>version:</code> in a topology means an unsequenced in-place upgrade rather than a rollout, approved through the topology’s own annotations. There is no <code>clusterctl generate cluster</code> flavor yet.</li>
 </ul>
 <h2 id="development"><a class="header" href="#development">Development</a></h2>
 <pre><code class="language-sh">make generate         # CRDs, RBAC and deepcopy functions
@@ -300,7 +301,7 @@ make zarf-package     # the air-gapped Zarf package, built from those manifests
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
 
-                            <a rel="next prefetch" href="guides/install.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="guides/clusterclass.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -311,7 +312,7 @@ make zarf-package     # the air-gapped Zarf package, built from those manifests
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
 
-                    <a rel="next prefetch" href="guides/install.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="guides/clusterclass.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

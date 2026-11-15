@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-fbfbe9a3.js";
+            window.path_to_searchindex_js = "../searchindex-84a23d42.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-1ea4ed26.js"></script>
+        <script src="../toc-2c3941cc.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -271,6 +271,7 @@
   controlplane.cluster.x-k8s.io/adopt-republished-package=true
 </code></pre>
 <p>Both are explained in <a href="../agent/choice-record-discovery.html">the decision record</a>.</p>
+<p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="clusterclass.html">Composing a ClusterClass</a>.</p>
 
                     </main>
 
