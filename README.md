@@ -93,7 +93,7 @@ spec:
     labelNodes: true
 ```
 
-Workers come from an ordinary `MachineDeployment` pointing at a `CargoshipConfigTemplate`. **The deployment's name is the cargoship profile**, so the `gpu` deployment below picks up the `gpu` profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together.
+Workers come from an ordinary `MachineDeployment` pointing at a `CargoshipConfigTemplate`. **The deployment's name is the cargoship profile**, so the `gpu` deployment below picks up the `gpu` profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a [`ClusterClass`](docs/guides/clusterclass.md) it is the machine-deployment class name instead, because Cluster API generates the object's name and carries the class in a label.
 
 ## How it differs from KubeadmControlPlane
 
