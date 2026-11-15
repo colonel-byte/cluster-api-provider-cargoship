@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6305979b.js";
+            window.path_to_searchindex_js = "searchindex-7d87dfd0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-828d1999.js"></script>
+        <script src="toc-1ea4ed26.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -224,6 +224,11 @@ spec:
     # Pin to a digest. A tag that is republished underneath a running cluster is not picked up;
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
+    # Or name the package and let the registry's own records say where it is, which is what an
+    # air gap wants - see docs/guides/registry.md:
+    #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    #   name: k3s
+    #   packageVersion: 1.34.1
     arch: amd64
   ssh:
     user: rocky
@@ -271,7 +276,8 @@ spec:
 <p>Stated plainly, because each of these is a thing an operator will reach for:</p>
 <ul>
 <li><strong>No rollout or in-place upgrade.</strong> Scale up and scale down only. A change to <code>spec.version</code> is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.</li>
-<li><strong>No tag-to-digest resolution.</strong> A republished tag is not noticed. Pin the reference.</li>
+<li><strong>No tag-to-digest resolution.</strong> A republished tag behind an <code>ociRef</code> is not noticed. Pin the reference. A package named by <code>registry</code> and <code>name</code> instead is noticed, because the registry’s record of it carries a content digest - but following it still takes the <code>controlplane.cluster.x-k8s.io/adopt-republished-package</code> annotation, since this provider has no rollout.</li>
+<li><strong>No discovering a version.</strong> <code>packageVersion</code> is required alongside <code>name</code>: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.</li>
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
 <li><strong>No mTLS to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="guides/registry.html"><code>docs/guides/registry.md</code></a> - but the pull presents no client certificate of its own.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>

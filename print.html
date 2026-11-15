@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6305979b.js";
+            window.path_to_searchindex_js = "searchindex-7d87dfd0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-828d1999.js"></script>
+        <script src="toc-1ea4ed26.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -222,6 +222,11 @@ spec:
     # Pin to a digest. A tag that is republished underneath a running cluster is not picked up;
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
+    # Or name the package and let the registry's own records say where it is, which is what an
+    # air gap wants - see docs/guides/registry.md:
+    #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    #   name: k3s
+    #   packageVersion: 1.34.1
     arch: amd64
   ssh:
     user: rocky
@@ -269,7 +274,8 @@ spec:
 <p>Stated plainly, because each of these is a thing an operator will reach for:</p>
 <ul>
 <li><strong>No rollout or in-place upgrade.</strong> Scale up and scale down only. A change to <code>spec.version</code> is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.</li>
-<li><strong>No tag-to-digest resolution.</strong> A republished tag is not noticed. Pin the reference.</li>
+<li><strong>No tag-to-digest resolution.</strong> A republished tag behind an <code>ociRef</code> is not noticed. Pin the reference. A package named by <code>registry</code> and <code>name</code> instead is noticed, because the registry’s record of it carries a content digest - but following it still takes the <code>controlplane.cluster.x-k8s.io/adopt-republished-package</code> annotation, since this provider has no rollout.</li>
+<li><strong>No discovering a version.</strong> <code>packageVersion</code> is required alongside <code>name</code>: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.</li>
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
 <li><strong>No mTLS to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> - but the pull presents no client certificate of its own.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
@@ -543,6 +549,30 @@ cosign verify \
 <p>What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with <code>mtlsStrategy</code> set to anything requiring one cannot be pulled from by this controller.</p>
 <h2 id="why-this-is-not-the-zarf-packages-problem"><a class="header" href="#why-this-is-not-the-zarf-packages-problem">Why this is not the Zarf package’s problem</a></h2>
 <p><a href="#installing-without-a-route-to-ghcrio">The Zarf package</a> installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.</p>
+<h2 id="naming-the-package-instead-of-referencing-it"><a class="header" href="#naming-the-package-instead-of-referencing-it">Naming the package instead of referencing it</a></h2>
+<p>A registry filled by cargoship can be asked what it holds, which saves writing a reference that has to be right. Set <code>registry</code>, <code>name</code> and <code>packageVersion</code> in place of <code>ociRef</code>:</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    name: k3s
+    packageVersion: 1.34.1
+    pullSecretRef:
+      name: zarf-registry
+    caBundleSecretRef:
+      name: zarf-registry-ca
+</code></pre>
+<p>The credentials and the certificate are the same two secrets and the same two conditions as above; <code>--docker-server</code> must match <code>registry</code> exactly, port included, for the same reason it had to match the reference.</p>
+<p>This reads the records <code>cargoship publish --record</code> and <code>cargoship mirror</code> leave in <code>&lt;registry&gt;/cargoship</code>, so it works against a registry those filled and reports nothing for one they did not. The package itself has to have been <strong>published</strong> into the registry, not only mirrored into it: a mirror pushes the images and files a node will ask for, which is the other half of an air gap and is not an artifact this controller can pull. A registry holding only the mirrored half says so:</p>
+<pre><code>zarf-docker-registry.zarf.svc.cluster.local:5000: k3s is recorded as mirrored into this registry but not published into it, so there is no package to pull: publish it with `cargoship publish --record`
+</code></pre>
+<p>A <code>packageVersion</code> nothing recorded lists what is on offer instead, on the <code>Converged</code> condition with the reason <code>DistroUnresolved</code>:</p>
+<pre><code>zarf-docker-registry.zarf.svc.cluster.local:5000: no record of k3s 1.37.0; recorded versions are 1.34.1, 1.36.1
+</code></pre>
+<p>Two things it deliberately does not do. <strong>It does not take the newest version</strong> when <code>packageVersion</code> is left out - the field is required alongside <code>name</code>, so publishing a package never moves a cluster. And <strong>it does not follow a republished version</strong> unless asked: the registry’s content digest for the resolved package lands in <code>status.distro.recordDigest</code> either way, but it only joins the desired state, and so only triggers a converge, with</p>
+<pre><code class="language-sh">kubectl annotate cargoshipcontrolplane fleet \
+  controlplane.cluster.x-k8s.io/adopt-republished-package=true
+</code></pre>
+<p>Both are explained in <a href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue">the decision record</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
 <p>The unit tests cover everything that can be covered without an API server: inventory construction from <code>Machine</code> objects, the desired-state fingerprint, the converge runner’s concurrency, and cloud-init rendering. They need no cluster and no network.</p>
@@ -586,6 +616,7 @@ var ErrLayerRequired = errors.New("no layer title was selected")
 <li><strong>It does</strong> mean <code>status.distro.digest</code> is empty for a tagged reference, so there is no record of what a fleet actually converged to. An operator who needs that answer has to pin.</li>
 <li><strong>It does not</strong> affect correctness of a converge. Cargoship resolves the reference itself on every apply, so the bytes installed are always whatever the tag points at now. The gap is only in <em>noticing</em> that it changed.</li>
 </ul>
+<p>A package named by <code>spec.distro.registry</code> and <code>spec.distro.name</code> rather than referenced is a different case, and a partial answer to the same question: the registry’s own record of it carries a digest computed over the package’s contents, so a version republished with new contents is noticeable without resolving anything. That digest is not a reference you can pull, and following it is gated on an annotation rather than automatic. See <a href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue"><code>choice-record-discovery.md</code></a>.</p>
 <p>Do not work around this by folding a timestamp or the reconcile count into the fingerprint. That would make the fingerprint change on every pass, which turns the drift interval into “re-converge the entire fleet over SSH every ten minutes” - the cost control the fingerprint exists to provide, removed.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true"><a class="header" href="#the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true">The SSH key is never written to a file, and nothing had to be added to make that true</a></h1>
@@ -657,6 +688,38 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <h2 id="what-would-change-it"><a class="header" href="#what-would-change-it">What would change it</a></h2>
 <p>Cargoship growing the ability to converge a declared subset of the inventory while reading the whole of it - so a worker-only run could rewrite that worker and leave the controllers’ <code>/etc/hosts</code> to the control-plane run. <code>ResetOptions.TargetHosts</code> is the shape of that idea for <code>reset</code>; there is no equivalent for <code>apply</code>, and adding one means deciding what <code>ModifyHosts</code> does when it can see hosts it may not write to.</p>
 <p>Until then, do not “fix” this by narrowing the machine list to the control plane. It will appear to work, because a single-node cluster has no other hosts to be wrong about.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue"><a class="header" href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue">A package is discovered by name through the registry’s own records, never by catalogue</a></h1>
+<p><code>spec.distro</code> names a cargoship package one of two ways: an <code>ociRef</code>, which says where it is, or a <code>registry</code> and a <code>name</code>, which asks the registry what it has. The second reads the records <code>cargoship publish --record</code> and <code>cargoship mirror</code> leave behind - <code>distro.ListMirrored</code>, new in cargoship 0.42.0. This records the parts of that which look arbitrary from the code.</p>
+<h2 id="one-tag-listing-not-a-catalogue-read"><a class="header" href="#one-tag-listing-not-a-catalogue-read">One tag listing, not a catalogue read</a></h2>
+<p>Every record a registry holds lives in one repository, <code>&lt;registry&gt;/cargoship</code>, tagged <code>_package.NAME.VERSION</code> or <code>_mirror.NAME.VERSION</code>. So discovery is a <code>tags/list</code> against a repository whose name is known, which needs no more permission than a pull - and the pull credentials <code>spec.distro.pullSecretRef</code> already names are therefore enough.</p>
+<p>The alternative, finding packages by enumerating the registry’s repositories, cannot work where this provider is aimed. <code>/v2/_catalog</code> is a wider permission than pushing wherever it exists at all: ghcr.io answers it <code>403 DENIED</code>, Docker Hub does not implement it, and the push credentials Zarf generates frequently cannot read it. Cargoship’s <a href="https://github.com/colonel-byte/cargoship/blob/main/docs/agent/choice-mirror-record-layout.md"><code>choice-mirror-record-layout.md</code></a> measured that against the real registries and chose the layout accordingly; this is the consuming half of that decision.</p>
+<h2 id="only-a-package-record-is-something-to-converge-from"><a class="header" href="#only-a-package-record-is-something-to-converge-from">Only a package record is something to converge from</a></h2>
+<p>The two record kinds describe different things, and the difference matters more here than it does to <code>cargoship ls</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Kind</th><th>Written by</th><th>What is in the registry</th></tr>
+</thead>
+<tbody>
+<tr><td><code>package</code></td><td><code>cargoship publish --record</code></td><td>One artifact at <code>&lt;registry&gt;/&lt;name&gt;:&lt;version&gt;</code>, which is what a converge pulls</td></tr>
+<tr><td><code>mirror</code></td><td><code>cargoship mirror</code></td><td>The images and files the package declares, pushed under their own references</td></tr>
+</tbody>
+</table>
+</div>
+<p>A registry filled by <code>cargoship mirror</code> alone holds everything a <em>node</em> needs and nothing the <em>controller</em> does, because there is no package artifact in it to pull. That is the one failure worth its own message, and <code>pickRecord</code> gives it one: the fix is a <code>cargoship publish --record</code> into the same registry, not a different version. An air gap wants both halves, and they are two commands.</p>
+<h2 id="statusdistrorecorddigest-is-not-a-digest-to-pin-to"><a class="header" href="#statusdistrorecorddigest-is-not-a-digest-to-pin-to"><code>status.distro.recordDigest</code> is not a digest to pin to</a></h2>
+<p>A record carries a <code>digest</code>, and the obvious move is to report it as <code>status.distro.digest</code> so an operator can paste it into an <code>ociRef</code>. It would be wrong. The record’s digest is <code>layout.Digest()</code>, computed over the package’s contents, while a published package’s root is a multi-architecture index whose digest is a different number - and for a mirror record there is no artifact in the registry at all. So the two live in separate status fields, and <code>status.distro.digest</code> stays empty for a discovered package.</p>
+<p>What the record’s digest is good for is noticing change: it moves when a version’s contents move, and not otherwise. That is why it is in the desired-state fingerprint rather than only in status - and why it is in it only when asked for, below. It does <strong>not</strong> close <a href="#a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed"><code>choice-distro-pinning.md</code></a>, which is about resolving a tag to the digest you could pull by; that still needs a cargoship-side resolve with no layer selector.</p>
+<h2 id="nothing-is-adopted-without-an-operator-asking"><a class="header" href="#nothing-is-adopted-without-an-operator-asking">Nothing is adopted without an operator asking</a></h2>
+<p>Two pieces of this would otherwise move a cluster that nobody touched, and both are deliberately refused:</p>
+<ul>
+<li><strong><code>packageVersion</code> is required alongside <code>name</code></strong>, rather than defaulting to the newest version recorded. Taking the newest makes the registry the desired state and the custom resource a follower of it, so staging a package on a Friday afternoon would converge a fleet over the weekend.</li>
+<li><strong>A republished version is followed only with <code>controlplane.cluster.x-k8s.io/adopt-republished-package: "true"</code></strong> on the <code>CargoshipControlPlane</code>. Without it the new content digest is reported in <code>status.distro.recordDigest</code> and the fingerprint is unchanged, so an operator can see that the registry moved and decide when the fleet does. The annotation value is matched against <code>"true"</code> exactly; anything else is not consent.</li>
+</ul>
+<p>The asymmetry is the point. Discovery is allowed to answer “what is in this registry” on every reconcile, because reading is free and a listing is a few kilobytes. Acting on a different answer than last time is an upgrade, and this provider has no rollout - a converge onto a package installing another Kubernetes version is refused rather than half-applied, so an automatic one would be a failed reconcile at best. See <a href="#there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied"><code>choice-no-rollout.md</code></a>.</p>
+<h2 id="the-credentials-are-staged-earlier-for-this-path-and-only-this-path"><a class="header" href="#the-credentials-are-staged-earlier-for-this-path-and-only-this-path">The credentials are staged earlier for this path, and only this path</a></h2>
+<p>Resolution reads the registry, so the pull credentials and the CA have to be in place before the reference is resolved rather than afterwards, where the converge picks them up. <code>stageRegistryAccess</code> is called before resolution when <code>spec.distro.name</code> is set and in its original place otherwise, which means a discovering resource rewrites its Docker configuration file on a resync that would not otherwise have touched it. That cost is why it is gated on the path that needs it instead of being hoisted for everybody.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="registry-credentials-are-written-to-a-file-and-the-ssh-key-is-not"><a class="header" href="#registry-credentials-are-written-to-a-file-and-the-ssh-key-is-not">Registry credentials are written to a file, and the SSH key is not</a></h1>
 <p><a href="#the-ssh-key-is-never-written-to-a-file-and-nothing-had-to-be-added-to-make-that-true"><code>choice-in-memory-ssh-key.md</code></a> is emphatic that the SSH key never reaches a filesystem. The registry credentials in <code>spec.distro.pullSecretRef</code> do: the controller writes them into a Docker config file on its cache volume. The difference is not carelessness, and the file is not a fallback for something better.</p>
