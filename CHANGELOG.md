@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.2...v0.2.3) (2026-11-15)
+
+
+### Features
+
+* **controlplane:** discover a distro package by name through the registry's records ([#39](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/39)) ([73d6cef](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/73d6cef9114de238f48ab0dd0e3d31c5338a1586))
+* **controlplane:** read a zarf registry's credentials and CA from its own state ([#40](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/40)) ([fd6b656](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/fd6b656c47f8001dd7fadf639deb683cef52586d))
+* **controlplane:** refuse an unapproved version change, and advertise the versions on offer ([#41](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/41)) ([226c664](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/226c664e0c2e2c6a4edcfb3dec9f2e75635e780a))
+
+
+### Build
+
+* **deps:** bump cargoship to 0.42.2 for the mirror record API ([#38](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/38)) ([8c515b8](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/8c515b899295b6d52b131c2ccb5466d11f29ee49))
+
 ## [0.2.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.1...v0.2.2) (2026-11-14)
 
 
