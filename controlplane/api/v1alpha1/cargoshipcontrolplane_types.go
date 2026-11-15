@@ -24,6 +24,19 @@ const (
 	// ControlPlaneFinalizer is set on a CargoshipControlPlane so its machines are deleted with it.
 	ControlPlaneFinalizer = "cargoshipcontrolplane.controlplane.cluster.x-k8s.io"
 
+	// ApproveVersionChangeAnnotation lets a converge proceed after spec.version has changed.
+	//
+	// Set it to the new spec.version exactly -- the value is checked against it, so an
+	// annotation left behind from one change cannot approve the next. Without it a control
+	// plane whose last successful converge was at another version is refused rather than
+	// converged, on the Converged condition with the reason VersionChangeRefused.
+	//
+	// What it approves is not a rollout. There is none: no machine is replaced and nothing is
+	// surged. Cargoship's upgrade phases walk the existing hosts in place, controllers first
+	// and then workers in whatever batches spec.apply.workerConcurrent allows, and this
+	// controller neither sequences that nor stops partway. See docs/agent/choice-no-rollout.md.
+	ApproveVersionChangeAnnotation = "controlplane.cluster.x-k8s.io/approve-version-change"
+
 	// AdoptRepublishedPackageAnnotation lets a converge follow a package republished under the
 	// version spec.distro.packageVersion already names.
 	//
@@ -76,10 +89,13 @@ type CargoshipControlPlaneSpec struct {
 	// version is the desired Kubernetes version, as the contract requires it: a semantic version
 	// with a leading "v".
 	//
-	// It must agree with what the distro package installs. The controller reads the package's own
-	// version and refuses a mismatch rather than installing something other than what was asked
-	// for -- the package is the authority on what lands on a host, and a CR that disagreed with
-	// it would make status.version a lie.
+	// It must agree with what the distro package installs, and nothing checks that: the package
+	// is the authority on what lands on a host, so a value here that disagrees with it makes
+	// status.version wrong rather than failing.
+	//
+	// Changing it against a control plane that has already converged is refused unless
+	// ApproveVersionChangeAnnotation says otherwise, because what the converge would then do is
+	// an unsupervised in-place upgrade of every host rather than a rollout.
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
@@ -455,6 +471,18 @@ type DistroStatus struct {
 	// +optional
 	// +kubebuilder:validation:MaxLength=256
 	RecordDigest string `json:"recordDigest,omitempty"`
+
+	// availableVersions are the other versions of this package the registry holds a published
+	// record of, newest first.
+	//
+	// Advertisement, not intent: nothing here moves a cluster. It is what makes an upgrade a
+	// decision an operator can make from `kubectl get cargoshipcontrolplane -o yaml` rather
+	// than by reading a registry themselves, and it is set only for a package discovered
+	// through registry and name.
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=32
+	AvailableVersions []string `json:"availableVersions,omitempty"`
 
 	// engine is the distro engine the package carries: k3s, rke2, or upstream.
 	// +optional

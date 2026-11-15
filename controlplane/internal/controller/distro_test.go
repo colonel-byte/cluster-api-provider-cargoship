@@ -294,3 +294,121 @@ func TestAdoptRepublished(t *testing.T) {
 		})
 	}
 }
+
+// TestAvailableVersions covers what a resource advertises as the other versions it could be moved
+// to. Package records only: a mirror record names content a node pulls, which is not a version
+// anything could be converged to.
+func TestAvailableVersions(t *testing.T) {
+	tests := []struct {
+		name    string
+		records []distro.MirrorRecord
+		pkg     string
+		want    []string
+	}{
+		{
+			name:    "newest first, and only this package",
+			records: records(),
+			pkg:     "k3s",
+			want:    []string{"1.36.1", "1.35.4"},
+		},
+		{
+			name:    "a package with one version",
+			records: records(),
+			pkg:     "rancher-rke2-multi-cilium",
+			want:    []string{"1.36.1"},
+		},
+		{
+			name: "mirror records are not versions to converge to",
+			records: []distro.MirrorRecord{
+				{
+					Kind:    distro.RecordKindMirror,
+					Name:    "k3s",
+					Version: "1.36.1",
+				},
+			},
+			pkg:  "k3s",
+			want: nil,
+		},
+		{
+			name:    "a registry holding nothing",
+			records: nil,
+			pkg:     "k3s",
+			want:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := availableVersions(tt.records, tt.pkg)
+			if len(got) != len(tt.want) {
+				t.Fatalf("availableVersions() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("availableVersions() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+// TestVersionChange covers what the gate reads: status.version is what the last successful
+// converge installed, spec.version is what is wanted now. The approval and the inert case are
+// decided at the call site and covered against a real API server.
+func TestVersionChange(t *testing.T) {
+	tests := []struct {
+		name         string
+		installed    string
+		desired      string
+		wantFrom     string
+		wantChanging bool
+	}{
+		{
+			name:         "a control plane that has never converged has nothing to have changed",
+			installed:    "",
+			desired:      "v1.34.1",
+			wantChanging: false,
+		},
+		{
+			name:         "nothing changed",
+			installed:    "v1.34.1",
+			desired:      "v1.34.1",
+			wantChanging: false,
+		},
+		{
+			name:         "a change",
+			installed:    "v1.34.1",
+			desired:      "v1.35.4",
+			wantFrom:     "v1.34.1",
+			wantChanging: true,
+		},
+		{
+			name:         "a downgrade is a change like any other",
+			installed:    "v1.35.4",
+			desired:      "v1.34.1",
+			wantFrom:     "v1.35.4",
+			wantChanging: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cp := &controlplanev1.CargoshipControlPlane{
+				Spec: controlplanev1.CargoshipControlPlaneSpec{
+					Version: tt.desired,
+				},
+				Status: controlplanev1.CargoshipControlPlaneStatus{
+					Version: tt.installed,
+				},
+			}
+
+			from, changing := versionChange(cp)
+			if changing != tt.wantChanging {
+				t.Errorf("versionChange() changing = %v, want %v", changing, tt.wantChanging)
+			}
+			if from != tt.wantFrom {
+				t.Errorf("versionChange() from = %q, want %q", from, tt.wantFrom)
+			}
+		})
+	}
+}

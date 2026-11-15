@@ -66,8 +66,12 @@ func distroSource(
 	cp.Status.Distro.Ref = ref
 	// Cleared rather than left stale, for the same reason the digest below is: a resource moved
 	// from a discovered package to an explicit reference must not keep reporting what the
-	// registry's record said.
+	// registry's record said. There is nothing to replace them with -- a reference says nothing
+	// about the package until it is pulled.
 	cp.Status.Distro.RecordDigest = ""
+	cp.Status.Distro.Engine = ""
+	cp.Status.Distro.Version = ""
+	cp.Status.Distro.AvailableVersions = nil
 	if digest, ok := digestOf(ref); ok {
 		cp.Status.Distro.Digest = digest
 	} else {
@@ -125,6 +129,12 @@ func discoverDistro(
 
 	cp.Status.Distro.Ref = ref
 	cp.Status.Distro.RecordDigest = record.Digest
+	// Both read off the record rather than out of the package, which is the only reason they can
+	// be filled in at all before a pull: nothing else here loads the package, and these two
+	// fields had no writer before discovery existed.
+	cp.Status.Distro.Engine = record.Engine
+	cp.Status.Distro.Version = record.Version
+	cp.Status.Distro.AvailableVersions = availableVersions(records, src.Name)
 	// Empty, and deliberately: the record's digest is computed over the package's contents, while
 	// the reference above resolves to a multi-architecture index whose digest is a different
 	// number. Reporting one as the other would make status.distro.digest a lie about something an
@@ -190,6 +200,34 @@ func pickRecord(records []distro.MirrorRecord, name, version string) (distro.Mir
 	return distro.MirrorRecord{}, fmt.Errorf(
 		"no record of %s %s; recorded versions are %s",
 		name, version, strings.Join(recordedVersions(packages), ", "))
+}
+
+// availableVersions are the published versions of one package a registry holds, newest first.
+//
+// Newest first rather than sorted, because the records arrive that way -- by when they were
+// recorded, which is the order an operator reading "what could I move to" wants and which no
+// version comparison here could reproduce: a package version is not required to be semver, and
+// guessing an ordering for one that is not would put the wrong entry at the top.
+//
+// Bounded, because the field is: a registry holding a hundred versions of a package should not
+// turn every reconcile into a hundred-entry status write.
+func availableVersions(records []distro.MirrorRecord, name string) []string {
+	const maxVersions = 32
+
+	versions := make([]string, 0, len(records))
+	for _, record := range records {
+		if record.Name != name || record.Kind != distro.RecordKindPackage {
+			continue
+		}
+		versions = append(versions, record.Version)
+		if len(versions) == maxVersions {
+			break
+		}
+	}
+	if len(versions) == 0 {
+		return nil
+	}
+	return versions
 }
 
 // recordedVersions lists the versions on offer, sorted so that the message an operator reads

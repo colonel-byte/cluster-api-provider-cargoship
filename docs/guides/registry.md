@@ -115,6 +115,15 @@ A `packageVersion` nothing recorded lists what is on offer instead, on the `Conv
 zarf-docker-registry.zarf.svc.cluster.local:5000: no record of k3s 1.37.0; recorded versions are 1.34.1, 1.36.1
 ```
 
+What it does report, for a package it resolved, is the rest of that package's published versions:
+
+```sh
+kubectl get cargoshipcontrolplane fleet \
+  -o jsonpath='{.status.distro.version} -> {.status.distro.availableVersions}'
+```
+
+That is advertisement and nothing else - no version here moves a cluster. Taking one is a change to `spec.distro.packageVersion` and `spec.version` together, plus the `controlplane.cluster.x-k8s.io/approve-version-change` annotation, because an in-place upgrade of every host is not something a registry gets to start. `status.distro.engine` and `status.distro.version` are filled from the same record.
+
 Two things it deliberately does not do. **It does not take the newest version** when `packageVersion` is left out - the field is required alongside `name`, so publishing a package never moves a cluster. And **it does not follow a republished version** unless asked: the registry's content digest for the resolved package lands in `status.distro.recordDigest` either way, but it only joins the desired state, and so only triggers a converge, with
 
 ```sh

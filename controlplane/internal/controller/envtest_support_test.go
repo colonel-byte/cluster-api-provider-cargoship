@@ -368,3 +368,43 @@ func testKey(t *testing.T) []byte {
 
 // errConvergeFailed is what the stub returns when a test asks for a failed apply.
 var errConvergeFailed = errors.New("a phase failed on 10.0.0.11")
+
+// setVersion changes spec.version the way an operator would, and reloads what the API server
+// stored so the next reconcile reads it.
+func (f *fixture) setVersion(t *testing.T, version string) {
+	t.Helper()
+
+	f.refresh(t)
+	f.cp.Spec.Version = version
+	if err := f.c.Update(t.Context(), f.cp); err != nil {
+		t.Fatalf("setting spec.version to %s: %v", version, err)
+	}
+}
+
+// setVersionAndPackage changes both halves of an upgrade: the version asked for, and the package
+// that installs it. Only the second reaches the desired-state fingerprint, which is why a test
+// that moves one without the other is testing something else.
+func (f *fixture) setVersionAndPackage(t *testing.T, version, ociRef string) {
+	t.Helper()
+
+	f.refresh(t)
+	f.cp.Spec.Version = version
+	f.cp.Spec.Distro.OCIRef = ociRef
+	if err := f.c.Update(t.Context(), f.cp); err != nil {
+		t.Fatalf("setting spec.version to %s and the package to %s: %v", version, ociRef, err)
+	}
+}
+
+// approveVersionChange sets the annotation that lets a converge follow a version change.
+func (f *fixture) approveVersionChange(t *testing.T, version string) {
+	t.Helper()
+
+	f.refresh(t)
+	if f.cp.Annotations == nil {
+		f.cp.Annotations = map[string]string{}
+	}
+	f.cp.Annotations[controlplanev1.ApproveVersionChangeAnnotation] = version
+	if err := f.c.Update(t.Context(), f.cp); err != nil {
+		t.Fatalf("approving the change to %s: %v", version, err)
+	}
+}

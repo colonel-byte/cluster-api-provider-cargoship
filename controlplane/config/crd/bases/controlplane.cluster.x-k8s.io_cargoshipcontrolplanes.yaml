@@ -427,10 +427,13 @@ spec:
                   version is the desired Kubernetes version, as the contract requires it: a semantic version
                   with a leading "v".
 
-                  It must agree with what the distro package installs. The controller reads the package's own
-                  version and refuses a mismatch rather than installing something other than what was asked
-                  for -- the package is the authority on what lands on a host, and a CR that disagreed with
-                  it would make status.version a lie.
+                  It must agree with what the distro package installs, and nothing checks that: the package
+                  is the authority on what lands on a host, so a value here that disagrees with it makes
+                  status.version wrong rather than failing.
+
+                  Changing it against a control plane that has already converged is refused unless
+                  ApproveVersionChangeAnnotation says otherwise, because what the converge would then do is
+                  an unsupervised in-place upgrade of every host rather than a rollout.
                 maxLength: 256
                 minLength: 1
                 type: string
@@ -514,6 +517,20 @@ spec:
                 description: distro records what was actually converged to, as opposed
                   to what was asked for.
                 properties:
+                  availableVersions:
+                    description: |-
+                      availableVersions are the other versions of this package the registry holds a published
+                      record of, newest first.
+
+                      Advertisement, not intent: nothing here moves a cluster. It is what makes an upgrade a
+                      decision an operator can make from `kubectl get cargoshipcontrolplane -o yaml` rather
+                      than by reading a registry themselves, and it is set only for a package discovered
+                      through registry and name.
+                    items:
+                      type: string
+                    maxItems: 32
+                    type: array
+                    x-kubernetes-list-type: atomic
                   digest:
                     description: |-
                       digest is the package digest, set only when the reference named one.
