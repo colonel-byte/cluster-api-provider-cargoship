@@ -60,3 +60,42 @@ What cannot be done at all: a registry configured for mTLS, where the client has
 ## Why this is not the Zarf package's problem
 
 [The Zarf package](install.md#installing-without-a-route-to-ghcrio) installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.
+
+## Naming the package instead of referencing it
+
+A registry filled by cargoship can be asked what it holds, which saves writing a reference that has to be right. Set `registry`, `name` and `packageVersion` in place of `ociRef`:
+
+```yaml
+spec:
+  distro:
+    registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    name: k3s
+    packageVersion: 1.34.1
+    pullSecretRef:
+      name: zarf-registry
+    caBundleSecretRef:
+      name: zarf-registry-ca
+```
+
+The credentials and the certificate are the same two secrets and the same two conditions as above; `--docker-server` must match `registry` exactly, port included, for the same reason it had to match the reference.
+
+This reads the records `cargoship publish --record` and `cargoship mirror` leave in `<registry>/cargoship`, so it works against a registry those filled and reports nothing for one they did not. The package itself has to have been **published** into the registry, not only mirrored into it: a mirror pushes the images and files a node will ask for, which is the other half of an air gap and is not an artifact this controller can pull. A registry holding only the mirrored half says so:
+
+```
+zarf-docker-registry.zarf.svc.cluster.local:5000: k3s is recorded as mirrored into this registry but not published into it, so there is no package to pull: publish it with `cargoship publish --record`
+```
+
+A `packageVersion` nothing recorded lists what is on offer instead, on the `Converged` condition with the reason `DistroUnresolved`:
+
+```
+zarf-docker-registry.zarf.svc.cluster.local:5000: no record of k3s 1.37.0; recorded versions are 1.34.1, 1.36.1
+```
+
+Two things it deliberately does not do. **It does not take the newest version** when `packageVersion` is left out - the field is required alongside `name`, so publishing a package never moves a cluster. And **it does not follow a republished version** unless asked: the registry's content digest for the resolved package lands in `status.distro.recordDigest` either way, but it only joins the desired state, and so only triggers a converge, with
+
+```sh
+kubectl annotate cargoshipcontrolplane fleet \
+  controlplane.cluster.x-k8s.io/adopt-republished-package=true
+```
+
+Both are explained in [the decision record](../agent/choice-record-discovery.md).

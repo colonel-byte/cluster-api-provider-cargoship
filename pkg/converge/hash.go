@@ -45,6 +45,14 @@ type DesiredState struct {
 	// converge. That is a known limit of the current version rather than a choice; see
 	// docs/agent/choice-distro-pinning.md in the provider repository.
 	DistroRef string `json:"distroRef,omitempty"`
+	// DistroDigest is the package content digest, where the caller discovered the package
+	// through a registry's own records rather than being handed a reference.
+	//
+	// It is what makes "the package changed" an event for a reference that is a tag: a record's
+	// digest is computed over the package's contents, so it moves when a version is republished
+	// with different contents and not otherwise. Empty for a reference given directly, which
+	// leaves every fingerprint that does not use discovery exactly as it was.
+	DistroDigest string `json:"distroDigest,omitempty"`
 	// Apply is the converge's own options, because they change what an apply does.
 	Apply json.RawMessage `json:"apply,omitempty"`
 }

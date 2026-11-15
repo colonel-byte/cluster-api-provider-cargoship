@@ -197,6 +197,13 @@ spec:
                       trusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH
                       connections to the fleet nor the workload cluster's API server.
                     type: boolean
+                  name:
+                    description: |-
+                      name is the cargoship package to converge to, as the package declares itself - "k3s",
+                      "rancher-rke2-multi-cilium".
+                    maxLength: 64
+                    minLength: 1
+                    type: string
                   ociRef:
                     description: |-
                       ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
@@ -205,6 +212,19 @@ spec:
                       Every later reconcile uses the digest, so a tag that moves underneath a running cluster
                       does not silently change what the fleet converges to; change the reference to adopt it.
                     maxLength: 2048
+                    minLength: 1
+                    type: string
+                  packageVersion:
+                    description: |-
+                      packageVersion is the package's own version to take, which is not spec.version: a package
+                      declares its own, and only the package knows which Kubernetes version that installs.
+
+                      Required alongside name, rather than defaulting to the newest version recorded. Taking the
+                      newest would make the registry the desired state and this resource a follower of it, so
+                      publishing a package on a Friday afternoon would move a cluster nobody touched. The
+                      version a fleet runs is decided here; discovery resolves it to a reference and says what
+                      else is on offer when it is wrong.
+                    maxLength: 64
                     minLength: 1
                     type: string
                   pullSecretRef:
@@ -225,9 +245,23 @@ spec:
                     required:
                     - name
                     type: object
-                required:
-                - ociRef
+                  registry:
+                    description: |-
+                      registry is where to discover the package, as a host with an optional path prefix -
+                      "zarf-docker-registry.zarf.svc.cluster.local:5000" or "ghcr.io/example". No scheme.
+
+                      The records are read from <registry>/cargoship, which is one tag listing rather than a
+                      catalogue read, so the pull credentials pullSecretRef names are enough. See
+                      docs/agent/choice-record-discovery.md.
+                    maxLength: 2048
+                    minLength: 1
+                    type: string
                 type: object
+                x-kubernetes-validations:
+                - message: set either ociRef, or both registry and name
+                  rule: has(self.ociRef) != (has(self.registry) && has(self.name))
+                - message: a discovered package needs both name and packageVersion
+                  rule: has(self.name) == has(self.packageVersion)
               machineTemplate:
                 description: |-
                   machineTemplate is the infrastructure and metadata each control-plane machine is created
@@ -468,6 +502,18 @@ spec:
                     description: 'engine is the distro engine the package carries:
                       k3s, rke2, or upstream.'
                     maxLength: 32
+                    type: string
+                  recordDigest:
+                    description: |-
+                      recordDigest is the package content digest the registry's own record claims, set only when
+                      the package was discovered through registry and name.
+
+                      It is not a reference you can pull: it is the digest cargoship computes over a package's
+                      contents, while a published package's root is a multi-architecture index whose digest
+                      differs. What it is good for is noticing a change - it moves when the contents move and
+                      not otherwise - so it is in the desired-state fingerprint, and a version republished with
+                      new contents re-converges the fleet.
+                    maxLength: 256
                     type: string
                   ref:
                     description: |-

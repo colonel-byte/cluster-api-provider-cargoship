@@ -60,6 +60,11 @@ spec:
     # Pin to a digest. A tag that is republished underneath a running cluster is not picked up;
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
+    # Or name the package and let the registry's own records say where it is, which is what an
+    # air gap wants - see docs/guides/registry.md:
+    #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    #   name: k3s
+    #   packageVersion: 1.34.1
     arch: amd64
   ssh:
     user: rocky
@@ -107,7 +112,8 @@ The node-removal row is the second. A machine Cluster API is destroying needs no
 Stated plainly, because each of these is a thing an operator will reach for:
 
 - **No rollout or in-place upgrade.** Scale up and scale down only. A change to `spec.version` is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.
-- **No tag-to-digest resolution.** A republished tag is not noticed. Pin the reference.
+- **No tag-to-digest resolution.** A republished tag behind an `ociRef` is not noticed. Pin the reference. A package named by `registry` and `name` instead is noticed, because the registry's record of it carries a content digest - but following it still takes the `controlplane.cluster.x-k8s.io/adopt-republished-package` annotation, since this provider has no rollout.
+- **No discovering a version.** `packageVersion` is required alongside `name`: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.
 - **No encrypted registry credentials.** Cargoship's keyring type is not reachable from outside its module.
 - **No mTLS to the package registry.** A pull secret and the registry's CA are both handled - see [`docs/guides/registry.md`](docs/guides/registry.md) - but the pull presents no client certificate of its own.
 - **No MachineHealthCheck remediation**, etcd backup or restore.

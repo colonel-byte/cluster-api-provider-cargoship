@@ -24,6 +24,18 @@ const (
 	// ControlPlaneFinalizer is set on a CargoshipControlPlane so its machines are deleted with it.
 	ControlPlaneFinalizer = "cargoshipcontrolplane.controlplane.cluster.x-k8s.io"
 
+	// AdoptRepublishedPackageAnnotation lets a converge follow a package republished under the
+	// version spec.distro.packageVersion already names.
+	//
+	// Set it to "true" on a CargoshipControlPlane and the registry's record of the package's
+	// contents joins the desired-state fingerprint, so a version rebuilt and pushed again
+	// re-converges the fleet. Unset -- the default -- the new contents are reported in
+	// status.distro.recordDigest and nothing happens, which is the only safe default: a package
+	// staged into a registry on a Friday would otherwise walk every host over SSH without an
+	// operator present, and this provider has no rollout, so a converge onto a package that
+	// installs a different Kubernetes version is refused rather than half-applied.
+	AdoptRepublishedPackageAnnotation = "controlplane.cluster.x-k8s.io/adopt-republished-package"
+
 	// PreTerminateHookName is the suffix of the pre-terminate annotation the controller puts on
 	// every machine it manages.
 	//
@@ -141,16 +153,55 @@ type CargoshipControlPlaneMachineTemplateSpec struct {
 }
 
 // DistroSource names the cargoship package to converge the fleet to.
+//
+// Two ways to name one, and exactly one of them: an ociRef, which says where the package is, or a
+// registry and a name, which asks the registry which versions of that package it holds. The
+// second reads the records `cargoship publish --record` and `cargoship mirror` leave behind, so it
+// works only against a registry those filled - which, in an air gap, is the registry the fleet
+// pulls from anyway.
+// +kubebuilder:validation:XValidation:rule="has(self.ociRef) != (has(self.registry) && has(self.name))",message="set either ociRef, or both registry and name"
+// +kubebuilder:validation:XValidation:rule="has(self.name) == has(self.packageVersion)",message="a discovered package needs both name and packageVersion"
 type DistroSource struct {
 	// ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
 	//
 	// A tag is resolved to a digest once and the digest is recorded in status.distro.digest.
 	// Every later reconcile uses the digest, so a tag that moves underneath a running cluster
 	// does not silently change what the fleet converges to; change the reference to adopt it.
-	// +required
+	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=2048
 	OCIRef string `json:"ociRef,omitempty"`
+
+	// registry is where to discover the package, as a host with an optional path prefix -
+	// "zarf-docker-registry.zarf.svc.cluster.local:5000" or "ghcr.io/example". No scheme.
+	//
+	// The records are read from <registry>/cargoship, which is one tag listing rather than a
+	// catalogue read, so the pull credentials pullSecretRef names are enough. See
+	// docs/agent/choice-record-discovery.md.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	Registry string `json:"registry,omitempty"`
+
+	// name is the cargoship package to converge to, as the package declares itself - "k3s",
+	// "rancher-rke2-multi-cilium".
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
+	Name string `json:"name,omitempty"`
+
+	// packageVersion is the package's own version to take, which is not spec.version: a package
+	// declares its own, and only the package knows which Kubernetes version that installs.
+	//
+	// Required alongside name, rather than defaulting to the newest version recorded. Taking the
+	// newest would make the registry the desired state and this resource a follower of it, so
+	// publishing a package on a Friday afternoon would move a cluster nobody touched. The
+	// version a fleet runs is decided here; discovery resolves it to a reference and says what
+	// else is on offer when it is wrong.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=64
+	PackageVersion string `json:"packageVersion,omitempty"`
 
 	// arch is the package architecture to pull, "amd64" or "arm64". Empty takes the package's
 	// sole architecture, and fails if it carries more than one.
@@ -368,6 +419,18 @@ type DistroStatus struct {
 	// +optional
 	// +kubebuilder:validation:MaxLength=256
 	Digest string `json:"digest,omitempty"`
+
+	// recordDigest is the package content digest the registry's own record claims, set only when
+	// the package was discovered through registry and name.
+	//
+	// It is not a reference you can pull: it is the digest cargoship computes over a package's
+	// contents, while a published package's root is a multi-architecture index whose digest
+	// differs. What it is good for is noticing a change - it moves when the contents move and
+	// not otherwise - so it is in the desired-state fingerprint, and a version republished with
+	// new contents re-converges the fleet.
+	// +optional
+	// +kubebuilder:validation:MaxLength=256
+	RecordDigest string `json:"recordDigest,omitempty"`
 
 	// engine is the distro engine the package carries: k3s, rke2, or upstream.
 	// +optional
