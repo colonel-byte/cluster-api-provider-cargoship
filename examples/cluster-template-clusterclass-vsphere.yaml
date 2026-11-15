@@ -1,0 +1,225 @@
+# A ClusterClass and one cluster built from it, for clusterctl to render.
+#
+# clusterctl's --flavor reads a template from the *infrastructure* provider's repository, so this
+# one is reached with --from instead:
+#
+#   clusterctl generate cluster fleet-one \
+#     --from https://github.com/colonel-byte/cluster-api-provider-cargoship/releases/download/vX.Y.Z/cluster-template-clusterclass-vsphere.yaml \
+#     > fleet-one.yaml
+#
+# Every variable below has to be set in the environment or in clusterctl's config; clusterctl
+# refuses to render and lists the ones it is missing, which is the quickest way to read this file.
+# Note that it substitutes comments too, so this one names none of them.
+#
+# The infrastructure half is vSphere because something has to be chosen and a cargoship fleet needs
+# hosts that answer SSH - the Docker provider's containers run no sshd. Adapt those three objects
+# for another provider; the two cargoship kinds and the topology do not change.
+#
+# See docs/guides/clusterclass.md.
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: ClusterClass
+metadata:
+  name: ${CLUSTER_CLASS_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  infrastructure:
+    templateRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: VSphereClusterTemplate
+      name: ${CLUSTER_CLASS_NAME}
+  controlPlane:
+    templateRef:
+      apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+      kind: CargoshipControlPlaneTemplate
+      name: ${CLUSTER_CLASS_NAME}
+    machineInfrastructure:
+      templateRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: VSphereMachineTemplate
+        name: ${CLUSTER_CLASS_NAME}-control-plane
+  workers:
+    machineDeployments:
+      # The class name is the cargoship profile, so this pool takes
+      # clusterConfig.profiles.worker from the control-plane template below.
+      - class: worker
+        bootstrap:
+          templateRef:
+            apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+            kind: CargoshipConfigTemplate
+            name: ${CLUSTER_CLASS_NAME}-worker
+        infrastructure:
+          templateRef:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+            kind: VSphereMachineTemplate
+            name: ${CLUSTER_CLASS_NAME}-worker
+  variables:
+    - name: controlPlaneEndpointIP
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: The address clients reach the API through, which a kube-vip or a load balancer answers on.
+    - name: packageVersion
+      required: true
+      schema:
+        openAPIV3Schema:
+          type: string
+          description: The cargoship package version to converge to, which has to install spec.topology.version.
+  patches:
+    # The endpoint has to be chosen before the first node boots, and nothing allocates it: no
+    # IPAddressClaim is created for an endpoint that is not a machine.
+    - name: control-plane-endpoint
+      definitions:
+        - selector:
+            apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+            kind: CargoshipControlPlaneTemplate
+            matchResources:
+              controlPlane: true
+          jsonPatches:
+            - op: add
+              path: /spec/template/spec/controlPlaneEndpoint/host
+              valueFrom:
+                variable: controlPlaneEndpointIP
+    # The package a cluster converges to, so one class serves several versions.
+    - name: package-version
+      definitions:
+        - selector:
+            apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+            kind: CargoshipControlPlaneTemplate
+            matchResources:
+              controlPlane: true
+          jsonPatches:
+            - op: replace
+              path: /spec/template/spec/distro/packageVersion
+              valueFrom:
+                variable: packageVersion
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
+kind: CargoshipControlPlaneTemplate
+metadata:
+  name: ${CLUSTER_CLASS_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    spec:
+      # No version, no replicas and no machineTemplate.spec.infrastructureRef: the topology and the
+      # class above fill all three in. See docs/agent/choice-clusterclass-template.md.
+      distro:
+        fromZarfState: true
+        registry: ${CARGOSHIP_REGISTRY}
+        name: ${CARGOSHIP_PACKAGE}
+        # Replaced per cluster by the packageVersion patch above.
+        packageVersion: unset
+      ssh:
+        user: ${CARGOSHIP_SSH_USER}
+        privateKeySecretRef:
+          name: ${CARGOSHIP_SSH_SECRET}
+      clusterConfig:
+        values:
+          cni: cilium
+        profiles:
+          worker:
+            engine:
+              labels:
+                node-role.kubernetes.io/worker: "true"
+      apply:
+        modifyHosts: true
+        modifyFirewall: true
+        labelNodes: true
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+kind: CargoshipConfigTemplate
+metadata:
+  name: ${CLUSTER_CLASS_NAME}-worker
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    spec:
+      user: ${CARGOSHIP_SSH_USER}
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  topology:
+    classRef:
+      name: ${CLUSTER_CLASS_NAME}
+    version: ${KUBERNETES_VERSION}
+    controlPlane:
+      replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+    workers:
+      machineDeployments:
+        - class: worker
+          name: worker
+          replicas: ${WORKER_MACHINE_COUNT}
+    variables:
+      - name: controlPlaneEndpointIP
+        value: ${CONTROL_PLANE_ENDPOINT_IP}
+      - name: packageVersion
+        value: ${CARGOSHIP_PACKAGE_VERSION}
+---
+# The infrastructure half: an example to adapt, not a tested vSphere configuration.
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereClusterTemplate
+metadata:
+  name: ${CLUSTER_CLASS_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    spec:
+      server: ${VSPHERE_SERVER}
+      thumbprint: ${VSPHERE_TLS_THUMBPRINT}
+      identityRef:
+        kind: Secret
+        name: ${CLUSTER_CLASS_NAME}-vsphere
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereMachineTemplate
+metadata:
+  name: ${CLUSTER_CLASS_NAME}-control-plane
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    spec:
+      server: ${VSPHERE_SERVER}
+      thumbprint: ${VSPHERE_TLS_THUMBPRINT}
+      template: ${VSPHERE_TEMPLATE}
+      datacenter: ${VSPHERE_DATACENTER}
+      datastore: ${VSPHERE_DATASTORE}
+      folder: ${VSPHERE_FOLDER}
+      resourcePool: ${VSPHERE_RESOURCE_POOL}
+      numCPUs: 4
+      memoryMiB: 8192
+      diskGiB: 50
+      cloneMode: linkedClone
+      network:
+        devices:
+          - networkName: ${VSPHERE_NETWORK}
+            dhcp4: true
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereMachineTemplate
+metadata:
+  name: ${CLUSTER_CLASS_NAME}-worker
+  namespace: ${NAMESPACE}
+spec:
+  template:
+    spec:
+      server: ${VSPHERE_SERVER}
+      thumbprint: ${VSPHERE_TLS_THUMBPRINT}
+      template: ${VSPHERE_TEMPLATE}
+      datacenter: ${VSPHERE_DATACENTER}
+      datastore: ${VSPHERE_DATASTORE}
+      folder: ${VSPHERE_FOLDER}
+      resourcePool: ${VSPHERE_RESOURCE_POOL}
+      numCPUs: 8
+      memoryMiB: 16384
+      diskGiB: 100
+      cloneMode: linkedClone
+      network:
+        devices:
+          - networkName: ${VSPHERE_NETWORK}
+            dhcp4: true
