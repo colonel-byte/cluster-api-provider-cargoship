@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-7d87dfd0.js";
+            window.path_to_searchindex_js = "../searchindex-fbfbe9a3.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-1ea4ed26.js"></script>
@@ -182,14 +182,40 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied"><a class="header" href="#there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied">There is no rollout, and <code>spec.version</code> changes are refused rather than half-applied</a></h1>
-<p><code>CargoshipControlPlane</code> scales up and scales down. It does not replace machines, and it does not upgrade them in place. A change to <code>spec.version</code> against a converged control plane is reported as unsupported rather than acted on.</p>
+                        <h1 id="there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><a class="header" href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval">There is no rollout, and a <code>spec.version</code> change needs an operator’s approval</a></h1>
+<p><code>CargoshipControlPlane</code> scales up and scales down. It does not replace machines, and it does not sequence an upgrade. A change to <code>spec.version</code> against a converged control plane is refused on the <code>Converged</code> condition unless <code>controlplane.cluster.x-k8s.io/approve-version-change</code> names the version being asked for.</p>
+<h2 id="what-this-document-used-to-claim-and-what-was-actually-true"><a class="header" href="#what-this-document-used-to-claim-and-what-was-actually-true">What this document used to claim, and what was actually true</a></h2>
+<p>It said a version change was “reported as unsupported rather than acted on”, and the README said it was “rejected rather than half-applied”. Neither was implemented. There are no webhooks in this provider, there was no CEL rule on <code>spec.version</code>, and no check in the reconcile - so what actually happened was:</p>
+<ul>
+<li><code>spec.version</code> was copied onto any new machine and into <code>status.version</code>, and</li>
+<li>if the package moved too, the desired-state fingerprint changed and a converge ran - and <code>action.Apply</code> already registers <code>UpgradeController</code> and <code>UpgradeWorkers</code>, so cargoship upgraded every existing host <strong>in place</strong>, workers in whatever batches <code>spec.apply.workerConcurrent</code> allowed, with nothing in this controller sequencing or supervising it, while</li>
+<li><code>status.upToDateReplicas</code> was the replica count unconditionally, so the resource claimed every machine was current throughout.</li>
+</ul>
+<p>That is the half-applied upgrade this document exists to refuse, reachable by accident. The gate below is what makes the claim true.</p>
+<h2 id="the-gate"><a class="header" href="#the-gate">The gate</a></h2>
+<p><code>versionChange</code> compares <code>status.version</code> - which only a successful converge writes, so it is what the hosts last had installed - against <code>spec.version</code>. When they differ, one of three things happens:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>State</th><th>Reason on <code>Converged</code></th><th>What happens</th></tr>
+</thead>
+<tbody>
+<tr><td>The package has not moved (fingerprint unchanged)</td><td><code>VersionChangeInert</code></td><td>Nothing. The message names <code>spec.distro</code> as the field to change</td></tr>
+<tr><td>The package moved, and no annotation approves the version</td><td><code>VersionChangeRefused</code></td><td>Nothing. The message names the annotation and the value to set</td></tr>
+<tr><td>The package moved and the annotation names <code>spec.version</code></td><td>-</td><td>The converge runs, and upgrades every host in place</td></tr>
+</tbody>
+</table>
+</div>
+<p>The annotation’s <strong>value</strong> is compared with <code>spec.version</code> rather than its presence being checked, so an approval left behind from one change cannot wave through the next.</p>
+<p><code>VersionChangeInert</code> exists because a version bumped on its own installs nothing: <code>converge.DesiredState</code> does not carry <code>spec.version</code> at all, so the fingerprint is unchanged and no converge would run. Approving it would not help. Reporting it as refused would have told an operator to set an annotation that changes nothing, and reporting it as converged would have left the resource claiming a version it is not running. This was found by a test written to assert the approved path, which never ran a second converge.</p>
+<p><strong>The machines’ own versions are deliberately not the gate.</strong> A machine’s <code>spec.version</code> is fixed when it is created and this provider never replaces a machine, so after an in-place upgrade every machine disagrees with the fleet forever - a gate reading them would refuse every converge from then on, and <code>upToDateReplicas</code> computed from them would never recover. <code>upToDateReplicas</code> is instead the whole-fleet answer the fingerprint already gives: the replica count when the last successful converge matches what is wanted now, and zero while a version change is pending or a converge is running.</p>
 <h2 id="why-refusing-is-better-than-trying"><a class="header" href="#why-refusing-is-better-than-trying">Why refusing is better than trying</a></h2>
 <p><code>KubeadmControlPlane</code>’s rollout is the most intricate part of it: surge a new machine, wait for it to join, remove an old one, repeat, while keeping etcd quorum and handling a machine that fails to come up halfway through. Half of that implemented is worse than none of it, because the failure mode is a control plane stuck between two versions with no path forward that the controller knows how to take.</p>
 <p>Cargoship does have the pieces - <code>pkg/phase/65_upgrade_common.go</code> and the engine-config-sync phases upgrade a host in place, draining and waiting for <code>Ready</code> through <code>waitNodeReady</code>. So the shape of an in-place rollout is available and is probably the right one for this provider, since replacing machines throws away the thing cargoship is good at. It is a separate piece of work with its own correctness argument, not an extension of this one.</p>
 <h2 id="what-an-operator-does-meanwhile"><a class="header" href="#what-an-operator-does-meanwhile">What an operator does meanwhile</a></h2>
 <p>Build a new cluster and move workloads, or scale the control plane up with machines created from a template carrying the new version and scale the old ones down - which works, because a scale-up creates a machine with <code>spec.version</code> from the custom resource and the converge installs whatever the package holds.</p>
-<p>The second route is why <code>status.version</code> is set from <code>spec.version</code> rather than observed per machine: with no rollout, every machine that exists was created at the current version. <strong>When rollout lands that stops being true</strong>, and <code>updateStatusCounts</code> has to compare each machine’s version against the desired one to fill in <code>upToDateReplicas</code> honestly. The comment on that function says so; the counts are correct today and will quietly lie the moment a second version can exist.</p>
+<p>Or approve the in-place upgrade with the annotation, which is what the gate above is for: change <code>spec.distro</code> to a package installing the new version, set <code>spec.version</code> to match, annotate, and the next converge walks the hosts. That is not a rollout - nothing is surged, nothing is drained by this controller, and a failure partway leaves a fleet with some hosts upgraded - but it is cargoship’s own upgrade path, supervised by the operator rather than by a controller.</p>
+<p><code>status.version</code> is still written from <code>spec.version</code> on a successful converge rather than observed per machine, because a converge either installed the package everywhere or failed. What changed is that it is now also the gate’s input, so it has to stay honest: it is written <strong>only</strong> in the success branch, never on a pass that merely found the fleet up to date.</p>
 
                     </main>
 

@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-7d87dfd0.js";
+            window.path_to_searchindex_js = "searchindex-fbfbe9a3.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-1ea4ed26.js"></script>
@@ -225,7 +225,9 @@ spec:
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
     # Or name the package and let the registry's own records say where it is, which is what an
-    # air gap wants - see docs/guides/registry.md:
+    # air gap wants - with fromZarfState, a Zarf registry needs no pull secret and no CA secret
+    # either. See docs/guides/registry.md:
+    #   fromZarfState: true
     #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
     #   name: k3s
     #   packageVersion: 1.34.1
@@ -275,11 +277,11 @@ spec:
 <h2 id="not-yet-supported"><a class="header" href="#not-yet-supported">Not yet supported</a></h2>
 <p>Stated plainly, because each of these is a thing an operator will reach for:</p>
 <ul>
-<li><strong>No rollout or in-place upgrade.</strong> Scale up and scale down only. A change to <code>spec.version</code> is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.</li>
+<li><strong>No rollout.</strong> Nothing is surged and no machine is replaced. A change to <code>spec.version</code> is refused on the <code>Converged</code> condition unless the <code>controlplane.cluster.x-k8s.io/approve-version-change</code> annotation names the new version; approving it lets cargoship’s own upgrade phases walk every host in place, unsequenced and unsupervised by this controller. Wiring that to a real Cluster API rollout is its own piece of work - see <a href="agent/choice-no-rollout.html"><code>docs/agent/choice-no-rollout.md</code></a>.</li>
 <li><strong>No tag-to-digest resolution.</strong> A republished tag behind an <code>ociRef</code> is not noticed. Pin the reference. A package named by <code>registry</code> and <code>name</code> instead is noticed, because the registry’s record of it carries a content digest - but following it still takes the <code>controlplane.cluster.x-k8s.io/adopt-republished-package</code> annotation, since this provider has no rollout.</li>
 <li><strong>No discovering a version.</strong> <code>packageVersion</code> is required alongside <code>name</code>: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.</li>
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
-<li><strong>No mTLS to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="guides/registry.html"><code>docs/guides/registry.md</code></a> - but the pull presents no client certificate of its own.</li>
+<li><strong>No client certificate to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="guides/registry.html"><code>docs/guides/registry.md</code></a> - but nothing presents a client certificate, so a registry that <em>requires</em> one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
 </ul>
 <h2 id="development"><a class="header" href="#development">Development</a></h2>

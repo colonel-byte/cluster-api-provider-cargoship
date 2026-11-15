@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-7d87dfd0.js";
+            window.path_to_searchindex_js = "searchindex-fbfbe9a3.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-1ea4ed26.js"></script>
@@ -223,7 +223,9 @@ spec:
     # see docs/agent/choice-distro-pinning.md.
     ociRef: oci://ghcr.io/example/k3s@sha256:1f5c...
     # Or name the package and let the registry's own records say where it is, which is what an
-    # air gap wants - see docs/guides/registry.md:
+    # air gap wants - with fromZarfState, a Zarf registry needs no pull secret and no CA secret
+    # either. See docs/guides/registry.md:
+    #   fromZarfState: true
     #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
     #   name: k3s
     #   packageVersion: 1.34.1
@@ -273,11 +275,11 @@ spec:
 <h2 id="not-yet-supported"><a class="header" href="#not-yet-supported">Not yet supported</a></h2>
 <p>Stated plainly, because each of these is a thing an operator will reach for:</p>
 <ul>
-<li><strong>No rollout or in-place upgrade.</strong> Scale up and scale down only. A change to <code>spec.version</code> is rejected rather than half-applied. Cargoship has upgrade phases; wiring them to a Cluster API rollout is its own piece of work.</li>
+<li><strong>No rollout.</strong> Nothing is surged and no machine is replaced. A change to <code>spec.version</code> is refused on the <code>Converged</code> condition unless the <code>controlplane.cluster.x-k8s.io/approve-version-change</code> annotation names the new version; approving it lets cargoship’s own upgrade phases walk every host in place, unsequenced and unsupervised by this controller. Wiring that to a real Cluster API rollout is its own piece of work - see <a href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><code>docs/agent/choice-no-rollout.md</code></a>.</li>
 <li><strong>No tag-to-digest resolution.</strong> A republished tag behind an <code>ociRef</code> is not noticed. Pin the reference. A package named by <code>registry</code> and <code>name</code> instead is noticed, because the registry’s record of it carries a content digest - but following it still takes the <code>controlplane.cluster.x-k8s.io/adopt-republished-package</code> annotation, since this provider has no rollout.</li>
 <li><strong>No discovering a version.</strong> <code>packageVersion</code> is required alongside <code>name</code>: nothing takes the newest package a registry holds, because that would converge a fleet whenever somebody published one.</li>
 <li><strong>No encrypted registry credentials.</strong> Cargoship’s keyring type is not reachable from outside its module.</li>
-<li><strong>No mTLS to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> - but the pull presents no client certificate of its own.</li>
+<li><strong>No client certificate to the package registry.</strong> A pull secret and the registry’s CA are both handled - see <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> - but nothing presents a client certificate, so a registry that <em>requires</em> one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.</li>
 <li><strong>No MachineHealthCheck remediation</strong>, etcd backup or restore.</li>
 </ul>
 <h2 id="development"><a class="header" href="#development">Development</a></h2>
@@ -549,6 +551,24 @@ cosign verify \
 <p>What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with <code>mtlsStrategy</code> set to anything requiring one cannot be pulled from by this controller.</p>
 <h2 id="why-this-is-not-the-zarf-packages-problem"><a class="header" href="#why-this-is-not-the-zarf-packages-problem">Why this is not the Zarf package’s problem</a></h2>
 <p><a href="#installing-without-a-route-to-ghcrio">The Zarf package</a> installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.</p>
+<h2 id="letting-zarfs-own-state-answer-both"><a class="header" href="#letting-zarfs-own-state-answer-both">Letting Zarf’s own state answer both</a></h2>
+<p>A registry Zarf stood up has already generated the credentials and signed the certificate, and both are in the management cluster as the <code>zarf-state</code> and <code>zarf-registry-server-tls</code> secrets. <code>fromZarfState: true</code> reads them from there, so neither secret above has to be created:</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    fromZarfState: true
+    registry: zarf-docker-registry.zarf.svc.cluster.local:5000
+    name: k3s
+    packageVersion: 1.34.1
+</code></pre>
+<p>That is the whole configuration for an air gap - no <code>pullSecretRef</code>, no <code>caBundleSecretRef</code>, and the API server refuses the resource if either is set alongside it, rather than leaving two answers to one question.</p>
+<p>Four things about it:</p>
+<ul>
+<li><strong><code>registry</code> is still required.</strong> Zarf records the address a <em>node</em> reaches the registry at, which is a NodePort or an external host; a controller inside the cluster wants the service, and the state does not carry it. The credential entry is keyed by whatever is written here, so it has to be the host a pull will ask for.</li>
+<li><strong>The pull-only credentials are used</strong>, falling back to the push pair only if the state carries no pull user. Zarf writes both.</li>
+<li><strong>A missing CA is not an error.</strong> <code>zarf-registry-server-tls</code> exists where Zarf manages the registry’s TLS; an external registry serving a publicly signed certificate has none, and there is nothing extra to trust.</li>
+<li><strong>A registry Zarf manages mTLS for still works</strong>, with that CA and no client certificate of the controller’s own. Zarf configures the registry <code>clientauth: verify-client-cert-if-given</code>, so a certificate is verified where one is offered and never demanded - the one Zarf issues belongs to the per-node registry proxy, which presents it for a node. The conditions to expect here are <code>ZarfStateUnreadable</code> for a cluster with no Zarf deployment in it, <code>ZarfStateUnusable</code> for state that carries no credentials, and <code>DistroUnresolved</code> for a package the registry does not hold.</li>
+</ul>
+<p>The controller reads both secrets with its own service account, through the <code>ClusterRole</code> it already carries; nothing extra is granted for this and the resource does not say which namespace to look in - <code>zarf</code> is where Zarf keeps them.</p>
 <h2 id="naming-the-package-instead-of-referencing-it"><a class="header" href="#naming-the-package-instead-of-referencing-it">Naming the package instead of referencing it</a></h2>
 <p>A registry filled by cargoship can be asked what it holds, which saves writing a reference that has to be right. Set <code>registry</code>, <code>name</code> and <code>packageVersion</code> in place of <code>ociRef</code>:</p>
 <pre><code class="language-yaml">spec:
@@ -568,6 +588,11 @@ cosign verify \
 <p>A <code>packageVersion</code> nothing recorded lists what is on offer instead, on the <code>Converged</code> condition with the reason <code>DistroUnresolved</code>:</p>
 <pre><code>zarf-docker-registry.zarf.svc.cluster.local:5000: no record of k3s 1.37.0; recorded versions are 1.34.1, 1.36.1
 </code></pre>
+<p>What it does report, for a package it resolved, is the rest of that package’s published versions:</p>
+<pre><code class="language-sh">kubectl get cargoshipcontrolplane fleet \
+  -o jsonpath='{.status.distro.version} -&gt; {.status.distro.availableVersions}'
+</code></pre>
+<p>That is advertisement and nothing else - no version here moves a cluster. Taking one is a change to <code>spec.distro.packageVersion</code> and <code>spec.version</code> together, plus the <code>controlplane.cluster.x-k8s.io/approve-version-change</code> annotation, because an in-place upgrade of every host is not something a registry gets to start. <code>status.distro.engine</code> and <code>status.distro.version</code> are filled from the same record.</p>
 <p>Two things it deliberately does not do. <strong>It does not take the newest version</strong> when <code>packageVersion</code> is left out - the field is required alongside <code>name</code>, so publishing a package never moves a cluster. And <strong>it does not follow a republished version</strong> unless asked: the registry’s content digest for the resolved package lands in <code>status.distro.recordDigest</code> either way, but it only joins the desired state, and so only triggers a converge, with</p>
 <pre><code class="language-sh">kubectl annotate cargoshipcontrolplane fleet \
   controlplane.cluster.x-k8s.io/adopt-republished-package=true
@@ -659,14 +684,40 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <h2 id="what-is-kept-from-cargoships-pattern"><a class="header" href="#what-is-kept-from-cargoships-pattern">What is kept from cargoship’s pattern</a></h2>
 <p>Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, Dependabot with the same grouping and daily cadence, the same pre-commit hooks, a vendored <code>vendor/</code> tree, and <code>.gitattributes</code> grouped by the generator that writes each path. The generator layout is now shared too - <code>magefiles/pkg/gen/...</code>, with the magefile holding no logic of its own.</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied"><a class="header" href="#there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied">There is no rollout, and <code>spec.version</code> changes are refused rather than half-applied</a></h1>
-<p><code>CargoshipControlPlane</code> scales up and scales down. It does not replace machines, and it does not upgrade them in place. A change to <code>spec.version</code> against a converged control plane is reported as unsupported rather than acted on.</p>
+<h1 id="there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><a class="header" href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval">There is no rollout, and a <code>spec.version</code> change needs an operator’s approval</a></h1>
+<p><code>CargoshipControlPlane</code> scales up and scales down. It does not replace machines, and it does not sequence an upgrade. A change to <code>spec.version</code> against a converged control plane is refused on the <code>Converged</code> condition unless <code>controlplane.cluster.x-k8s.io/approve-version-change</code> names the version being asked for.</p>
+<h2 id="what-this-document-used-to-claim-and-what-was-actually-true"><a class="header" href="#what-this-document-used-to-claim-and-what-was-actually-true">What this document used to claim, and what was actually true</a></h2>
+<p>It said a version change was “reported as unsupported rather than acted on”, and the README said it was “rejected rather than half-applied”. Neither was implemented. There are no webhooks in this provider, there was no CEL rule on <code>spec.version</code>, and no check in the reconcile - so what actually happened was:</p>
+<ul>
+<li><code>spec.version</code> was copied onto any new machine and into <code>status.version</code>, and</li>
+<li>if the package moved too, the desired-state fingerprint changed and a converge ran - and <code>action.Apply</code> already registers <code>UpgradeController</code> and <code>UpgradeWorkers</code>, so cargoship upgraded every existing host <strong>in place</strong>, workers in whatever batches <code>spec.apply.workerConcurrent</code> allowed, with nothing in this controller sequencing or supervising it, while</li>
+<li><code>status.upToDateReplicas</code> was the replica count unconditionally, so the resource claimed every machine was current throughout.</li>
+</ul>
+<p>That is the half-applied upgrade this document exists to refuse, reachable by accident. The gate below is what makes the claim true.</p>
+<h2 id="the-gate"><a class="header" href="#the-gate">The gate</a></h2>
+<p><code>versionChange</code> compares <code>status.version</code> - which only a successful converge writes, so it is what the hosts last had installed - against <code>spec.version</code>. When they differ, one of three things happens:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>State</th><th>Reason on <code>Converged</code></th><th>What happens</th></tr>
+</thead>
+<tbody>
+<tr><td>The package has not moved (fingerprint unchanged)</td><td><code>VersionChangeInert</code></td><td>Nothing. The message names <code>spec.distro</code> as the field to change</td></tr>
+<tr><td>The package moved, and no annotation approves the version</td><td><code>VersionChangeRefused</code></td><td>Nothing. The message names the annotation and the value to set</td></tr>
+<tr><td>The package moved and the annotation names <code>spec.version</code></td><td>-</td><td>The converge runs, and upgrades every host in place</td></tr>
+</tbody>
+</table>
+</div>
+<p>The annotation’s <strong>value</strong> is compared with <code>spec.version</code> rather than its presence being checked, so an approval left behind from one change cannot wave through the next.</p>
+<p><code>VersionChangeInert</code> exists because a version bumped on its own installs nothing: <code>converge.DesiredState</code> does not carry <code>spec.version</code> at all, so the fingerprint is unchanged and no converge would run. Approving it would not help. Reporting it as refused would have told an operator to set an annotation that changes nothing, and reporting it as converged would have left the resource claiming a version it is not running. This was found by a test written to assert the approved path, which never ran a second converge.</p>
+<p><strong>The machines’ own versions are deliberately not the gate.</strong> A machine’s <code>spec.version</code> is fixed when it is created and this provider never replaces a machine, so after an in-place upgrade every machine disagrees with the fleet forever - a gate reading them would refuse every converge from then on, and <code>upToDateReplicas</code> computed from them would never recover. <code>upToDateReplicas</code> is instead the whole-fleet answer the fingerprint already gives: the replica count when the last successful converge matches what is wanted now, and zero while a version change is pending or a converge is running.</p>
 <h2 id="why-refusing-is-better-than-trying"><a class="header" href="#why-refusing-is-better-than-trying">Why refusing is better than trying</a></h2>
 <p><code>KubeadmControlPlane</code>’s rollout is the most intricate part of it: surge a new machine, wait for it to join, remove an old one, repeat, while keeping etcd quorum and handling a machine that fails to come up halfway through. Half of that implemented is worse than none of it, because the failure mode is a control plane stuck between two versions with no path forward that the controller knows how to take.</p>
 <p>Cargoship does have the pieces - <code>pkg/phase/65_upgrade_common.go</code> and the engine-config-sync phases upgrade a host in place, draining and waiting for <code>Ready</code> through <code>waitNodeReady</code>. So the shape of an in-place rollout is available and is probably the right one for this provider, since replacing machines throws away the thing cargoship is good at. It is a separate piece of work with its own correctness argument, not an extension of this one.</p>
 <h2 id="what-an-operator-does-meanwhile"><a class="header" href="#what-an-operator-does-meanwhile">What an operator does meanwhile</a></h2>
 <p>Build a new cluster and move workloads, or scale the control plane up with machines created from a template carrying the new version and scale the old ones down - which works, because a scale-up creates a machine with <code>spec.version</code> from the custom resource and the converge installs whatever the package holds.</p>
-<p>The second route is why <code>status.version</code> is set from <code>spec.version</code> rather than observed per machine: with no rollout, every machine that exists was created at the current version. <strong>When rollout lands that stops being true</strong>, and <code>updateStatusCounts</code> has to compare each machine’s version against the desired one to fill in <code>upToDateReplicas</code> honestly. The comment on that function says so; the counts are correct today and will quietly lie the moment a second version can exist.</p>
+<p>Or approve the in-place upgrade with the annotation, which is what the gate above is for: change <code>spec.distro</code> to a package installing the new version, set <code>spec.version</code> to match, annotate, and the next converge walks the hosts. That is not a rollout - nothing is surged, nothing is drained by this controller, and a failure partway leaves a fleet with some hosts upgraded - but it is cargoship’s own upgrade path, supervised by the operator rather than by a controller.</p>
+<p><code>status.version</code> is still written from <code>spec.version</code> on a successful converge rather than observed per machine, because a converge either installed the package everywhere or failed. What changed is that it is now also the gate’s input, so it has to stay honest: it is written <strong>only</strong> in the success branch, never on a pass that merely found the fleet up to date.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines"><a class="header" href="#the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines">The control plane owns the whole fleet, not just the control-plane machines</a></h1>
 <p><code>CargoshipControlPlane</code>’s reconcile lists <strong>every</strong> <code>Machine</code> with the cluster’s name label - control plane and <code>MachineDeployment</code> workers alike - and converges all of them in one <code>cargoship apply</code>. <code>KubeadmControlPlane</code> owns only control-plane machines, and the Cluster API control-plane contract is written on that assumption, so this is a deliberate departure from it.</p>
@@ -717,7 +768,7 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <li><strong><code>packageVersion</code> is required alongside <code>name</code></strong>, rather than defaulting to the newest version recorded. Taking the newest makes the registry the desired state and the custom resource a follower of it, so staging a package on a Friday afternoon would converge a fleet over the weekend.</li>
 <li><strong>A republished version is followed only with <code>controlplane.cluster.x-k8s.io/adopt-republished-package: "true"</code></strong> on the <code>CargoshipControlPlane</code>. Without it the new content digest is reported in <code>status.distro.recordDigest</code> and the fingerprint is unchanged, so an operator can see that the registry moved and decide when the fleet does. The annotation value is matched against <code>"true"</code> exactly; anything else is not consent.</li>
 </ul>
-<p>The asymmetry is the point. Discovery is allowed to answer “what is in this registry” on every reconcile, because reading is free and a listing is a few kilobytes. Acting on a different answer than last time is an upgrade, and this provider has no rollout - a converge onto a package installing another Kubernetes version is refused rather than half-applied, so an automatic one would be a failed reconcile at best. See <a href="#there-is-no-rollout-and-specversion-changes-are-refused-rather-than-half-applied"><code>choice-no-rollout.md</code></a>.</p>
+<p>The asymmetry is the point. Discovery is allowed to answer “what is in this registry” on every reconcile, because reading is free and a listing is a few kilobytes. Acting on a different answer than last time is an upgrade, and this provider has no rollout - a converge onto a package installing another Kubernetes version is refused rather than half-applied, so an automatic one would be a failed reconcile at best. See <a href="#there-is-no-rollout-and-a-specversion-change-needs-an-operators-approval"><code>choice-no-rollout.md</code></a>.</p>
 <h2 id="the-credentials-are-staged-earlier-for-this-path-and-only-this-path"><a class="header" href="#the-credentials-are-staged-earlier-for-this-path-and-only-this-path">The credentials are staged earlier for this path, and only this path</a></h2>
 <p>Resolution reads the registry, so the pull credentials and the CA have to be in place before the reference is resolved rather than afterwards, where the converge picks them up. <code>stageRegistryAccess</code> is called before resolution when <code>spec.distro.name</code> is set and in its original place otherwise, which means a discovering resource rewrites its Docker configuration file on a resync that would not otherwise have touched it. That cost is why it is gated on the path that needs it instead of being hoisted for everybody.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -729,6 +780,19 @@ KeyPath *string `yaml:"keyPath,omitempty" ...`
 <h2 id="one-file-merged-rather-than-one-per-resource"><a class="header" href="#one-file-merged-rather-than-one-per-resource">One file, merged, rather than one per resource</a></h2>
 <p><code>$DOCKER_CONFIG</code> is a process-wide variable, and <code>converge.Runner</code> holds one in-flight converge <em>per resource</em>, so two clusters converge at once. A file per <code>CargoshipControlPlane</code> would mean rewriting the variable underneath a pull that is already reading it.</p>
 <p><code>pkg/dockerconfig.Merge</code> writes one file instead, keyed by registry, under a mutex and through a rename. Two clusters pulling from two registries each find their own entry. Two naming the same registry with different credentials are the case this does not serve: the last converge to start wins, which is recorded as a <code>shortcut:</code> comment beside the merge rather than hidden.</p>
+<h2 id="fromzarfstate-is-a-second-source-for-the-same-file"><a class="header" href="#fromzarfstate-is-a-second-source-for-the-same-file"><code>fromZarfState</code> is a second source for the same file</a></h2>
+<p><code>spec.distro.fromZarfState</code> reads the credentials out of the Zarf deployment in the controller’s own cluster instead of out of a secret an operator wrote, and it changes nothing about the above: <code>zarfstate.Load</code> hands back a username and a password, <code>dockerconfig.MergeCredential</code> assembles the one-registry payload, and the pull reads the same file it always did. The listing that resolves a package by name reads it too - <code>distro.ListMirroredOptions</code> falls back to the Docker credential store when handed no username - so neither half has to be threaded through a function signature.</p>
+<p>What it saves is the two secrets, which were the air-gapped operator’s only remaining manual step: <code>zarf tools get-creds</code>, a <code>kubectl create secret docker-registry</code> whose <code>--docker-server</code> had to match the registry string exactly, and the registry CA extracted out of <code>zarf-registry-server-tls</code> by hand. Both are already in the cluster, and <code>cargoship mirror --from-zarf-state</code> already read them - which is why <a href="https://github.com/colonel-byte/cargoship/pull/1118">cargoship 0.42.1 exports <code>pkg/zarfstate</code></a> rather than this repository decoding zarf’s state JSON a second time.</p>
+<p><strong>The registry address is not read from that state, and that is the part worth knowing.</strong> Zarf records where a <em>node</em> reaches the registry - a NodePort on the host, or an external address - and a controller inside the cluster wants the service, which the state does not carry at all; <code>cargoship mirror</code> holds <code>zarf/zarf-docker-registry:5000</code> as a constant for the same reason. So <code>spec.distro.registry</code> is still named by the operator, and <code>fromZarfState</code> requires it: the Docker credential store is keyed by the host a pull asks for, so there has to be one to key the entry under.</p>
+<h2 id="a-zarf-managed-mtls-registry-needs-no-client-certificate-measured-rather-than-assumed"><a class="header" href="#a-zarf-managed-mtls-registry-needs-no-client-certificate-measured-rather-than-assumed">A Zarf-managed-mTLS registry needs no client certificate, measured rather than assumed</a></h2>
+<p><code>zarfstate.Registry.UsesMTLS()</code> reports true for any <code>mtlsStrategy</code> other than <code>none</code>, and the obvious reading - that such a registry cannot be pulled from without a client certificate, which nothing here presents - is wrong. It was implemented that way first, as a refused reconcile.</p>
+<p>Zarf’s registry chart sets the client-auth mode to <code>verify-client-cert-if-given</code>:</p>
+<pre><code># packages/init/v1alpha1/zarf-registry/chart/templates/_helpers.tpl
+"clientcas" (list "/certs/server/ca.crt")
+"clientauth" "verify-client-cert-if-given"
+</code></pre>
+<p>That is <code>tls.VerifyClientCertIfGiven</code>: a certificate is verified where the client offers one, and a client that offers none is still served. The certificate Zarf issues - <code>zarf-registry-client-tls</code>, common name <code>zarf-registry-client</code> - is mounted into the per-node registry proxy, which is a <code>socat</code> presenting it on a node’s behalf, and not into anything a management-cluster controller runs. So the CA out of <code>zarf-registry-server-tls</code> is the whole requirement, and <code>UsesMTLS()</code> is logged at <code>V(1)</code> rather than acted on.</p>
+<p>The case this does not cover is a registry that genuinely requires one - Harbor or Nexus configured for it, or a Zarf registry whose <code>clientauth</code> an operator overrode through <code>secrets.configData</code>, which the chart’s <code>mergeOverwrite</code> allows. That needs a client certificate on the pull, and there is nowhere to put one: <code>images.ClientOptions</code> carries <code>CABundle</code> and builds the <code>tls.Config</code> itself, with no <code>Certificates</code> and no transport to substitute, and <code>distro.LoadOptions</code> and <code>distro.ListMirroredOptions</code> pass their own <code>CABundle</code> down the same path. Supporting it is a cargoship change first - a client certificate beside <code>CABundle</code> in those three option structs - and a <code>clientCertSecretRef</code> here second.</p>
 <h2 id="the-blast-radius-is-smaller-than-the-ssh-keys"><a class="header" href="#the-blast-radius-is-smaller-than-the-ssh-keys">The blast radius is smaller than the SSH key’s</a></h2>
 <p>Worth saying plainly, because “a secret on a disk” is where review attention goes. The SSH key opens a root shell on every machine in the fleet; these credentials pull a public artifact from a registry, and Zarf’s <code>zarf-pull</code> user cannot even push to it. The file is <code>0600</code> on a volume only the controller mounts, in a pod running as <code>65532</code> with no shell in the image.</p>
 <div style="break-before: page; page-break-before: always;"></div>
