@@ -11,6 +11,10 @@
 # `go mod vendor`
 vendor/** linguist-vendored
 
+# `make vendor` (magefiles/pkg/gen/osv). Written into the vendored tree rather than copied into
+# it, so they are generated as well as vendored; vendor/** above already collapses them.
+vendor/**/osv-scanner.toml linguist-generated
+
 # `make generate-deepcopy` (controller-gen object)
 **/zz_generated.deepcopy.go linguist-generated
 

@@ -80,6 +80,26 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 		output:crd:artifacts:config=controlplane/config/crd/bases \
 		output:rbac:artifacts:config=controlplane/config/rbac
 
+.PHONY: vendor
+vendor: ## Re-vendor dependencies. Use this, not `go mod vendor` directly.
+	go mod vendor
+	$(MAGE) generate:osvOverrides
+
+.PHONY: vendor-osv
+vendor-osv: ## Rewrite the vendored osv-scanner.toml overrides without re-vendoring.
+	# `go mod vendor` copies every file that sits in the directory of a package this module
+	# imports, which for three dependencies means a requirements.txt pinning their own Python
+	# test or docs tooling. Nothing here installs them, but osv-scanner walks the whole tree and
+	# scores what it finds there against this repository. The generated overrides tell it to skip
+	# that ecosystem, and they have to sit beside each manifest because that is the only place
+	# osv-scanner reads configuration from. Separate from `vendor` because
+	# .github/workflows/fix-vendor-osv.yaml runs this against a tree it must not re-vendor.
+	$(MAGE) generate:osvOverrides
+
+.PHONY: verify-vendor
+verify-vendor: ## Fail if an override is missing or a new non-Go manifest is uncovered.
+	$(MAGE) generate:verifyOSVOverrides
+
 ##@ Test
 
 .PHONY: test

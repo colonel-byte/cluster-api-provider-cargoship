@@ -37,7 +37,21 @@ jobs:
 
       # vendor/ is committed and every CI job builds with -mod=vendor, so a stale tree means CI
       # tests different code than go.mod declares -- silently, and in the direction of passing.
+      # `make vendor`, not `go mod vendor`: the target also writes the three generated
+      # osv-scanner.toml files that `go mod vendor` deletes along with the rest of the tree, so a
+      # bare `go mod vendor` here would report them as a diff. See docs/agent/choice-osv-vendor-overrides.md.
       - name: Check vendor/ matches go.mod
         run: |
-          go mod vendor
+          make vendor
           git diff --exit-code vendor/
+
+      # The diff above catches a deleted or edited override. This catches the other half: a
+      # dependency bump that brings in a module carrying a lockfile no override covers, which
+      # would otherwise drop the Scorecard score on some later run with nothing in the diff to
+      # point at. Both that and a dropped module need an edit to Overrides in
+      # magefiles/pkg/gen/osv, which is why they are left to fail here.
+      #
+      # Dependabot re-vendors on every gomod update and trips the step above every time;
+      # fix-vendor-osv.yaml pushes the regenerated overrides back onto its branch.
+      - name: Check the vendored osv-scanner overrides
+        run: make verify-vendor

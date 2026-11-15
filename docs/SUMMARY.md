@@ -25,6 +25,7 @@
 - [choice-makefile-not-mage](agent/choice-makefile-not-mage.md)
 - [choice-no-rollout](agent/choice-no-rollout.md)
 - [choice-one-converge](agent/choice-one-converge.md)
+- [choice-osv-vendor-overrides](agent/choice-osv-vendor-overrides.md)
 - [choice-record-discovery](agent/choice-record-discovery.md)
 - [choice-registry-credentials](agent/choice-registry-credentials.md)
 - [choice-tool-dependencies](agent/choice-tool-dependencies.md)
