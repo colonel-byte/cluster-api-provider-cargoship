@@ -132,3 +132,5 @@ kubectl annotate cargoshipcontrolplane fleet \
 ```
 
 Both are explained in [the decision record](../agent/choice-record-discovery.md).
+
+Written once per cluster *shape* rather than once per cluster, if you compose a `ClusterClass`: the four fields above live in the `CargoshipControlPlaneTemplate`'s `spec.template.spec.distro`, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto `/spec/template/spec/distro/packageVersion`. See [Composing a ClusterClass](clusterclass.md).

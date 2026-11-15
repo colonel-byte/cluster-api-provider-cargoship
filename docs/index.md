@@ -119,6 +119,7 @@ Stated plainly, because each of these is a thing an operator will reach for:
 - **No encrypted registry credentials.** Cargoship's keyring type is not reachable from outside its module.
 - **No client certificate to the package registry.** A pull secret and the registry's CA are both handled - see [`docs/guides/registry.md`](guides/registry.md) - but nothing presents a client certificate, so a registry that *requires* one cannot be pulled from. A Zarf-managed registry is not one of those: it verifies a client certificate where one is offered and never demands it.
 - **No MachineHealthCheck remediation**, etcd backup or restore.
+- **A `ClusterClass` composes, but a topology upgrade is still in place.** `CargoshipControlPlaneTemplate` and `CargoshipConfigTemplate` are the two halves a class needs - see [`docs/guides/clusterclass.md`](guides/clusterclass.md) - and editing `version:` in a topology means an unsequenced in-place upgrade rather than a rollout, approved through the topology's own annotations. There is no `clusterctl generate cluster` flavor yet.
 
 ## Development
 

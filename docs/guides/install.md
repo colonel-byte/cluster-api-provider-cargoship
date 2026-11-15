@@ -57,6 +57,7 @@ Three things it does not do, each of which will otherwise be found out later:
 
 - **It does not install core Cluster API.** `clusterctl init` is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.
 - **It does not carry the cargoship distro packages.** The control-plane controller pulls the package named in `spec.distro.ociRef` over OCI at converge time, from inside the management cluster. Mirror it to a registry the cluster can reach and point the reference there - [pulling it from a Zarf registry](registry.md) covers the credentials and the certificate that usually come with one.
+- **It does not stop a `ClusterClass` working.** The package deploys the same component manifests `clusterctl` would, so all three CRDs come with it - including `CargoshipControlPlaneTemplate`, the kind a class names as its control plane. A class, its templates and a `Cluster` with a topology are ordinary objects an operator applies afterwards; see [Composing a ClusterClass](clusterclass.md), and remember that `CLUSTER_TOPOLOGY` is a flag on core Cluster API, which this package does not install.
 - **`clusterctl` does not know the provider is installed.** The component manifests carry the Cluster API contract labels, which is what the core controllers read, but not the `clusterctl.cluster.x-k8s.io` bookkeeping `clusterctl init` adds - so `clusterctl upgrade` will not see this provider. Upgrade it by deploying the next package.
 
 ## The SSH key
