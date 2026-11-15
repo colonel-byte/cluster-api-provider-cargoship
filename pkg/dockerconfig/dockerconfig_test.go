@@ -142,3 +142,71 @@ func keys(m map[string]json.RawMessage) []string {
 	}
 	return out
 }
+
+// MergeCredential is the path a Zarf deployment's own state takes, where there is no
+// dockerconfigjson secret to read. All three fields are written because which one a client reads
+// is not ours to decide.
+func TestMergeCredential(t *testing.T) {
+	dir := useTempDir(t)
+
+	if err := MergeCredential("zarf-docker-registry.zarf.svc.cluster.local:5000", "zarf-pull", "secret"); err != nil {
+		t.Fatalf("MergeCredential() = %v, want no error", err)
+	}
+
+	auths := readAuths(t, filepath.Join(dir, fileName))
+	entry, ok := auths["zarf-docker-registry.zarf.svc.cluster.local:5000"]
+	if !ok {
+		t.Fatalf("the config file holds %v, want an entry for the zarf registry", keys(auths))
+	}
+	// base64 of zarf-pull:secret, which is what a docker-shaped client reads first.
+	want := `{"username":"zarf-pull","password":"secret","auth":"emFyZi1wdWxsOnNlY3JldA=="}`
+	if got := string(entry); got != want {
+		t.Fatalf("the entry is %s, want %s", got, want)
+	}
+}
+
+func TestMergeCredentialRejectsWhatCannotBeUsed(t *testing.T) {
+	cases := []struct {
+		name     string
+		host     string
+		username string
+		password string
+		want     string
+	}{
+		{
+			name:     "no host",
+			host:     "",
+			username: "zarf-pull",
+			password: "secret",
+			want:     "registry host is required",
+		},
+		{
+			name:     "no password",
+			host:     "ghcr.io",
+			username: "zarf-pull",
+			password: "",
+			want:     "no username and password",
+		},
+		{
+			name:     "no username",
+			host:     "ghcr.io",
+			username: "",
+			password: "secret",
+			want:     "no username and password",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			useTempDir(t)
+
+			err := MergeCredential(tt.host, tt.username, tt.password)
+			if err == nil {
+				t.Fatal("MergeCredential() = nil, want an error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("MergeCredential() error = %q, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}

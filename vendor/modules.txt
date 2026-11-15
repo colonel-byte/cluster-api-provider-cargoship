@@ -250,6 +250,7 @@ github.com/colonel-byte/cargoship/pkg/schema
 github.com/colonel-byte/cargoship/pkg/signing
 github.com/colonel-byte/cargoship/pkg/utils
 github.com/colonel-byte/cargoship/pkg/zarfpackage
+github.com/colonel-byte/cargoship/pkg/zarfstate
 github.com/colonel-byte/cargoship/types
 github.com/colonel-byte/cargoship/types/distrocfg
 github.com/colonel-byte/cargoship/types/distrocfg/registry

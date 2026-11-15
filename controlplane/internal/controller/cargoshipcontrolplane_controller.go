@@ -19,14 +19,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/colonel-byte/cargoship/pkg/distro"
+	"github.com/colonel-byte/cargoship/pkg/zarfstate"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiutil "sigs.k8s.io/cluster-api/util"
@@ -65,6 +68,14 @@ const (
 // implementation outside tests is converge.Apply, which SetupWithManager installs.
 type ConvergeFunc func(ctx context.Context, inv *converge.Inventory, opts converge.Options) (*converge.Run, error)
 
+// ZarfStateFunc reads the registry half of a Zarf deployment's state, and the certificate
+// authority for that registry where the cluster holds one.
+//
+// One function for both because a caller wants both or neither, and because it lets a test stand
+// in for a Zarf deployment without one. The one implementation outside tests is zarfState, which
+// SetupWithManager installs.
+type ZarfStateFunc func(ctx context.Context, opts zarfstate.Options) (zarfstate.Registry, []byte, error)
+
 // CargoshipControlPlaneReconciler converges a fleet to a cargoship package.
 type CargoshipControlPlaneReconciler struct {
 	client.Client
@@ -77,6 +88,12 @@ type CargoshipControlPlaneReconciler struct {
 	// Records reads what a registry holds, for a spec.distro that names a package rather than
 	// referencing one. Replaced in tests.
 	Records RecordLister
+	// ZarfState reads a Zarf deployment's registry credentials, for a spec.distro that asks for
+	// them. Replaced in tests.
+	ZarfState ZarfStateFunc
+	// RESTConfig is the connection ZarfState reads over. It is the manager's own, so the
+	// credentials are the controller's service account rather than a kubeconfig it does not have.
+	RESTConfig *rest.Config
 }
 
 // +kubebuilder:rbac:groups=controlplane.cluster.x-k8s.io,resources=cargoshipcontrolplanes,verbs=get;list;watch;create;update;patch;delete
@@ -369,6 +386,10 @@ func (r *CargoshipControlPlaneReconciler) stageRegistryAccess(
 	ctx context.Context,
 	cp *controlplanev1.CargoshipControlPlane,
 ) ([]byte, error) {
+	if cp.Spec.Distro.FromZarfState {
+		return r.stageFromZarfState(ctx, cp)
+	}
+
 	if err := r.writePullSecret(ctx, cp); err != nil {
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "PullSecretUnusable", err.Error())
 		return nil, err
@@ -380,6 +401,78 @@ func (r *CargoshipControlPlaneReconciler) stageRegistryAccess(
 		return nil, err
 	}
 	return caBundle, nil
+}
+
+// stageFromZarfState does the same for a registry a Zarf deployment stood up, reading what it
+// needs out of that deployment's own state rather than out of secrets an operator wrote.
+//
+// The credentials go into the same Docker configuration file a pull secret would, because that
+// file is still the only place the pull reads them from. The listing that resolves the package
+// reads it too -- distro.ListMirroredOptions falls back to it when handed no username -- so
+// nothing has to be threaded through for either.
+func (r *CargoshipControlPlaneReconciler) stageFromZarfState(
+	ctx context.Context,
+	cp *controlplanev1.CargoshipControlPlane,
+) ([]byte, error) {
+	registry, caBundle, err := r.ZarfState(ctx, zarfstate.Options{RESTConfig: r.RESTConfig})
+	if err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "ZarfStateUnreadable", err.Error())
+		return nil, err
+	}
+
+	// Attempted rather than refused, which is the opposite of what the state's mTLS strategy
+	// reads like. Zarf's registry is configured `clientauth: verify-client-cert-if-given`
+	// (packages/init/.../zarf-registry/chart/templates/_helpers.tpl), so a client certificate is
+	// verified where one is offered and never required: the certificate Zarf issues belongs to
+	// the per-node registry proxy, which presents it on a node's behalf. A controller holding
+	// only the CA connects. See docs/agent/choice-registry-credentials.md.
+	if registry.UsesMTLS() {
+		log.FromContext(ctx).V(1).Info("the zarf registry records an mTLS strategy; "+
+			"connecting with its CA and no client certificate of our own",
+			"mtlsStrategy", registry.MTLSStrategy)
+	}
+
+	// The pull-only pair, because reading records and pulling a package is all this does. Zarf
+	// writes both pairs, so the fallback is for a state somebody assembled by hand rather than
+	// for anything zarf produces.
+	username, password := registry.PullUsername, registry.PullPassword
+	if username == "" || password == "" {
+		username, password = registry.PushUsername, registry.PushPassword
+	}
+
+	if err := dockerconfig.MergeCredential(registryHost(cp.Spec.Distro.Registry), username, password); err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "ZarfStateUnusable", err.Error())
+		return nil, err
+	}
+	return caBundle, nil
+}
+
+// zarfState reads a Zarf deployment's registry and the CA that signed its certificate.
+//
+// A missing CA is not a failure. The secret only exists where Zarf manages the registry's TLS, so
+// a registry serving a publicly signed certificate -- an external one, usually -- has none, and
+// there is nothing extra for the pull to trust.
+func zarfState(ctx context.Context, opts zarfstate.Options) (zarfstate.Registry, []byte, error) {
+	registry, err := zarfstate.Load(ctx, opts)
+	if err != nil {
+		return zarfstate.Registry{}, nil, err
+	}
+
+	caBundle, err := zarfstate.LoadCABundle(ctx, opts)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return zarfstate.Registry{}, nil, err
+		}
+		caBundle = nil
+	}
+	return registry, caBundle, nil
+}
+
+// registryHost is spec.distro.registry with any repository prefix taken off, which is how the
+// Docker credential store keys an entry. See dockerconfig.MergeCredential.
+func registryHost(registry string) string {
+	host, _, _ := strings.Cut(strings.TrimSpace(registry), "/")
+	return host
 }
 
 // caBundle returns the certificates spec.distro.caBundleSecretRef names, and nil when the field is
@@ -640,6 +733,12 @@ func (r *CargoshipControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) err
 	}
 	if r.Records == nil {
 		r.Records = distro.ListMirrored
+	}
+	if r.ZarfState == nil {
+		r.ZarfState = zarfState
+	}
+	if r.RESTConfig == nil {
+		r.RESTConfig = mgr.GetConfig()
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).

@@ -159,8 +159,14 @@ type CargoshipControlPlaneMachineTemplateSpec struct {
 // second reads the records `cargoship publish --record` and `cargoship mirror` leave behind, so it
 // works only against a registry those filled - which, in an air gap, is the registry the fleet
 // pulls from anyway.
+// Each rule guards an optional boolean with has() before reading it. A boolean that was never set
+// is absent from the stored object rather than false, and reading an absent key is an evaluation
+// error that rejects the resource -- `!self.fromZarfState || ...` refused every custom resource
+// that did not mention the field, which the envtest suite caught and nothing else would have.
 // +kubebuilder:validation:XValidation:rule="has(self.ociRef) != (has(self.registry) && has(self.name))",message="set either ociRef, or both registry and name"
 // +kubebuilder:validation:XValidation:rule="has(self.name) == has(self.packageVersion)",message="a discovered package needs both name and packageVersion"
+// +kubebuilder:validation:XValidation:rule="!has(self.fromZarfState) || !self.fromZarfState || has(self.registry)",message="fromZarfState needs registry, which is the host its credentials are stored under"
+// +kubebuilder:validation:XValidation:rule="!has(self.fromZarfState) || !self.fromZarfState || (!has(self.pullSecretRef) && !has(self.caBundleSecretRef))",message="fromZarfState supplies the credentials and the CA, so pullSecretRef and caBundleSecretRef must be unset"
 type DistroSource struct {
 	// ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
 	//
@@ -208,6 +214,24 @@ type DistroSource struct {
 	// +optional
 	// +kubebuilder:validation:Enum=amd64;arm64
 	Arch string `json:"arch,omitempty"`
+
+	// fromZarfState reads the registry's credentials and its certificate authority out of the
+	// Zarf deployment in the controller's own cluster, instead of from pullSecretRef and
+	// caBundleSecretRef.
+	//
+	// This is the air-gapped case with nothing to wire up: Zarf generated the credentials and
+	// signed the registry's certificate itself, and both are already in the management cluster
+	// as the `zarf-state` and `zarf-registry-server-tls` secrets. The pull-only credentials are
+	// preferred over the push pair, and a registry Zarf manages mTLS for is reached with that
+	// CA and no client certificate: Zarf requires one only where it is offered, and the one it
+	// issues belongs to the per-node registry proxy.
+	//
+	// registry is still named here rather than read from that state. Zarf records the address a
+	// node reaches the registry at - a NodePort or an external host - and a controller inside
+	// the cluster wants the service, which the state does not carry. See
+	// docs/agent/choice-registry-credentials.md.
+	// +optional
+	FromZarfState bool `json:"fromZarfState,omitempty"`
 
 	// pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses
 	// anonymous access.
