@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -91,6 +90,10 @@ type CargoshipControlPlaneReconciler struct {
 	// ZarfState reads a Zarf deployment's registry credentials, for a spec.distro that asks for
 	// them. Replaced in tests.
 	ZarfState ZarfStateFunc
+	// SecretNamespaces are the namespaces other than a control plane's own that it may name a
+	// secret in. Empty refuses every cross-namespace reference; see the flag's comment in
+	// pkg/manager for why that is the default.
+	SecretNamespaces []string
 	// RESTConfig is the connection ZarfState reads over. It is the manager's own, so the
 	// credentials are the controller's service account rather than a kubeconfig it does not have.
 	RESTConfig *rest.Config
@@ -527,9 +530,9 @@ func (r *CargoshipControlPlaneReconciler) caBundle(
 		return nil, nil
 	}
 
-	key := types.NamespacedName{
-		Namespace: cp.Namespace,
-		Name:      cp.Spec.Distro.CABundleSecretRef.Name,
+	key, err := cp.Spec.Distro.CABundleSecretRef.Key(cp.Namespace, r.SecretNamespaces)
+	if err != nil {
+		return nil, err
 	}
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, key, secret); err != nil {
@@ -557,9 +560,9 @@ func (r *CargoshipControlPlaneReconciler) writePullSecret(
 		return nil
 	}
 
-	key := types.NamespacedName{
-		Namespace: cp.Namespace,
-		Name:      cp.Spec.Distro.PullSecretRef.Name,
+	key, err := cp.Spec.Distro.PullSecretRef.Key(cp.Namespace, r.SecretNamespaces)
+	if err != nil {
+		return err
 	}
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, key, secret); err != nil {
@@ -600,9 +603,9 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 	}
 
 	secret := &corev1.Secret{}
-	key := types.NamespacedName{
-		Namespace: cp.Namespace,
-		Name:      cp.Spec.SSH.PrivateKeySecretRef.Name,
+	key, err := cp.Spec.SSH.PrivateKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)
+	if err != nil {
+		return nil, nil, err
 	}
 	if err := r.Get(ctx, key, secret); err != nil {
 		return nil, nil, fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)

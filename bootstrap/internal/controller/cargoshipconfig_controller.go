@@ -53,6 +53,10 @@ const waitForOwner = 2 * time.Second
 // bootstrap/internal/cloudinit.
 type CargoshipConfigReconciler struct {
 	client.Client
+	// SecretNamespaces are the namespaces other than a control plane's own that it may name a
+	// secret in. Empty refuses every cross-namespace reference; see the flag's comment in
+	// pkg/manager for why that is the default.
+	SecretNamespaces []string
 }
 
 // +kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=cargoshipconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -187,9 +191,9 @@ func (r *CargoshipConfigReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 // machines that boot correctly and refuse every connection.
 func (r *CargoshipConfigReconciler) publicKey(ctx context.Context, cp *controlplanev1.CargoshipControlPlane) (string, error) {
 	secret := &corev1.Secret{}
-	key := types.NamespacedName{
-		Namespace: cp.Namespace,
-		Name:      cp.Spec.SSH.PrivateKeySecretRef.Name,
+	key, err := cp.Spec.SSH.PrivateKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)
+	if err != nil {
+		return "", err
 	}
 	if err := r.Get(ctx, key, secret); err != nil {
 		return "", fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)

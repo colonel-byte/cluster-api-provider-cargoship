@@ -15,8 +15,11 @@
 package v1alpha1
 
 import (
+	"fmt"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -257,7 +260,7 @@ type DistroSource struct {
 	// config file the controller keeps on its cache volume, because that file is the only place
 	// the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
 	// +optional
-	PullSecretRef *LocalObjectReference `json:"pullSecretRef,omitempty"`
+	PullSecretRef *SecretReference `json:"pullSecretRef,omitempty"`
 
 	// caBundleSecretRef is a secret holding PEM-encoded certificates to trust when pulling the
 	// package, in its "ca.crt" key. They are trusted in addition to the controller's own roots,
@@ -266,7 +269,7 @@ type DistroSource struct {
 	// This is the way to pull from a registry serving a certificate nothing public signed - a
 	// Zarf registry, usually. Prefer it to insecureSkipTLSVerify, which verifies nothing at all.
 	// +optional
-	CABundleSecretRef *LocalObjectReference `json:"caBundleSecretRef,omitempty"`
+	CABundleSecretRef *SecretReference `json:"caBundleSecretRef,omitempty"`
 
 	// insecureSkipTLSVerify accepts the registry's certificate without verifying it, rather than
 	// trusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH
@@ -296,7 +299,7 @@ type SSHConfig struct {
 	// written to the pod's filesystem, so the controller needs no writable mount for it and a
 	// container compromise has to read process memory rather than a file.
 	// +required
-	PrivateKeySecretRef LocalObjectReference `json:"privateKeySecretRef,omitempty,omitzero"`
+	PrivateKeySecretRef SecretReference `json:"privateKeySecretRef,omitempty,omitzero"`
 
 	// useSudo runs privileged commands through sudo rather than as the login user. Needed for any
 	// user that is not root, which should be every user.
@@ -352,13 +355,43 @@ type ApplyConfig struct {
 	DriftIntervalSeconds int32 `json:"driftIntervalSeconds,omitempty"`
 }
 
-// LocalObjectReference names an object in the same namespace.
-type LocalObjectReference struct {
-	// name of the referenced object.
+// SecretReference names a secret, in the referring object's namespace by default.
+type SecretReference struct {
+	// name of the referenced secret.
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
 	Name string `json:"name,omitempty"`
+
+	// namespace of the referenced secret. Empty means the namespace of the object holding this
+	// reference.
+	//
+	// A namespace other than that one is refused unless the controller was started with
+	// --secret-namespaces naming it, because reading it would otherwise be a credential the
+	// referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	Namespace string `json:"namespace,omitempty"`
+}
+
+// Key is the secret this reference names, as seen from an object in ownerNamespace.
+//
+// allowed is the controller's --secret-namespaces list; "*" in it permits any namespace. A
+// cross-namespace reference to a namespace not in the list is an error rather than a fallback to
+// ownerNamespace, because silently reading a different secret than the one named is worse than
+// refusing.
+func (r SecretReference) Key(ownerNamespace string, allowed []string) (types.NamespacedName, error) {
+	if r.Namespace == "" || r.Namespace == ownerNamespace {
+		return types.NamespacedName{Namespace: ownerNamespace, Name: r.Name}, nil
+	}
+	for _, ns := range allowed {
+		if ns == "*" || ns == r.Namespace {
+			return types.NamespacedName{Namespace: r.Namespace, Name: r.Name}, nil
+		}
+	}
+	return types.NamespacedName{}, fmt.Errorf(
+		"secret %s/%s is in another namespace than %s, which this controller was not started with --secret-namespaces for",
+		r.Namespace, r.Name, ownerNamespace)
 }
 
 // CargoshipControlPlaneStatus is the observed state of a CargoshipControlPlane.

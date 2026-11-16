@@ -188,9 +188,19 @@ spec:
                               Zarf registry, usually. Prefer it to insecureSkipTLSVerify, which verifies nothing at all.
                             properties:
                               name:
-                                description: name of the referenced object.
+                                description: name of the referenced secret.
                                 maxLength: 253
                                 minLength: 1
+                                type: string
+                              namespace:
+                                description: |-
+                                  namespace of the referenced secret. Empty means the namespace of the object holding this
+                                  reference.
+
+                                  A namespace other than that one is refused unless the controller was started with
+                                  --secret-namespaces naming it, because reading it would otherwise be a credential the
+                                  referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+                                maxLength: 63
                                 type: string
                             required:
                             - name
@@ -260,9 +270,19 @@ spec:
                               the pull reads credentials from; see docs/agent/choice-registry-credentials.md.
                             properties:
                               name:
-                                description: name of the referenced object.
+                                description: name of the referenced secret.
                                 maxLength: 253
                                 minLength: 1
+                                type: string
+                              namespace:
+                                description: |-
+                                  namespace of the referenced secret. Empty means the namespace of the object holding this
+                                  reference.
+
+                                  A namespace other than that one is refused unless the controller was started with
+                                  --secret-namespaces naming it, because reading it would otherwise be a credential the
+                                  referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+                                maxLength: 63
                                 type: string
                             required:
                             - name
@@ -353,9 +373,19 @@ spec:
                               container compromise has to read process memory rather than a file.
                             properties:
                               name:
-                                description: name of the referenced object.
+                                description: name of the referenced secret.
                                 maxLength: 253
                                 minLength: 1
+                                type: string
+                              namespace:
+                                description: |-
+                                  namespace of the referenced secret. Empty means the namespace of the object holding this
+                                  reference.
+
+                                  A namespace other than that one is refused unless the controller was started with
+                                  --secret-namespaces naming it, because reading it would otherwise be a credential the
+                                  referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+                                maxLength: 63
                                 type: string
                             required:
                             - name

@@ -43,7 +43,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := (&controller.CargoshipConfigReconciler{Client: mgr.GetClient()}).SetupWithManager(mgr); err != nil {
+	reconciler := &controller.CargoshipConfigReconciler{
+		Client: mgr.GetClient(),
+		// The same list the control-plane provider is given: this is the other half of the same
+		// reference, and the two disagreeing would mean a key the control plane connects with and
+		// no matching authorized-keys line on the machine.
+		SecretNamespaces: opts.SecretNamespaces,
+	}
+	if err := reconciler.SetupWithManager(mgr); err != nil {
 		ctrl.Log.Error(err, "unable to set up the CargoshipConfig controller")
 		os.Exit(1)
 	}

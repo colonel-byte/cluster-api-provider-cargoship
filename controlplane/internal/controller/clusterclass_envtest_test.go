@@ -56,7 +56,7 @@ func TestClusterClassReferencesTheControlPlaneTemplate(t *testing.T) {
 					},
 					SSH: controlplanev1.SSHConfig{
 						User:                "rocky",
-						PrivateKeySecretRef: controlplanev1.LocalObjectReference{Name: "fleet-ssh"},
+						PrivateKeySecretRef: controlplanev1.SecretReference{Name: "fleet-ssh"},
 					},
 					Apply: controlplanev1.ApplyConfig{
 						ModifyHosts:    true,
@@ -135,7 +135,7 @@ func TestClusterClassTemplateValidatesTheDistroSource(t *testing.T) {
 					},
 					SSH: controlplanev1.SSHConfig{
 						User:                "rocky",
-						PrivateKeySecretRef: controlplanev1.LocalObjectReference{Name: "fleet-ssh"},
+						PrivateKeySecretRef: controlplanev1.SecretReference{Name: "fleet-ssh"},
 					},
 				},
 			},

@@ -122,7 +122,7 @@ func TestDistroSourceValidation(t *testing.T) {
 				Registry:       "zarf-docker-registry.zarf.svc.cluster.local:5000",
 				Name:           "k3s",
 				PackageVersion: "1.36.1",
-				PullSecretRef:  &controlplanev1.LocalObjectReference{Name: "zarf-registry"},
+				PullSecretRef:  &controlplanev1.SecretReference{Name: "zarf-registry"},
 			},
 			wantErr: "pullSecretRef and caBundleSecretRef must be unset",
 		},
@@ -133,7 +133,7 @@ func TestDistroSourceValidation(t *testing.T) {
 				Registry:          "zarf-docker-registry.zarf.svc.cluster.local:5000",
 				Name:              "k3s",
 				PackageVersion:    "1.36.1",
-				CABundleSecretRef: &controlplanev1.LocalObjectReference{Name: "zarf-registry-ca"},
+				CABundleSecretRef: &controlplanev1.SecretReference{Name: "zarf-registry-ca"},
 			},
 			wantErr: "pullSecretRef and caBundleSecretRef must be unset",
 		},
@@ -166,7 +166,7 @@ func TestDistroSourceValidation(t *testing.T) {
 					Distro: tt.distro,
 					SSH: controlplanev1.SSHConfig{
 						User:                "rocky",
-						PrivateKeySecretRef: controlplanev1.LocalObjectReference{Name: "fleet-ssh"},
+						PrivateKeySecretRef: controlplanev1.SecretReference{Name: "fleet-ssh"},
 					},
 				},
 			}
