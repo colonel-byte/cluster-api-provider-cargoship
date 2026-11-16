@@ -41,7 +41,7 @@ make release-manifests  # the three files clusterctl downloads
 make help             # everything else
 ```
 
-The repository vendors its dependencies and every CI job builds with `-mod=vendor`, so all of the above works with no network access. `make test-envtest` is wired up and has **no tests behind it yet**; see [`docs/dev/e2e-tests.md`](docs/dev/e2e-tests.md) for what that leaves uncovered and why the Docker infrastructure provider cannot be used to cover it.
+The repository vendors its dependencies and every CI job builds with `-mod=vendor`, so all of the above works with no network access. `make test-envtest` drives both controllers against a real API server with the cargoship apply stubbed out, so the reconcile state machine is covered and **a converge against real hosts still is not**; see [`docs/dev/e2e-tests.md`](docs/dev/e2e-tests.md) for what that leaves uncovered and why the Docker infrastructure provider cannot be used to cover it.
 
 ## Three constraints that look reversible and are not
 
