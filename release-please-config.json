@@ -21,7 +21,12 @@
       ],
       "extra-files": [
         "docs/guides/install.md",
-        "zarf.yaml"
+        "zarf.yaml",
+        "metadata.yaml",
+        "manifest/turtle/capi-provider-bootstrap.yaml",
+        "manifest/turtle/capi-provider-control-plane.yaml",
+        "manifest/turtle/bootstrap/kustomization.yaml",
+        "manifest/turtle/control-plane/kustomization.yaml"
       ]
     }
   },

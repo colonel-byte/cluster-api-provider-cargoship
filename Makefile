@@ -173,10 +173,11 @@ docker-build: ## Build both controller images.
 
 .PHONY: release-manifests
 release-manifests: manifests ## Render the component manifests clusterctl installs.
+	rm -rf $(RELEASE_DIR)
 	mkdir -p $(RELEASE_DIR)
-	cd bootstrap/config/manager && $(KUSTOMIZE) edit set image controller=$(BOOTSTRAP_IMG)
+	cd bootstrap/config/manager    && $(KUSTOMIZE) edit set image controller=$(BOOTSTRAP_IMG)
 	cd controlplane/config/manager && $(KUSTOMIZE) edit set image controller=$(CONTROLPLANE_IMG)
-	$(KUSTOMIZE) build bootstrap/config/default > $(RELEASE_DIR)/bootstrap-components.yaml
+	$(KUSTOMIZE) build bootstrap/config/default    > $(RELEASE_DIR)/bootstrap-components.yaml
 	$(KUSTOMIZE) build controlplane/config/default > $(RELEASE_DIR)/control-plane-components.yaml
 	cp metadata.yaml $(RELEASE_DIR)/metadata.yaml
 
@@ -212,6 +213,18 @@ ZARF_CREATE_FLAGS += $(if $(COSIGN_KEY),--signing-key env://COSIGN_KEY --signing
 .PHONY: zarf-package
 zarf-package: ## Build the air-gapped Zarf package. Needs the release's images to be published.
 	$(MAKE) release-manifests TAG=$(ZARF_VERSION)
+	# The three files the rancher-turtle-artifacts component's ConfigMaps embed, staged beside the
+	# kustomizations that name them. Copied here rather than written by release-manifests, which
+	# runs at whatever TAG its caller passes -- `dev` from a bare run, `smoke` in install-smoke,
+	# the release version under goreleaser -- and would leave a ConfigMap named for one version
+	# holding components built for another. Only this target pins TAG, so only this target stages
+	# them. Not cleaned first: every one is overwritten on the way through, and a file that stops
+	# being written is one the kustomization still names, which fails the build rather than
+	# packaging something stale.
+	cp $(RELEASE_DIR)/bootstrap-components.yaml     manifest/turtle/bootstrap/
+	cp $(RELEASE_DIR)/control-plane-components.yaml manifest/turtle/control-plane/
+	cp $(RELEASE_DIR)/metadata.yaml                 manifest/turtle/bootstrap/
+	cp $(RELEASE_DIR)/metadata.yaml                 manifest/turtle/control-plane/
 	zarf package create . --confirm --output $(RELEASE_DIR) $(ZARF_CREATE_FLAGS)
 
 .PHONY: clean

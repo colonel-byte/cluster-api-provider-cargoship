@@ -69,25 +69,35 @@ jobs:
 
       # clusterctl fetches a provider's three files over HTTP from a release, so a local provider
       # is served from a directory layout it understands: {basepath}/{provider}/{version}/{file}.
+      #
+      # The version is read out of metadata.yaml rather than written here. clusterctl refuses one
+      # that falls outside the release series metadata.yaml declares -- `does not match any
+      # release series` -- and release-please bumps that series on a release, so a literal goes
+      # stale at the next minor and fails naming the version rather than the drift.
       - name: Lay out a local provider repository
         run: |
+          major="$(sed -n 's/^[[:space:]]*-[[:space:]]*major:[[:space:]]*\([0-9]*\).*/\1/p' out/metadata.yaml)"
+          minor="$(sed -n 's/^[[:space:]]*minor:[[:space:]]*\([0-9]*\).*/\1/p' out/metadata.yaml)"
+          version="v${major}.${minor}.0"
+          echo "PROVIDER_VERSION=${version}" >> "${GITHUB_ENV}"
+
           base="${RUNNER_TEMP}/providers"
           for kind in bootstrap-cargoship control-plane-cargoship; do
-            dir="${base}/${kind}/v0.1.0"
+            dir="${base}/${kind}/${version}"
             mkdir -p "${dir}"
             cp out/metadata.yaml "${dir}/metadata.yaml"
           done
-          cp out/bootstrap-components.yaml "${base}/bootstrap-cargoship/v0.1.0/bootstrap-components.yaml"
-          cp out/control-plane-components.yaml "${base}/control-plane-cargoship/v0.1.0/control-plane-components.yaml"
+          cp out/bootstrap-components.yaml "${base}/bootstrap-cargoship/${version}/bootstrap-components.yaml"
+          cp out/control-plane-components.yaml "${base}/control-plane-cargoship/${version}/control-plane-components.yaml"
 
           mkdir -p "${HOME}/.config/cluster-api"
           cat > "${HOME}/.config/cluster-api/clusterctl.yaml" <<YAML
           providers:
             - name: cargoship
-              url: ${base}/bootstrap-cargoship/v0.1.0/bootstrap-components.yaml
+              url: ${base}/bootstrap-cargoship/${version}/bootstrap-components.yaml
               type: BootstrapProvider
             - name: cargoship
-              url: ${base}/control-plane-cargoship/v0.1.0/control-plane-components.yaml
+              url: ${base}/control-plane-cargoship/${version}/control-plane-components.yaml
               type: ControlPlaneProvider
           YAML
 
@@ -106,8 +116,8 @@ jobs:
         run: |
           clusterctl init \
             --infrastructure docker \
-            --bootstrap cargoship:v0.1.0 \
-            --control-plane cargoship:v0.1.0 \
+            --bootstrap "cargoship:${PROVIDER_VERSION}" \
+            --control-plane "cargoship:${PROVIDER_VERSION}" \
             --wait-providers
 
       - name: Check the CRDs were established and carry the contract label

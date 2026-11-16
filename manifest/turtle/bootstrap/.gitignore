@@ -1,0 +1,4 @@
+# Staged by `make zarf-package` from out/, which is where they are built. Listed here rather than
+# in the root .gitignore so that the kustomization's inputs are named next to it.
+bootstrap-components.yaml
+metadata.yaml
