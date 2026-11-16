@@ -19,7 +19,7 @@ kind: ZarfPackageConfig
 metadata:
   name: cluster-api-provider-cargoship
   description: The cargoship bootstrap and control-plane providers for Cluster API
-  version: 0.3.0 # x-release-please-version
+  version: 0.3.1 # x-release-please-version
   annotations:
     org.opencontainers.image.source: https://github.com/colonel-byte/cluster-api-provider-cargoship
 components:
@@ -33,7 +33,7 @@ components:
         files:
           - out/bootstrap-components.yaml
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.3.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.3.1 # x-release-please-version
 
   - name: controlplane-provider
     description: CargoshipControlPlane, in cargoship-controlplane-system
@@ -43,11 +43,11 @@ components:
         files:
           - out/control-plane-components.yaml
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.3.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.3.1 # x-release-please-version
 
   - name: rancher-turtle-artifacts
     description: Both halves' components as one OCI artifact, which the Cluster API Operator and Rancher Turtles install from
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.3.0 # x-release-please-version
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.3.0 # x-release-please-version
-      - name: ghcr.io/colonel-byte/turtle/cargoship:v0.3.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.3.1 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.3.1 # x-release-please-version
+      - name: ghcr.io/colonel-byte/turtle/cargoship:v0.3.1 # x-release-please-version
