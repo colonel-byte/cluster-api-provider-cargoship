@@ -104,6 +104,9 @@ type CargoshipControlPlaneReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+// Every infrastructure provider's machine kind, because the infrastructure machine each Machine
+// gets is cloned from whatever template the control plane names and that kind is not known here.
+// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=*,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile walks the control plane one step towards its desired state.
 //

@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -99,8 +100,32 @@ func TestReconcileCreatesMachinesOneAtATime(t *testing.T) {
 	if _, ok := m.Annotations[preTerminateAnnotation]; !ok {
 		t.Error("machine is missing the pre-terminate hook, which cannot be claimed once it is being deleted")
 	}
-	if m.Spec.InfrastructureRef.Kind != "StubMachineTemplate" {
-		t.Errorf("machine infrastructure ref = %q, want the template's", m.Spec.InfrastructureRef.Kind)
+	// A clone of the template, not the template: every machine pointing at the one shared template
+	// means the first Machine controller to claim it owns it and the rest fail outright.
+	if m.Spec.InfrastructureRef.Kind != "StubMachine" {
+		t.Errorf("machine infrastructure ref kind = %q, want StubMachine", m.Spec.InfrastructureRef.Kind)
+	}
+	if m.Spec.InfrastructureRef.Name == "stub" {
+		t.Error("machine infrastructure ref names the template itself rather than a clone of it")
+	}
+	infra := &unstructured.Unstructured{}
+	infra.SetAPIVersion("infrastructure.cluster.x-k8s.io/v1beta1")
+	infra.SetKind(m.Spec.InfrastructureRef.Kind)
+	infraKey := types.NamespacedName{Namespace: f.ns, Name: m.Spec.InfrastructureRef.Name}
+	if err := f.c.Get(t.Context(), infraKey, infra); err != nil {
+		t.Fatalf("reading the cloned infrastructure machine %s: %v", infraKey, err)
+	}
+	if got := infra.GetLabels()[clusterv1.ClusterNameLabel]; got != f.cluster.Name {
+		t.Errorf("clone cluster-name label = %q, want %q", got, f.cluster.Name)
+	}
+	owners := infra.GetOwnerReferences()
+	if len(owners) != 1 || owners[0].Kind != "CargoshipControlPlane" || owners[0].Name != f.cp.Name {
+		t.Fatalf("clone owner references = %v, want the control plane", owners)
+	}
+	// Non-controller on purpose: the Machine controller sets itself as the clone's controller, and
+	// a second claim is the failure this clone exists to avoid.
+	if owners[0].Controller != nil && *owners[0].Controller {
+		t.Error("the control plane claimed the clone as its controller, which collides with the Machine controller")
 	}
 	if len(m.OwnerReferences) != 1 || m.OwnerReferences[0].Name != f.cp.Name {
 		t.Errorf("machine owner references = %v, want the control plane", m.OwnerReferences)

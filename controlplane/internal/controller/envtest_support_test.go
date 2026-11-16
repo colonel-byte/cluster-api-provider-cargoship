@@ -33,6 +33,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -143,6 +144,25 @@ func newFixture(t *testing.T) *fixture {
 		Data:       map[string][]byte{corev1.SSHAuthPrivateKey: testKey(t)},
 	}); err != nil {
 		t.Fatalf("creating the ssh secret: %v", err)
+	}
+
+	// The template every machine's infrastructure is cloned from. A real object rather than a
+	// dangling reference, because createMachine reads it now.
+	tmpl := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+		"kind":       "StubMachineTemplate",
+		"metadata": map[string]any{
+			"name":      "stub",
+			"namespace": ns,
+		},
+		"spec": map[string]any{
+			"template": map[string]any{
+				"spec": map[string]any{"size": "small"},
+			},
+		},
+	}}
+	if err := c.Create(ctx, tmpl); err != nil {
+		t.Fatalf("creating the machine template: %v", err)
 	}
 
 	cp := &controlplanev1.CargoshipControlPlane{
