@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.3.0...v0.3.1) (2026-11-16)
+
+
+### Miscellaneous
+
+* update zarf to include images in turtle component ([#59](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/59)) ([4b1e419](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/4b1e4194108b254a622bfbf97189dc65945d9f02))
+
+
+### CI/CD
+
+* generate the vendored osv-scanner overrides, and add a security policy ([#52](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/52)) ([a38fb25](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/a38fb257009ac44231f5524a3f0389dad71b811a))
+
+
+### Build
+
+* **deps:** bump github.com/agnivade/levenshtein from 1.2.1 to 1.2.2 ([#55](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/55)) ([cfb003a](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/cfb003aa6a7f794341cc61d1aa9b6eab70175a19))
+* **deps:** bump github.com/googleapis/enterprise-certificate-proxy from 0.3.24 to 0.3.25 ([#56](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/56)) ([4ac45aa](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/4ac45aacaae0fde229ceebbf33dec660cf9215df))
+* **deps:** bump github.com/prometheus/common from 0.73.1 to 0.74.0 ([#58](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/58)) ([f365fcd](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/f365fcd95fcc27a69d871c8026b5a7b7edd831c3))
+* **deps:** bump github.com/sigstore/rekor from 1.6.0 to 1.6.1 ([#57](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/57)) ([f3fe6a2](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/f3fe6a22275c3fe4d434285c1a1f5f3b5c7d19ec))
+
 ## [0.3.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.2.3...v0.3.0) (2026-11-15)
 
 
