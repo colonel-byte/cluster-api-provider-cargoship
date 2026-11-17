@@ -357,7 +357,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "Converging",
 			convergingMessage(len(inv.Hosts), run))
 		r.updateStatusCounts(cp, controlPlaneMachines, false)
-		logger.Info("converging", "hosts", len(inv.Hosts), "phase", run.Progress.Phase,
+		logger.V(1).Info("converging", "hosts", len(inv.Hosts), "phase", run.Progress.Phase,
 			"index", run.Progress.Index, "total", run.Progress.Total)
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 
