@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.4.0...v0.4.1) (2026-11-17)
+
+
+### Miscellaneous
+
+* **zarf:** make all components optional ([#68](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/68)) ([b37dbfd](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/b37dbfdb7c38e990b283818e5669821943544327))
+
+
+### Build
+
+* **deps:** bump github.com/docker/cli from 29.9.3+incompatible to 29.10.0+incompatible ([#67](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/67)) ([42b7dbf](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/42b7dbf413ae248d6932ab619de1d11edad11038))
+* **deps:** bump https://github.com/google/keep-sorted from v0.10.0 to 0.11.0 ([#65](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/65)) ([0d90e89](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0d90e89476860321aa8cd162bee4f6bb593cda33))
+
 ## [0.4.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.3.1...v0.4.0) (2026-11-17)
 
 
