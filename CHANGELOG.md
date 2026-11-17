@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.4.1...v0.5.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** move the providers to cabpc-system and cacpc-system ([#70](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/70))
+
+### Bug Fixes
+
+* make a converge work against a real fleet from inside the management cluster ([#71](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/71)) ([6e66263](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/6e6626361efcbd5948f08ef95d2aea39483378ed))
+
+
+### Refactoring
+
+* **config:** move the providers to cabpc-system and cacpc-system ([#70](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/70)) ([7320a2c](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/7320a2c38978d4c2e4759d47515a0cd3750702cf))
+
 ## [0.4.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.4.0...v0.4.1) (2026-11-17)
 
 

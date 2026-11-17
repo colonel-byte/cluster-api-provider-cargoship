@@ -7,7 +7,7 @@ metadata:
 spec:
   name: cargoship
   type: controlPlane
-  version: v0.4.1 # x-release-please-version
+  version: v0.5.0 # x-release-please-version
   fetchConfig:
     selector:
       matchLabels:
