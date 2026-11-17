@@ -56,8 +56,14 @@ func TestRunnerStartIsNotBlocking(t *testing.T) {
 	}
 
 	// Observing it must not block either, and must still say running.
-	if got := r.Observe(testKeyName); got == nil || got.State != StateRunning {
+	got := r.Observe(testKeyName)
+	if got == nil || got.State != StateRunning {
 		t.Fatalf("Observe = %+v, want a running run", got)
+	}
+	// The progress sink is attached before the apply starts, so reading it is safe at any point
+	// in a run; this apply never enters a phase, so it reports none.
+	if got.Progress.Phase != "" {
+		t.Errorf("Progress.Phase = %q, want empty before any phase runs", got.Progress.Phase)
 	}
 
 	close(release)
