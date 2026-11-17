@@ -3,7 +3,7 @@ apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-control-plane
-  namespace: cargoship-controlplane-system
+  namespace: cacpc-system
 spec:
   name: cargoship
   type: controlPlane

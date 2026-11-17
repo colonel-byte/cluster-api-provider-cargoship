@@ -27,7 +27,13 @@ clusterctl init \
   --control-plane cargoship
 ```
 
-This installs two controller deployments, into `cargoship-bootstrap-system` and `cargoship-controlplane-system`.
+This installs two controller deployments, into `cabpc-system` and `cacpc-system`.
+
+Those two namespaces changed in 0.5.0, from `cargoship-bootstrap-system` and `cargoship-controlplane-system`. A provider installed before then cannot be moved by `clusterctl upgrade apply`, which installs each new release into the namespace the existing `Provider` object records; delete the provider and init it again instead.
+
+```sh
+clusterctl delete --bootstrap cargoship --control-plane cargoship
+```
 
 ## Installing without a route to ghcr.io
 
@@ -111,8 +117,8 @@ Note what the cache does and does not save. It saves the *fetch*. The package is
 ## Checking it is up
 
 ```sh
-kubectl -n cargoship-controlplane-system logs deploy/cargoship-controlplane-controller-manager
-kubectl -n cargoship-bootstrap-system logs deploy/cargoship-bootstrap-controller-manager
+kubectl -n cacpc-system logs deploy/cargoship-controlplane-controller-manager
+kubectl -n cabpc-system logs deploy/cargoship-bootstrap-controller-manager
 ```
 
 A healthy control-plane controller logs the cache and temp paths it resolved at startup. If it exited instead, those paths are the reason: it refuses to start rather than fall back to a default that would put the cache on the pod's writable layer.

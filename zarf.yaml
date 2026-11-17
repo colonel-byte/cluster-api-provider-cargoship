@@ -34,22 +34,22 @@ components:
   # the package worth deploying at all, and `zarf package deploy --confirm` skips every optional
   # component without a word -- marking these would make the documented deploy install nothing.
   - name: bootstrap-provider
-    description: CargoshipConfig and CargoshipConfigTemplate, in cargoship-bootstrap-system
+    description: CargoshipConfig and CargoshipConfigTemplate, in cabpc-system
     optional: true
     manifests:
       - name: bootstrap-components
-        namespace: cargoship-bootstrap-system
+        namespace: cabpc-system
         files:
           - out/bootstrap-components.yaml
     images:
       - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.4.1 # x-release-please-version
 
   - name: controlplane-provider
-    description: CargoshipControlPlane, in cargoship-controlplane-system
+    description: CargoshipControlPlane, in cacpc-system
     optional: true
     manifests:
       - name: control-plane-components
-        namespace: cargoship-controlplane-system
+        namespace: cacpc-system
         files:
           - out/control-plane-components.yaml
     images:

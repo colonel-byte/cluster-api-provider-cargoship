@@ -3,7 +3,7 @@ apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-bootstrap
-  namespace: cargoship-bootstrap-system
+  namespace: cabpc-system
 spec:
   name: cargoship
   type: bootstrap
