@@ -115,6 +115,21 @@ Then both objects lose `fetchConfig.url` and gain the selector, with everything 
 - **The components still name `ghcr.io` images.** Mirror the two controller images and override the registry through the `CAPIProvider`'s `configSecret`, whose `images` key the operator reads as a clusterctl image override - `all: {repository: <registry>/<org>}`. This is the one part of the air-gapped install that a selector does not cover. The distro package the controller pulls later is separate again: see [pulling it from a Zarf registry](registry.md).
 - **A ConfigMap holds 1 MiB.** These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, `gzip` the components and annotate the ConfigMap `provider.cluster.x-k8s.io/compressed: "true"`, without which the operator reads the archive as YAML.
 
+### Or let the Zarf package carry it
+
+Those four commands and both `CAPIProvider` objects are also pre-rendered into the [air-gapped Zarf package](install.md#installing-without-a-route-to-ghcrio), as its `rancher-turtle-artifacts` component - so there is nothing to assemble on the inside at all:
+
+```sh
+zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst \
+  --components rancher-turtle-artifacts
+```
+
+Three things about that component.
+
+- **It is optional, so it has to be named.** `zarf package deploy --confirm` skips every optional component without a word, and a cluster installing this with `clusterctl` instead wants exactly that. Deploying interactively prompts for it rather than needing the flag.
+- **Rancher Turtles has to be on the cluster first.** A `CAPIProvider` applied to a cluster whose Turtles CRDs are missing fails the component, and with it the deploy.
+- **It is built at the version `zarf.yaml` pins, not at a `TAG`.** `make zarf-package` stages the components and the metadata into `manifest/turtle/` from the build it has just pinned, and Zarf runs the kustomization there to generate the two ConfigMaps. That is the whole reason the staging is in that target and not in `make release-manifests`, which runs at whatever tag its caller passes: the ConfigMap's name is a version, and a ConfigMap named for one version holding components built for another is a mismatch nothing on the cluster would report.
+
 ## Air-gapped, from a registry
 
 `fetchConfig.oci` is the third option, and the one to reach for where the air gap already has a registry: the operator pulls `metadata.yaml` and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.

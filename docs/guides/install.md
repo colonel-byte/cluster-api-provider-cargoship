@@ -53,6 +53,8 @@ Carry the tarball in, and deploy it to a cluster that has had `zarf init` run on
 zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst
 ```
 
+It carries a fourth component, `rancher-turtle-artifacts`, which is **optional and so is skipped unless it is named** - `--components rancher-turtle-artifacts`, or answering the prompt when deploying without `--confirm`. It holds both halves' components as an OCI artifact and as the ConfigMaps a Cluster API Operator install reads, and it needs Rancher Turtles on the cluster already; see [Installing the provider with Rancher Turtles](rancher-turtles.md). A cluster installing this with `clusterctl` wants nothing from it.
+
 Three things it does not do, each of which will otherwise be found out later:
 
 - **It does not install core Cluster API.** `clusterctl init` is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.
