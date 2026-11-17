@@ -35,6 +35,7 @@ components:
   # component without a word -- marking these would make the documented deploy install nothing.
   - name: bootstrap-provider
     description: CargoshipConfig and CargoshipConfigTemplate, in cargoship-bootstrap-system
+    optional: true
     manifests:
       - name: bootstrap-components
         namespace: cargoship-bootstrap-system
@@ -45,6 +46,7 @@ components:
 
   - name: controlplane-provider
     description: CargoshipControlPlane, in cargoship-controlplane-system
+    optional: true
     manifests:
       - name: control-plane-components
         namespace: cargoship-controlplane-system
