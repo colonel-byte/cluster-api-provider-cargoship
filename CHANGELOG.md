@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.3.1...v0.4.0) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** allow cross-namespace secret references ([#62](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/62))
+
+### Features
+
+* **api:** allow cross-namespace secret references ([#62](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/62)) ([5c744e8](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/5c744e8c4040778d46ead313f74ad8e3d6a0ea11))
+* **zarf:** package pre-rendered Turtles ConfigMaps and CAPIProviders ([#60](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/60)) ([1b5ddc0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/1b5ddc0dcb099bdea6b7d68ceca626bb45700504))
+
+
+### Bug Fixes
+
+* **controlplane:** clone the infrastructure template per machine ([#61](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/61)) ([cb356d3](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/cb356d3b72887ae7250de342a5ac3b174d2f00b4))
+
 ## [0.3.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.3.0...v0.3.1) (2026-11-16)
 
 
