@@ -25,6 +25,7 @@ import (
 	"github.com/colonel-byte/cargoship/config"
 	"github.com/colonel-byte/cargoship/pkg/action"
 	"github.com/colonel-byte/cargoship/pkg/distro"
+	"github.com/zarf-dev/zarf/src/pkg/logger"
 
 	"github.com/colonel-byte/cluster-api-provider-cargoship/pkg/dockerconfig"
 )
@@ -172,6 +173,7 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 	}
 
 	run := &Run{}
+	ctx = logger.WithContext(ctx, logger.Default())
 	applyErr := apply.Run(ctx)
 	run.Result = manager.Result
 
