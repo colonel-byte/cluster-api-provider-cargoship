@@ -75,9 +75,11 @@ func (p *DialProbe) Reachable(ctx context.Context, host converge.Host) (bool, er
 		// Refused, unreachable or timed out: all of them mean "not yet", which is not an error.
 		return false, nil
 	}
-	// The probe's whole answer is "something is listening". A failure to close a socket we
-	// opened only to drop does not change that, and there is no caller to tell.
-	_ = conn.Close() //nolint:errcheck // nothing acts on a failed close of a discarded probe socket
+	defer conn.Close() //nolint:errcheck
+
+	// Send an SSH identification string so sshd does not treat the connection as an unauthenticated
+	// probe and penalize the source IP under OpenSSH 8.7+ (srclimit_penalise).
+	_, _ = fmt.Fprintf(conn, "SSH-2.0-CargoshipProbe\r\n")
 	return true, nil
 }
 
