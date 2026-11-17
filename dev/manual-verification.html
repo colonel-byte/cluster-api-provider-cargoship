@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-9cbe4b82.js";
+            window.path_to_searchindex_js = "../searchindex-e80becf0.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-8b7a017e.js"></script>
@@ -227,7 +227,7 @@ zarf package deploy out/zarf-package-cluster-api-provider-cargoship-amd64-0.3.0-
 </code></pre>
 <p>Restore <code>zarf.yaml</code> and both <code>config/manager/kustomization.yaml</code> files afterwards - <code>make release-manifests</code> rewrites the latter through <code>kustomize edit set image</code>.</p>
 <p>To check the air-gapped path actually happened, read the image off the running pod rather than the deployment: Zarf’s webhook rewrote it, so a pod serving from <code>127.0.0.1:5000/...</code> is the proof.</p>
-<pre><code class="language-sh">kubectl get pod -n cargoship-controlplane-system -o jsonpath='{.items[0].spec.containers[0].image}'
+<pre><code class="language-sh">kubectl get pod -n cacpc-system -o jsonpath='{.items[0].spec.containers[0].image}'
 </code></pre>
 <h2 id="making-the-controllers-start-at-all"><a class="header" href="#making-the-controllers-start-at-all">Making the controllers start at all</a></h2>
 <p>Both managers watch <code>clusterv1.Machine</code>, so without Cluster API’s CRDs the manager cannot start its informers. Core Cluster API is not needed for that - the CRDs are:</p>

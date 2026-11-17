@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-9cbe4b82.js";
+            window.path_to_searchindex_js = "../searchindex-e80becf0.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-8b7a017e.js"></script>
@@ -186,14 +186,14 @@
 <p><a href="https://turtles.docs.rancher.com">Rancher Turtles</a> installs Cluster API providers through the Cluster API Operator rather than through <code>clusterctl</code>, so the <a href="install.html">install guide</a>’s <code>clusterctl init</code> is not the install path on a Turtles management cluster. Two <code>CAPIProvider</code> objects are, and nothing else in that guide changes: the SSH key secret, the control-plane controller’s storage, and the contract labels on the CRDs are all the same install.</p>
 <h2 id="declare-both-halves"><a class="header" href="#declare-both-halves">Declare both halves</a></h2>
 <p>The namespaces are not created for you, and the operator installs each provider into the namespace of the object that asked for it. Using the two this repository’s manifests already name keeps the log commands in the install guide working:</p>
-<pre><code class="language-sh">kubectl create namespace cargoship-bootstrap-system
-kubectl create namespace cargoship-controlplane-system
+<pre><code class="language-sh">kubectl create namespace cabpc-system
+kubectl create namespace cacpc-system
 </code></pre>
 <pre><code class="language-yaml">apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-bootstrap
-  namespace: cargoship-bootstrap-system
+  namespace: cabpc-system
 spec:
   name: cargoship
   type: bootstrap
@@ -205,7 +205,7 @@ apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-control-plane
-  namespace: cargoship-controlplane-system
+  namespace: cacpc-system
 spec:
   name: cargoship
   type: controlPlane
@@ -249,15 +249,15 @@ spec:
   --pattern 'bootstrap-components.yaml' --pattern 'control-plane-components.yaml' --pattern 'metadata.yaml'
 </code></pre>
 <p>Inside:</p>
-<pre><code class="language-sh">kubectl create configmap v0.1.0 --namespace cargoship-bootstrap-system \
+<pre><code class="language-sh">kubectl create configmap v0.1.0 --namespace cabpc-system \
   --from-file=components=bootstrap-components.yaml \
   --from-file=metadata=metadata.yaml
-kubectl label configmap v0.1.0 --namespace cargoship-bootstrap-system provider-components=cargoship
+kubectl label configmap v0.1.0 --namespace cabpc-system provider-components=cargoship
 
-kubectl create configmap v0.1.0 --namespace cargoship-controlplane-system \
+kubectl create configmap v0.1.0 --namespace cacpc-system \
   --from-file=components=control-plane-components.yaml \
   --from-file=metadata=metadata.yaml
-kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provider-components=cargoship
+kubectl label configmap v0.1.0 --namespace cacpc-system provider-components=cargoship
 </code></pre>
 <p>Then both objects lose <code>fetchConfig.url</code> and gain the selector, with everything else unchanged:</p>
 <pre><code class="language-yaml">  fetchConfig:
