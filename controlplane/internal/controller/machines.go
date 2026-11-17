@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sort"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -169,6 +171,53 @@ func (r *CargoshipControlPlaneReconciler) createMachine(
 		machineLabels[k] = v
 	}
 
+	// One infrastructure machine per Machine, cloned from the template. Pointing every Machine at
+	// the template itself means the first Machine controller to see it takes the owner reference
+	// and every later one fails with "already owned by another Machine controller", so no
+	// infrastructure is ever created past the first replica.
+	//
+	// The apiVersion CreateFromTemplate wants is only derivable from the CRD's contract labels,
+	// and the helper that reads them is in cluster-api's internal/contract; fetching the template
+	// through the contract-versioned reference answers it without reimplementing that lookup.
+	tmpl, err := external.GetObjectFromContractVersionedRef(
+		ctx, r.Client, cp.Spec.MachineTemplate.Spec.InfrastructureRef, cp.Namespace)
+	if err != nil {
+		return fmt.Errorf("unable to read the infrastructure machine template: %w", err)
+	}
+
+	// Deliberately not ownerRef(cp): that one sets Controller, and the Machine controller sets
+	// itself as the clone's controller -- two claims on one object is the bug being fixed here.
+	// Without the controller flag this is still enough for garbage collection to take the clone
+	// if the control plane goes away before the Machine does.
+	infraOwner := &metav1.OwnerReference{
+		APIVersion: controlplanev1.GroupVersion.String(),
+		Kind:       "CargoshipControlPlane",
+		Name:       cp.Name,
+		UID:        cp.UID,
+	}
+
+	// shortcut: a clone whose Machine then fails to create is orphaned until the control plane is
+	// deleted and garbage collection takes it; upgrade to an explicit cleanup if that leak is ever
+	// observed to matter. Everything else is covered -- the Machine controller deletes the
+	// infrastructure machine with the Machine.
+	_, infraRef, err := external.CreateFromTemplate(ctx, &external.CreateFromTemplateInput{
+		Client: r.Client,
+		TemplateRef: &corev1.ObjectReference{
+			APIVersion: tmpl.GetAPIVersion(),
+			Kind:       tmpl.GetKind(),
+			Namespace:  cp.Namespace,
+			Name:       tmpl.GetName(),
+		},
+		Namespace:   cp.Namespace,
+		ClusterName: cluster.Name,
+		OwnerRef:    infraOwner,
+		Labels:      machineLabels,
+		Annotations: cp.Spec.MachineTemplate.ObjectMeta.Annotations,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to clone the infrastructure machine template: %w", err)
+	}
+
 	annotations := map[string]string{
 		// Claimed at creation, not at deletion: by the time a machine is being deleted it is
 		// already draining, and there is no window left to ask for one.
@@ -196,7 +245,7 @@ func (r *CargoshipControlPlaneReconciler) createMachine(
 					Name:     config.Name,
 				},
 			},
-			InfrastructureRef: cp.Spec.MachineTemplate.Spec.InfrastructureRef,
+			InfrastructureRef: infraRef,
 			FailureDomain:     r.failureDomain(cp),
 		},
 	}

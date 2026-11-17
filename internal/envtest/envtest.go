@@ -68,6 +68,9 @@ func Run(m *testing.M) int {
 			capiCRDs,
 			filepath.Join(repoRoot(), "bootstrap", "config", "crd", "bases"),
 			filepath.Join(repoRoot(), "controlplane", "config", "crd", "bases"),
+			// A stand-in infrastructure provider, so the control plane has a machine template to
+			// clone and a machine kind to clone it into. See the file for why it is hand-written.
+			filepath.Join(repoRoot(), "internal", "envtest", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
 	}

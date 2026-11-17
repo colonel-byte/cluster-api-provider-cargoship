@@ -1,0 +1,64 @@
+---
+# A stand-in infrastructure provider, for the tests only.
+#
+# The control plane clones its machine template into one infrastructure machine per Machine, so a
+# test that reaches createMachine needs both kinds to exist on the API server: the template to read
+# and the machine kind to create. No infrastructure provider's CRDs are available here -- the e2e
+# suite is where a real one appears -- and the schemas are open rather than modelled, because
+# nothing in this provider looks inside spec.
+#
+# The name of each CRD is what contract.CalculateCRDName produces for its kind, and the
+# cluster.x-k8s.io/<contract> label is what the contract lookup reads to pick an apiVersion. Get
+# either wrong and the clone fails with "contract version label(s) are either missing" rather than
+# with anything naming the fixture.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: stubmachinetemplates.infrastructure.cluster.x-k8s.io
+  labels:
+    cluster.x-k8s.io/v1beta2: v1beta1
+spec:
+  group: infrastructure.cluster.x-k8s.io
+  scope: Namespaced
+  names:
+    kind: StubMachineTemplate
+    listKind: StubMachineTemplateList
+    plural: stubmachinetemplates
+    singular: stubmachinetemplate
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: stubmachines.infrastructure.cluster.x-k8s.io
+  labels:
+    cluster.x-k8s.io/v1beta2: v1beta1
+spec:
+  group: infrastructure.cluster.x-k8s.io
+  scope: Namespaced
+  names:
+    kind: StubMachine
+    listKind: StubMachineList
+    plural: stubmachines
+    singular: stubmachine
+  versions:
+    - name: v1beta1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
