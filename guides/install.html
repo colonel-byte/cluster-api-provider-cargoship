@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4fe44402.js";
+            window.path_to_searchindex_js = "../searchindex-d79f3bef.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-2bb09e97.js"></script>
@@ -214,6 +214,7 @@
 <p>Carry the tarball in, and deploy it to a cluster that has had <code>zarf init</code> run on it - the in-cluster registry it installs is what the controller images are rewritten to point at:</p>
 <pre><code class="language-sh">zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst
 </code></pre>
+<p>It carries a fourth component, <code>rancher-turtle-artifacts</code>, which is <strong>optional and so is skipped unless it is named</strong> - <code>--components rancher-turtle-artifacts</code>, or answering the prompt when deploying without <code>--confirm</code>. It holds both halves’ components as an OCI artifact and as the ConfigMaps a Cluster API Operator install reads, and it needs Rancher Turtles on the cluster already; see <a href="rancher-turtles.html">Installing the provider with Rancher Turtles</a>. A cluster installing this with <code>clusterctl</code> wants nothing from it.</p>
 <p>Three things it does not do, each of which will otherwise be found out later:</p>
 <ul>
 <li><strong>It does not install core Cluster API.</strong> <code>clusterctl init</code> is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.</li>

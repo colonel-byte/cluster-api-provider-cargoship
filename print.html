@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4fe44402.js";
+            window.path_to_searchindex_js = "searchindex-d79f3bef.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-2bb09e97.js"></script>
@@ -497,6 +497,7 @@ clusterctl generate cluster fleet-one \
 <p>Carry the tarball in, and deploy it to a cluster that has had <code>zarf init</code> run on it - the in-cluster registry it installs is what the controller images are rewritten to point at:</p>
 <pre><code class="language-sh">zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst
 </code></pre>
+<p>It carries a fourth component, <code>rancher-turtle-artifacts</code>, which is <strong>optional and so is skipped unless it is named</strong> - <code>--components rancher-turtle-artifacts</code>, or answering the prompt when deploying without <code>--confirm</code>. It holds both halves’ components as an OCI artifact and as the ConfigMaps a Cluster API Operator install reads, and it needs Rancher Turtles on the cluster already; see <a href="#installing-the-provider-with-rancher-turtles">Installing the provider with Rancher Turtles</a>. A cluster installing this with <code>clusterctl</code> wants nothing from it.</p>
 <p>Three things it does not do, each of which will otherwise be found out later:</p>
 <ul>
 <li><strong>It does not install core Cluster API.</strong> <code>clusterctl init</code> is still what puts the core controllers and an infrastructure provider in place, and in an air gap that means its own images and manifests mirrored by some other means.</li>
@@ -653,6 +654,17 @@ kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provide
 <li><strong>The label is yours.</strong> <code>provider-components</code> is only the convention the operator’s own examples use; nothing reads the key, the selector just has to match.</li>
 <li><strong>The components still name <code>ghcr.io</code> images.</strong> Mirror the two controller images and override the registry through the <code>CAPIProvider</code>’s <code>configSecret</code>, whose <code>images</code> key the operator reads as a clusterctl image override - <code>all: {repository: &lt;registry&gt;/&lt;org&gt;}</code>. This is the one part of the air-gapped install that a selector does not cover. The distro package the controller pulls later is separate again: see <a href="#pulling-the-distro-package-from-a-zarf-registry">pulling it from a Zarf registry</a>.</li>
 <li><strong>A ConfigMap holds 1 MiB.</strong> These manifests are tens of kilobytes, so there is room to spare; if that ever stops being true, <code>gzip</code> the components and annotate the ConfigMap <code>provider.cluster.x-k8s.io/compressed: "true"</code>, without which the operator reads the archive as YAML.</li>
+</ul>
+<h3 id="or-let-the-zarf-package-carry-it"><a class="header" href="#or-let-the-zarf-package-carry-it">Or let the Zarf package carry it</a></h3>
+<p>Those four commands and both <code>CAPIProvider</code> objects are also pre-rendered into the <a href="#installing-without-a-route-to-ghcrio">air-gapped Zarf package</a>, as its <code>rancher-turtle-artifacts</code> component - so there is nothing to assemble on the inside at all:</p>
+<pre><code class="language-sh">zarf package deploy zarf-package-cluster-api-provider-cargoship-amd64-0.1.0.tar.zst \
+  --components rancher-turtle-artifacts
+</code></pre>
+<p>Three things about that component.</p>
+<ul>
+<li><strong>It is optional, so it has to be named.</strong> <code>zarf package deploy --confirm</code> skips every optional component without a word, and a cluster installing this with <code>clusterctl</code> instead wants exactly that. Deploying interactively prompts for it rather than needing the flag.</li>
+<li><strong>Rancher Turtles has to be on the cluster first.</strong> A <code>CAPIProvider</code> applied to a cluster whose Turtles CRDs are missing fails the component, and with it the deploy.</li>
+<li><strong>It is built at the version <code>zarf.yaml</code> pins, not at a <code>TAG</code>.</strong> <code>make zarf-package</code> stages the components and the metadata into <code>manifest/turtle/</code> from the build it has just pinned, and Zarf runs the kustomization there to generate the two ConfigMaps. That is the whole reason the staging is in that target and not in <code>make release-manifests</code>, which runs at whatever tag its caller passes: the ConfigMap’s name is a version, and a ConfigMap named for one version holding components built for another is a mismatch nothing on the cluster would report.</li>
 </ul>
 <h2 id="air-gapped-from-a-registry"><a class="header" href="#air-gapped-from-a-registry">Air-gapped, from a registry</a></h2>
 <p><code>fetchConfig.oci</code> is the third option, and the one to reach for where the air gap already has a registry: the operator pulls <code>metadata.yaml</code> and the components out of a single OCI artifact, which is one object to mirror rather than four ConfigMaps to keep in step.</p>
