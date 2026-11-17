@@ -134,3 +134,31 @@ kubectl annotate cargoshipcontrolplane fleet \
 Both are explained in [the decision record](../agent/choice-record-discovery.md).
 
 Written once per cluster *shape* rather than once per cluster, if you compose a `ClusterClass`: the four fields above live in the `CargoshipControlPlaneTemplate`'s `spec.template.spec.distro`, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto `/spec/template/spec/distro/packageVersion`. See [Composing a ClusterClass](clusterclass.md).
+
+## A secret in another namespace
+
+`pullSecretRef`, `caBundleSecretRef` and `ssh.privateKeySecretRef` each take an optional `namespace`. Empty - and anything written before the field existed - means the namespace the `CargoshipControlPlane` itself is in, which is the only thing the controller allows by default:
+
+```yaml
+spec:
+  distro:
+    pullSecretRef:
+      name: zarf-registry
+      namespace: zarf
+```
+
+A reference to any other namespace is refused on the reconcile unless the control-plane *and* bootstrap controllers were both started with `--secret-namespaces` naming it:
+
+```sh
+# Both managers, and the same list: one credential, read by two controllers.
+--secret-namespaces=zarf,shared-creds
+# Or, if every namespace is as trusted as every other:
+--secret-namespaces='*'
+```
+
+Refusing by default is deliberate rather than conservative. The controller reads secrets with a cluster-wide `ClusterRole`, so anyone who can create a `CargoshipControlPlane` in their own namespace could otherwise point it at a credential they have no access to - and for the SSH key that is worse than reading it, because the bootstrap provider derives the public half and installs it on their machines. See [the decision record](../agent/choice-cross-namespace-secrets.md).
+
+Two limits to know before using it:
+
+- **`clusterctl move` does not move the secret.** It moves the objects the cluster owns, and a secret in a namespace that is not the cluster's is not one of them. Move it yourself, or the cluster arrives in the target management cluster unable to reach its registry or its fleet.
+- **A manager running with `--namespace` cannot see it.** That flag scopes the whole cache to one namespace, so a secret anywhere else reads as not found. Nothing checks the two flags against each other at startup; the symptom is a `NotFound` naming a secret that exists.

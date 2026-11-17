@@ -185,7 +185,7 @@ func newFixture(t *testing.T) *fixture {
 			},
 			SSH: controlplanev1.SSHConfig{
 				User:                "rocky",
-				PrivateKeySecretRef: controlplanev1.LocalObjectReference{Name: "fleet-ssh"},
+				PrivateKeySecretRef: controlplanev1.SecretReference{Name: "fleet-ssh"},
 			},
 		},
 	}

@@ -76,6 +76,8 @@ spec:
   ssh:
     user: rocky
     privateKeySecretRef:
+      # Optionally `namespace:` too, for a secret elsewhere; the controller refuses one unless it
+      # was started with --secret-namespaces. See docs/guides/registry.md.
       name: fleet-ssh
   machineTemplate:
     spec:

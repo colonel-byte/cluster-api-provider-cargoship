@@ -23,6 +23,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,6 +57,16 @@ type Options struct {
 	// Long on purpose. This provider's own requeues are what drive it forward; a short resync
 	// would add nothing but reconciles that find the fingerprint unchanged and go back to sleep.
 	SyncPeriod time.Duration
+	// SecretNamespaces are the namespaces a CargoshipControlPlane may name a secret in other
+	// than its own. "*" allows any.
+	//
+	// Empty by default, which is same-namespace only: anyone who can create a
+	// CargoshipControlPlane would otherwise be able to point it at a credential in a namespace
+	// they have no access to, and the controller reads it with its own cluster-wide permission.
+	// The SSH key makes that worse than a leak of the secret itself -- the bootstrap provider
+	// derives the public half and publishes it into the machine's bootstrap data, so the operator
+	// of the borrowed key learns nothing while the borrower gets a fleet their key opens.
+	SecretNamespaces []string
 	// CachePath is where pulled OCI blobs are kept. Control-plane binary only.
 	CachePath string
 	// TempPath is where a distro package is extracted. Control-plane binary only.
@@ -69,6 +80,17 @@ func (o *Options) BindFlags(fs *flag.FlagSet) {
 	fs.BoolVar(&o.EnableLeaderElection, "leader-elect", false, "run only one active replica")
 	fs.StringVar(&o.WatchNamespace, "namespace", "", "namespace to watch, or empty for all")
 	fs.DurationVar(&o.SyncPeriod, "sync-period", 30*time.Minute, "resync interval")
+	fs.Func("secret-namespaces",
+		"comma-separated namespaces a control plane may reference a secret in besides its own, or * for any; empty allows none",
+		func(v string) error {
+			o.SecretNamespaces = nil
+			for _, ns := range strings.Split(v, ",") {
+				if ns = strings.TrimSpace(ns); ns != "" {
+					o.SecretNamespaces = append(o.SecretNamespaces, ns)
+				}
+			}
+			return nil
+		})
 }
 
 // BindConvergeFlags registers the flags only the control-plane binary takes.

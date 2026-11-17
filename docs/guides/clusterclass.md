@@ -24,6 +24,8 @@ spec:
       ssh:
         user: rocky
         privateKeySecretRef:
+          # One secret for every cluster built from the class, so this is the reference most likely
+          # to want a `namespace:`. See [Pulling the distro package](registry.md#a-secret-in-another-namespace).
           name: fleet-ssh
       clusterConfig:
         values:

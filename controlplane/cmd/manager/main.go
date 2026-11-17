@@ -63,6 +63,8 @@ func main() {
 		// One runner for the process, so "at most one converge per cluster" holds across
 		// reconciles rather than within one.
 		Runner: converge.NewRunner(),
+		// Empty unless --secret-namespaces was given, which is same-namespace only.
+		SecretNamespaces: opts.SecretNamespaces,
 	}
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		ctrl.Log.Error(err, "unable to set up the CargoshipControlPlane controller")

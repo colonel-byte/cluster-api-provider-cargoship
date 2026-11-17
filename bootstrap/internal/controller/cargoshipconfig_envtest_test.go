@@ -100,7 +100,7 @@ func newFixture(t *testing.T, spec bootstrapv1.CargoshipConfigSpec) *fixture {
 			Distro: controlplanev1.DistroSource{OCIRef: "oci://registry.test/k3s:v1.34.1"},
 			SSH: controlplanev1.SSHConfig{
 				User:                "rocky",
-				PrivateKeySecretRef: controlplanev1.LocalObjectReference{Name: "fleet-ssh"},
+				PrivateKeySecretRef: controlplanev1.SecretReference{Name: "fleet-ssh"},
 			},
 		},
 	}
