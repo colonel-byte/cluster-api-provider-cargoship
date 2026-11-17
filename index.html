@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-db0396eb.js";
+            window.path_to_searchindex_js = "searchindex-9cbe4b82.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2bb09e97.js"></script>
+        <script src="toc-8b7a017e.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -240,6 +240,8 @@ spec:
   ssh:
     user: rocky
     privateKeySecretRef:
+      # Optionally `namespace:` too, for a secret elsewhere; the controller refuses one unless it
+      # was started with --secret-namespaces. See docs/guides/registry.md.
       name: fleet-ssh
   machineTemplate:
     spec:

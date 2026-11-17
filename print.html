@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-db0396eb.js";
+            window.path_to_searchindex_js = "searchindex-9cbe4b82.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2bb09e97.js"></script>
+        <script src="toc-8b7a017e.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -238,6 +238,8 @@ spec:
   ssh:
     user: rocky
     privateKeySecretRef:
+      # Optionally `namespace:` too, for a secret elsewhere; the controller refuses one unless it
+      # was started with --secret-namespaces. See docs/guides/registry.md.
       name: fleet-ssh
   machineTemplate:
     spec:
@@ -319,6 +321,8 @@ spec:
       ssh:
         user: rocky
         privateKeySecretRef:
+          # One secret for every cluster built from the class, so this is the reference most likely
+          # to want a `namespace:`. See [Pulling the distro package](registry.md#a-secret-in-another-namespace).
           name: fleet-ssh
       clusterConfig:
         values:
@@ -810,6 +814,26 @@ stringData:
 </code></pre>
 <p>Both are explained in <a href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue">the decision record</a>.</p>
 <p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="#composing-a-clusterclass">Composing a ClusterClass</a>.</p>
+<h2 id="a-secret-in-another-namespace"><a class="header" href="#a-secret-in-another-namespace">A secret in another namespace</a></h2>
+<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>. Empty - and anything written before the field existed - means the namespace the <code>CargoshipControlPlane</code> itself is in, which is the only thing the controller allows by default:</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    pullSecretRef:
+      name: zarf-registry
+      namespace: zarf
+</code></pre>
+<p>A reference to any other namespace is refused on the reconcile unless the control-plane <em>and</em> bootstrap controllers were both started with <code>--secret-namespaces</code> naming it:</p>
+<pre><code class="language-sh"># Both managers, and the same list: one credential, read by two controllers.
+--secret-namespaces=zarf,shared-creds
+# Or, if every namespace is as trusted as every other:
+--secret-namespaces='*'
+</code></pre>
+<p>Refusing by default is deliberate rather than conservative. The controller reads secrets with a cluster-wide <code>ClusterRole</code>, so anyone who can create a <code>CargoshipControlPlane</code> in their own namespace could otherwise point it at a credential they have no access to - and for the SSH key that is worse than reading it, because the bootstrap provider derives the public half and installs it on their machines. See <a href="#a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in">the decision record</a>.</p>
+<p>Two limits to know before using it:</p>
+<ul>
+<li><strong><code>clusterctl move</code> does not move the secret.</strong> It moves the objects the cluster owns, and a secret in a namespace that is not the cluster’s is not one of them. Move it yourself, or the cluster arrives in the target management cluster unable to reach its registry or its fleet.</li>
+<li><strong>A manager running with <code>--namespace</code> cannot see it.</strong> That flag scopes the whole cache to one namespace, so a secret anywhere else reads as not found. Nothing checks the two flags against each other at startup; the symptom is a <code>NotFound</code> naming a secret that exists.</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="end-to-end-tests"><a class="header" href="#end-to-end-tests">End-to-end tests</a></h1>
 <p>For driving the provider by hand against a real cluster - a build of a branch deployed with Zarf, a registry read, a <code>ClusterClass</code> stamping a control plane - see <a href="#driving-the-provider-by-hand"><code>manual-verification.md</code></a>. This page is the automated suites.</p>
@@ -1039,6 +1063,23 @@ kubectl delete -f out/envtest-crds/
 <li><code>spec.topology.controlPlane.rollout.after</code> asks for a rollout after a timestamp. Nothing replaces machines here, so nothing happens.</li>
 <li>A topology that changes the package without changing the version converges the fleet with no approval needed, because the gate reads the version rather than the package. That is the same behaviour a hand-wired resource has.</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in"><a class="header" href="#a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in">A cross-namespace secret reference is refused unless an operator opts in</a></h1>
+<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>, and the controllers refuse any value other than the referring object’s own namespace unless they were started with <code>--secret-namespaces</code> naming it. The flag’s default is empty, which is the behaviour before the field existed: same namespace only.</p>
+<h2 id="why-the-default-is-to-refuse-rather-than-to-allow"><a class="header" href="#why-the-default-is-to-refuse-rather-than-to-allow">Why the default is to refuse rather than to allow</a></h2>
+<p>The controller reads secrets through a cluster-wide <code>ClusterRole</code> - it has to, because a management cluster puts each workload cluster in its own namespace and the provider is installed once. The reference is therefore not an access check, it is a request the controller performs with its own permission. Allowing any namespace by default would mean anybody who can create a <code>CargoshipControlPlane</code> in a namespace they own can have the controller read a credential they do not.</p>
+<p>For the SSH key that is worse than reading the secret. The bootstrap provider derives the public half of whatever key the control plane names and publishes it into each machine’s bootstrap data, so the borrower ends up with a fleet that the borrowed key opens, while the namespace that owns the key sees nothing happen at all. A field that is harmless on a pull secret is a privilege escalation on that one, and they are the same field.</p>
+<p>Opening it up later is a flag value. Closing it down later is a breaking change for every cluster that had come to rely on it, which is the asymmetry the default follows from.</p>
+<h2 id="no-startup-validation-of-the-two-things-it-interacts-badly-with"><a class="header" href="#no-startup-validation-of-the-two-things-it-interacts-badly-with">No startup validation of the two things it interacts badly with</a></h2>
+<p>Both are documented in <a href="#pulling-the-distro-package-from-a-zarf-registry"><code>docs/guides/registry.md</code></a> and neither is enforced:</p>
+<ul>
+<li><strong><code>clusterctl move</code> does not move the secret.</strong> It moves what the cluster owns, and a secret outside the cluster’s namespace is not that. A moved cluster arrives unable to reach its registry or its fleet.</li>
+<li><strong><code>--namespace</code> on the manager makes the secret invisible.</strong> That flag scopes the whole controller-runtime cache to one namespace, so a secret anywhere else reads as <code>NotFound</code>.</li>
+</ul>
+<p>The second one is tempting to check at startup - the two flags are both right there - and it is deliberately not checked. <code>--secret-namespaces</code> is a list of what is <em>permitted</em>, not a list of what is used: an operator can reasonably set it on a manager that is also namespace-scoped, against the day the scope is widened, and refusing to start would be refusing a configuration that is merely unused. The failure it would prevent is a <code>NotFound</code> naming the secret, at the one moment the operator is looking at the reference they just wrote.</p>
+<h2 id="the-method-rather-than-the-call-sites"><a class="header" href="#the-method-rather-than-the-call-sites">The method rather than the call sites</a></h2>
+<p><code>SecretReference.Key(ownerNamespace, allowed)</code> is where the decision lives, and the four resolution sites - the CA bundle, the pull secret, and the SSH key in each of the two providers - go through it. A cross-namespace reference that is not permitted is an error, never a quiet fall back to the owner’s namespace: reading a different secret than the one named is a worse outcome than refusing, because it succeeds.</p>
+<p><code>contentFrom.secret</code> on a <code>CargoshipConfig</code>’s files is deliberately not included. It is a different reference type, written by whoever writes the config rather than by the control plane, and nothing has asked for it.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed"><a class="header" href="#a-tagged-distro-reference-is-not-re-resolved-and-a-republished-tag-is-not-noticed">A tagged distro reference is not re-resolved, and a republished tag is not noticed</a></h1>
 <p><code>spec.distro.ociRef</code> is used exactly as given. The desired-state fingerprint hashes the reference string, so a package rebuilt and republished behind the same tag produces the same fingerprint, and no converge runs. <strong>Pin the reference to a digest where that matters.</strong></p>

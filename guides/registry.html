@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-db0396eb.js";
+            window.path_to_searchindex_js = "../searchindex-9cbe4b82.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2bb09e97.js"></script>
+        <script src="../toc-8b7a017e.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -272,6 +272,26 @@
 </code></pre>
 <p>Both are explained in <a href="../agent/choice-record-discovery.html">the decision record</a>.</p>
 <p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="clusterclass.html">Composing a ClusterClass</a>.</p>
+<h2 id="a-secret-in-another-namespace"><a class="header" href="#a-secret-in-another-namespace">A secret in another namespace</a></h2>
+<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>. Empty - and anything written before the field existed - means the namespace the <code>CargoshipControlPlane</code> itself is in, which is the only thing the controller allows by default:</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    pullSecretRef:
+      name: zarf-registry
+      namespace: zarf
+</code></pre>
+<p>A reference to any other namespace is refused on the reconcile unless the control-plane <em>and</em> bootstrap controllers were both started with <code>--secret-namespaces</code> naming it:</p>
+<pre><code class="language-sh"># Both managers, and the same list: one credential, read by two controllers.
+--secret-namespaces=zarf,shared-creds
+# Or, if every namespace is as trusted as every other:
+--secret-namespaces='*'
+</code></pre>
+<p>Refusing by default is deliberate rather than conservative. The controller reads secrets with a cluster-wide <code>ClusterRole</code>, so anyone who can create a <code>CargoshipControlPlane</code> in their own namespace could otherwise point it at a credential they have no access to - and for the SSH key that is worse than reading it, because the bootstrap provider derives the public half and installs it on their machines. See <a href="../agent/choice-cross-namespace-secrets.html">the decision record</a>.</p>
+<p>Two limits to know before using it:</p>
+<ul>
+<li><strong><code>clusterctl move</code> does not move the secret.</strong> It moves the objects the cluster owns, and a secret in a namespace that is not the cluster’s is not one of them. Move it yourself, or the cluster arrives in the target management cluster unable to reach its registry or its fleet.</li>
+<li><strong>A manager running with <code>--namespace</code> cannot see it.</strong> That flag scopes the whole cache to one namespace, so a secret anywhere else reads as not found. Nothing checks the two flags against each other at startup; the symptom is a <code>NotFound</code> naming a secret that exists.</li>
+</ul>
 
                     </main>
 
