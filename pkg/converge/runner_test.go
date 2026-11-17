@@ -20,6 +20,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/colonel-byte/cargoship/api/colonel-byte.dev/v1alpha1/cluster"
+	"github.com/colonel-byte/cargoship/pkg/phase"
 )
 
 const testKeyName = "default/fleet"
@@ -56,8 +59,14 @@ func TestRunnerStartIsNotBlocking(t *testing.T) {
 	}
 
 	// Observing it must not block either, and must still say running.
-	if got := r.Observe(testKeyName); got == nil || got.State != StateRunning {
+	got := r.Observe(testKeyName)
+	if got == nil || got.State != StateRunning {
 		t.Fatalf("Observe = %+v, want a running run", got)
+	}
+	// The progress sink is attached before the apply starts, so reading it is safe at any point
+	// in a run; this apply never enters a phase, so it reports none.
+	if got.Progress.Phase != "" {
+		t.Errorf("Progress.Phase = %q, want empty before any phase runs", got.Progress.Phase)
 	}
 
 	close(release)
@@ -66,6 +75,66 @@ func TestRunnerStartIsNotBlocking(t *testing.T) {
 	}
 	if got := r.Observe(testKeyName); got.State != StateSucceeded {
 		t.Errorf("after finishing, state = %q, want %q", got.State, StateSucceeded)
+	}
+}
+
+// fakePhase is one cargoship phase that blocks until released, so a test can observe a run while
+// it is in flight.
+type fakePhase struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (f fakePhase) Title() string       { return "Fake Phase" }
+func (f fakePhase) Explanation() string { return "does nothing, slowly" }
+
+func (f fakePhase) Run(_ context.Context) error {
+	close(f.entered)
+	<-f.release
+	return nil
+}
+
+// TestRunnerObservesTheRunningPhase is the wiring the Converged condition message rests on: the
+// sink Start attaches has to reach the phase manager the ApplyFunc runs, and Observe has to report
+// what that manager last said.
+//
+// Driven through a real phase.Manager rather than a stub, because what is worth testing is that
+// the context the ApplyFunc is handed carries the sink -- a stub reporting progress itself would
+// pass with the sink never attached.
+func TestRunnerObservesTheRunningPhase(t *testing.T) {
+	t.Parallel()
+
+	r := NewRunner()
+	p := fakePhase{
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+
+	r.Start(context.Background(), testKeyName, "fp-1", func(runCtx context.Context) (*Run, error) {
+		m := &phase.Manager{Config: &cluster.Cluster{}}
+		m.SetPhases(phase.Phases{p})
+		return &Run{}, m.Run(runCtx)
+	})
+
+	<-p.entered
+	waitFor(t, "the phase to be reported", func() bool {
+		return r.Observe(testKeyName).Progress.Phase == "Fake Phase"
+	})
+
+	got := r.Observe(testKeyName)
+	if got.Progress.Index != 1 || got.Progress.Total != 1 {
+		t.Errorf("Progress position = %d of %d, want 1 of 1", got.Progress.Index, got.Progress.Total)
+	}
+	if got.Progress.State != phase.StateRunning {
+		t.Errorf("Progress.State = %q, want %q", got.Progress.State, phase.StateRunning)
+	}
+
+	close(p.release)
+	if err := r.Wait(context.Background(), testKeyName); err != nil {
+		t.Fatalf("Wait: %v", err)
+	}
+	if got := r.Observe(testKeyName); got.Progress.State != phase.StateCompleted {
+		t.Errorf("after finishing, Progress.State = %q, want %q", got.Progress.State, phase.StateCompleted)
 	}
 }
 

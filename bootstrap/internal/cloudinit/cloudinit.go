@@ -70,6 +70,7 @@ type cloudConfig struct {
 type cloudUser struct {
 	Name              string   `json:"name"`
 	SSHAuthorizedKeys []string `json:"ssh_authorized_keys,omitempty"`
+	Sudo              string   `json:"sudo,omitempty"`
 }
 
 type cloudFile struct {
@@ -100,6 +101,9 @@ func Render(c Config) ([]byte, error) {
 				// cloud-init appends to the user's authorized_keys rather than replacing it,
 				// so a key the image already carries survives.
 				SSHAuthorizedKeys: c.AuthorizedKeys,
+				// Cargoship executes commands via non-interactive sudo (sudo -n), so the user needs
+				// passwordless sudo to manage services, firewalls, and install distro packages.
+				Sudo: "ALL=(ALL) NOPASSWD:ALL",
 			},
 		},
 		RunCmd: c.RunCmd,

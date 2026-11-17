@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zarf-dev/zarf/src/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -155,11 +156,37 @@ func New(o Options) (ctrl.Manager, error) {
 }
 
 // SetupLogging routes controller-runtime's logging and returns the zap flag set to register.
+//
+// It configures two loggers, because a converge produces both kinds of line. The controller's own
+// logging is zap, as JSON. Everything cargoship logs goes through zarf's package-level logger,
+// whose default is console format with ANSI colour on stderr -- left alone, a converge interleaves
+// escape codes into the manager's JSON stream and a log pipeline that parses JSON drops exactly
+// the lines a converge exists to produce. Its level is set from the same `--zap-log-level` flag,
+// because the alternative is a flag that reaches the controller and not the library doing the work:
+// most of cargoship's per-host detail is logged at debug.
 func SetupLogging(fs *flag.FlagSet) func() {
 	zapOpts := zap.Options{Development: false}
 	zapOpts.BindFlags(fs)
 	return func() {
 		ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
+
+		// Asked of the logger that was just installed rather than of the zap options, so the
+		// mapping is the one controller-runtime itself applies: zapr renders V(1) at debug.
+		level := logger.Info
+		if ctrl.Log.V(1).Enabled() {
+			level = logger.Debug
+		}
+		l, err := logger.New(logger.Config{
+			Level:  level,
+			Format: logger.FormatJSON,
+			Color:  false,
+		})
+		if err != nil {
+			// Only an unknown level can fail here, and the level comes from the constants above.
+			ctrl.Log.Error(err, "unable to configure cargoship's logger; it keeps zarf's console default")
+			return
+		}
+		logger.SetDefault(l)
 	}
 }
 

@@ -52,6 +52,13 @@ type Prober interface {
 // The reason the probe exists at all is that cargoship's connect phase retries for fifteen minutes
 // by default. Against a machine that is still booting that would hold the runner's single slot for
 // the whole window and report nothing but "converging" to the operator.
+//
+// A connect-and-drop is counted as `noauth` by OpenSSH's PerSourcePenalties, which is on by
+// default from 10.0, so a fleet on a recent sshd penalises the manager's address for every pass.
+// Writing an SSH identification string before closing does not help: the penalty is for a
+// connection that attempted no authentication, and sending `SSH-2.0-...` attempts none. Avoiding
+// it needs a completed handshake and a successful authentication, which is a different probe from
+// this one -- not an identification string bolted onto it.
 type DialProbe struct{}
 
 // Reachable opens and closes a TCP connection to the host's SSH port.

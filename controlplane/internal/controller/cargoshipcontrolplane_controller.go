@@ -355,8 +355,10 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	switch run.State {
 	case converge.StateRunning:
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "Converging",
-			fmt.Sprintf("converging %d hosts", len(inv.Hosts)))
+			convergingMessage(len(inv.Hosts), run))
 		r.updateStatusCounts(cp, controlPlaneMachines, false)
+		logger.V(1).Info("converging", "hosts", len(inv.Hosts), "phase", run.Progress.Phase,
+			"index", run.Progress.Index, "total", run.Progress.Total)
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 
 	case converge.StateFailed:
@@ -403,6 +405,20 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	}
 
 	return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
+}
+
+// convergingMessage is how far the in-flight apply has got, for the Converged condition while it
+// runs.
+//
+// It is the only thing that changes about a converging resource for minutes at a time, so it is
+// what an operator reads to tell a slow phase from a stuck one. The phase comes from cargoship's
+// progress sink, which is empty until the apply enters its first phase.
+func convergingMessage(hosts int, run *converge.Run) string {
+	if run.Progress.Phase == "" {
+		return fmt.Sprintf("converging %d hosts", hosts)
+	}
+	return fmt.Sprintf("converging %d hosts: phase %d of %d, %s",
+		hosts, run.Progress.Index, run.Progress.Total, run.Progress.Phase)
 }
 
 // caBundleField is the key a CA bundle is conventionally kept under in a secret -- the same one

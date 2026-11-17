@@ -45,6 +45,11 @@ type Run struct {
 	// Result is cargoship's own account of the run: which phases ran, which hosts each named,
 	// and what changed. It is what the controller writes status from.
 	Result phase.RunResult
+	// Progress is the phase the apply is on, as of the moment this Run was observed. It is the
+	// only thing that distinguishes one minute of StateRunning from the next, so it is what a
+	// condition message on a converging resource is written from. Zero before the apply enters
+	// its first phase.
+	Progress phase.Progress
 	// KubeConfig is the admin credentials the apply built, when it was asked for them.
 	KubeConfig []byte
 }
@@ -76,8 +81,20 @@ type Runner struct {
 
 type entry struct {
 	run    *Run
+	sink   *phase.ProgressSink
 	cancel context.CancelFunc
 	done   chan struct{}
+}
+
+// snapshot is the Run as a caller outside the goroutine may read it: a copy, with the phase the
+// apply has reached read from the sink rather than from the Run, because the goroutine writes the
+// Run itself once, at the end.
+//
+// Called with the mutex held.
+func (e *entry) snapshot() *Run {
+	run := *e.run
+	run.Progress = e.sink.Current()
+	return &run
 }
 
 // NewRunner returns an empty Runner.
@@ -97,8 +114,7 @@ func (r *Runner) Observe(key string) *Run {
 	if !ok {
 		return nil
 	}
-	snapshot := *e.run
-	return &snapshot
+	return e.snapshot()
 }
 
 // Start begins a converge for key, unless one is already in flight.
@@ -117,14 +133,12 @@ func (r *Runner) Start(ctx context.Context, key, fingerprint string, apply Apply
 			if e.run.Fingerprint != fingerprint {
 				e.cancel()
 			}
-			snapshot := *e.run
-			return &snapshot
+			return e.snapshot()
 		}
 		// A finished run for the fingerprint being asked for is the answer, not a reason to run
 		// again. A finished run for any other fingerprint is stale and replaced below.
 		if e.run.Fingerprint == fingerprint {
-			snapshot := *e.run
-			return &snapshot
+			return e.snapshot()
 		}
 	}
 
@@ -132,9 +146,14 @@ func (r *Runner) Start(ctx context.Context, key, fingerprint string, apply Apply
 	// returns, which is immediately. The converge outlives the reconcile that started it, and is
 	// stopped either by Cancel or by the manager shutting down.
 	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	// The sink is cargoship's exported way for a caller that is not driving an apply to ask where
+	// it has got to. It is scoped to this context rather than process-global, so one per run is
+	// correct even with several resources converging at once.
+	runCtx, sink := phase.WithProgressSink(runCtx)
 
 	e := &entry{
 		run:    &Run{Fingerprint: fingerprint, State: StateRunning},
+		sink:   sink,
 		cancel: cancel,
 		done:   make(chan struct{}),
 	}
@@ -167,8 +186,7 @@ func (r *Runner) Start(ctx context.Context, key, fingerprint string, apply Apply
 		e.run.State = StateSucceeded
 	}()
 
-	snapshot := *e.run
-	return &snapshot
+	return e.snapshot()
 }
 
 // Cancel stops the converge for key, if there is one, and forgets it.

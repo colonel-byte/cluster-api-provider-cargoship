@@ -51,6 +51,7 @@ func TestRender(t *testing.T) {
 		"ssh_authorized_keys:",
 		"ssh-ed25519 AAAA controller",
 		"ssh-ed25519 BBBB operator",
+		"sudo: ALL=(ALL) NOPASSWD:ALL",
 		"write_files:",
 		"/etc/pki/ca-trust/source/anchors/internal.crt",
 		"permissions: \"0644\"",
