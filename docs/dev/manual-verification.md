@@ -75,7 +75,7 @@ Restore `zarf.yaml` and both `config/manager/kustomization.yaml` files afterward
 To check the air-gapped path actually happened, read the image off the running pod rather than the deployment: Zarf's webhook rewrote it, so a pod serving from `127.0.0.1:5000/...` is the proof.
 
 ```sh
-kubectl get pod -n cargoship-controlplane-system -o jsonpath='{.items[0].spec.containers[0].image}'
+kubectl get pod -n cacpc-system -o jsonpath='{.items[0].spec.containers[0].image}'
 ```
 
 ## Making the controllers start at all

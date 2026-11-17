@@ -7,8 +7,8 @@
 The namespaces are not created for you, and the operator installs each provider into the namespace of the object that asked for it. Using the two this repository's manifests already name keeps the log commands in the install guide working:
 
 ```sh
-kubectl create namespace cargoship-bootstrap-system
-kubectl create namespace cargoship-controlplane-system
+kubectl create namespace cabpc-system
+kubectl create namespace cacpc-system
 ```
 
 ```yaml
@@ -16,7 +16,7 @@ apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-bootstrap
-  namespace: cargoship-bootstrap-system
+  namespace: cabpc-system
 spec:
   name: cargoship
   type: bootstrap
@@ -28,7 +28,7 @@ apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
 metadata:
   name: cargoship-control-plane
-  namespace: cargoship-controlplane-system
+  namespace: cacpc-system
 spec:
   name: cargoship
   type: controlPlane
@@ -90,15 +90,15 @@ gh release download v0.1.0 --repo colonel-byte/cluster-api-provider-cargoship \
 Inside:
 
 ```sh
-kubectl create configmap v0.1.0 --namespace cargoship-bootstrap-system \
+kubectl create configmap v0.1.0 --namespace cabpc-system \
   --from-file=components=bootstrap-components.yaml \
   --from-file=metadata=metadata.yaml
-kubectl label configmap v0.1.0 --namespace cargoship-bootstrap-system provider-components=cargoship
+kubectl label configmap v0.1.0 --namespace cabpc-system provider-components=cargoship
 
-kubectl create configmap v0.1.0 --namespace cargoship-controlplane-system \
+kubectl create configmap v0.1.0 --namespace cacpc-system \
   --from-file=components=control-plane-components.yaml \
   --from-file=metadata=metadata.yaml
-kubectl label configmap v0.1.0 --namespace cargoship-controlplane-system provider-components=cargoship
+kubectl label configmap v0.1.0 --namespace cacpc-system provider-components=cargoship
 ```
 
 Then both objects lose `fetchConfig.url` and gain the selector, with everything else unchanged:
