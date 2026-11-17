@@ -88,8 +88,8 @@ func SetPaths(p Paths) error {
 		return fmt.Errorf("unable to create the temp directory: %w", err)
 	}
 	// cargoship's values loader is the one temp directory that does not read the config below:
-	// layout.LoadValues passes an empty tmpDir, so a package whose values files are URLs lands in
-	// os.MkdirTemp("") -- /tmp, which is read-only in the manager's pod.
+	// layout.LoadValues passes an empty tmpDir, so any package that ships a values file at all
+	// lands in os.MkdirTemp("") -- /tmp, which is read-only in the manager's pod.
 	// shortcut: TMPDIR is process-global, so this is set for the whole manager rather than for
 	// one apply; drop it once cargoship honours config.CommonOptions.TempDirectory there.
 	if err := os.Setenv("TMPDIR", p.Temp); err != nil {
@@ -119,6 +119,12 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 		return nil, errors.New("SetPaths has not been called")
 	}
 
+	// Everything cargoship logs it logs through logger.From(ctx), which discards when nothing is
+	// attached. Attached here rather than around the apply alone because the package pull and the
+	// manager build below log too, and those are the minutes an operator is waiting through when
+	// a registry is slow or a signature does not verify.
+	ctx = logger.WithContext(ctx, logger.Default())
+
 	cachePath, err := config.GetAbsCachePath()
 	if err != nil {
 		return nil, fmt.Errorf("unable to resolve the cache path: %w", err)
@@ -130,8 +136,9 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 		Output:       config.CommonOptions.TempDirectory,
 	}
 	loadOptions.CABundle = opts.CABundle
-	// Set through the promoted field rather than by naming cargoship's embedded
-	// types.RemoteOptions, which would make zarf a direct dependency of this module for one bool.
+	// Set after the literal because it is a promoted field: Go has no composite-literal syntax
+	// for a field of an embedded struct, and naming cargoship's embedded types.RemoteOptions here
+	// would couple this call to zarf's type rather than to cargoship's option struct.
 	loadOptions.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
 
 	layout, err := distro.Load(ctx, opts.Source, loadOptions)
@@ -181,7 +188,6 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 	}
 
 	run := &Run{}
-	ctx = logger.WithContext(ctx, logger.Default())
 	applyErr := apply.Run(ctx)
 	run.Result = manager.Result
 
