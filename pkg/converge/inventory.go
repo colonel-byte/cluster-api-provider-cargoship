@@ -182,11 +182,14 @@ func BuildInventory(in Input) (*Inventory, error) {
 		}
 		host.ConnectionConfig.SSH = sshConfig
 
-		// The private address is what the nodes use to talk to each other, which is not
-		// necessarily the address this controller reached them on. Setting it only when they
-		// differ leaves cargoship to discover it in the ordinary case.
-		if private := addressOfType(m, clusterv1.MachineInternalIP); private != "" && private != address {
+		// The private address is what the nodes use to talk to each other and what
+		// the firewall phase adds to the cluster trust set (k8s-nodes ipset).
+		// Always populate it: if an InternalIP is present use it, otherwise fall back
+		// to the connection address.
+		if private := addressOfType(m, clusterv1.MachineInternalIP); private != "" {
 			host.PrivateAddress = private
+		} else {
+			host.PrivateAddress = address
 		}
 
 		inv.Cluster.Spec.Hosts = append(inv.Cluster.Spec.Hosts, host)
