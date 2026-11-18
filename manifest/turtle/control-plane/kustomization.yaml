@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 configMapGenerator:
-  - name: v0.5.0 # x-release-please-version
+  - name: v0.5.1 # x-release-please-version
     namespace: cacpc-system
     files:
       - components=control-plane-components.yaml
