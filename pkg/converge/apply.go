@@ -87,14 +87,6 @@ func SetPaths(p Paths) error {
 	if err := os.MkdirAll(p.Temp, 0o750); err != nil {
 		return fmt.Errorf("unable to create the temp directory: %w", err)
 	}
-	// cargoship's values loader is the one temp directory that does not read the config below:
-	// layout.LoadValues passes an empty tmpDir, so any package that ships a values file at all
-	// lands in os.MkdirTemp("") -- /tmp, which is read-only in the manager's pod.
-	// shortcut: TMPDIR is process-global, so this is set for the whole manager rather than for
-	// one apply; drop it once cargoship honours config.CommonOptions.TempDirectory there.
-	if err := os.Setenv("TMPDIR", p.Temp); err != nil {
-		return fmt.Errorf("unable to point TMPDIR at the temp directory: %w", err)
-	}
 	config.CommonOptions.CachePath = p.Cache
 	config.CommonOptions.TempDirectory = p.Temp
 
