@@ -125,7 +125,6 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 	loadOptions := distro.LoadOptions{
 		CachePath:    cachePath,
 		Architecture: opts.Architecture,
-		Output:       config.CommonOptions.TempDirectory,
 	}
 	loadOptions.CABundle = opts.CABundle
 	// Set after the literal because it is a promoted field: Go has no composite-literal syntax
