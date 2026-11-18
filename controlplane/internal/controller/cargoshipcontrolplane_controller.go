@@ -362,6 +362,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 
 	case converge.StateFailed:
+		logger.Error(run.Err, "converge failed")
 		r.recordHosts(cp, inv, run)
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "ConvergeFailed", run.Err.Error())
 		// Forgotten so the next pass runs again rather than reporting the same failure forever.
