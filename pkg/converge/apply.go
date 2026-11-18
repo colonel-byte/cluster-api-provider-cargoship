@@ -25,8 +25,6 @@ import (
 	"github.com/colonel-byte/cargoship/config"
 	"github.com/colonel-byte/cargoship/pkg/action"
 	"github.com/colonel-byte/cargoship/pkg/distro"
-	// Aliased because Apply holds the extracted package in a variable of the same name, and a
-	// package shadowed by a local is a trap for the next edit rather than a compile error.
 	pkglayout "github.com/colonel-byte/cargoship/pkg/packager/layout"
 	"github.com/colonel-byte/cargoship/pkg/signing"
 	"github.com/zarf-dev/zarf/src/pkg/logger"
@@ -161,6 +159,10 @@ func Apply(ctx context.Context, inv *Inventory, opts Options) (*Run, error) {
 		// keyless method reports "nothing to verify against" -- which the default strategy
 		// tolerates with a warning. That is a converge of unverified contents on a fleet whose
 		// operator asked for verification, so the strategy says always.
+		//
+		// pkglayout rather than layout: the package below holds the extracted distro in a local
+		// of that name, and a package shadowed by a variable is a trap for the next edit rather
+		// than a compile error.
 		loadOptions.VerificationStrategy = pkglayout.VerifyAlways
 	}
 
