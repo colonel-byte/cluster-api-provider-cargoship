@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.4...v0.5.5) (2026-11-18)
+
+
+### CI/CD
+
+* **release:** drop the redundant goreleaser dependency from the zarf publish job ([#87](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/87)) ([a14523c](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/a14523c770a980ea38109172df24d80b10d02c92))
+
 ## [0.5.4](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.3...v0.5.4) (2026-11-18)
 
 
