@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.1...v0.5.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* **controlplane:** log the underlying error when a converge fails ([#79](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/79)) ([1652e0e](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/1652e0ee0553567dca64eb96c3e9ff56f6b3a0fc))
+
 ## [0.5.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.0...v0.5.1) (2026-11-18)
 
 
