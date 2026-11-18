@@ -28,7 +28,11 @@ spec:
           volumeMounts:
             - name: cargoship
               mountPath: /var/lib/cargoship
+            - name: ssh
+              mountPath: /home/nonroot/.ssh
       volumes:
         - name: cargoship
           emptyDir:
             sizeLimit: 20Gi
+        - name: ssh
+          emptyDir: {}
