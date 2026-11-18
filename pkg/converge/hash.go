@@ -55,6 +55,14 @@ type DesiredState struct {
 	DistroDigest string `json:"distroDigest,omitempty"`
 	// Apply is the converge's own options, because they change what an apply does.
 	Apply json.RawMessage `json:"apply,omitempty"`
+	// SignatureKey is the Cosign public key the package's signature is verified against, where
+	// the caller has one.
+	//
+	// Here because turning verification on has to be an event: a fleet that already matches its
+	// last converge would otherwise skip the apply, and the key would never be used. It is the
+	// public half, so there is nothing secret in a fingerprint input -- and the fingerprint is
+	// a hash either way.
+	SignatureKey []byte `json:"signatureKey,omitempty"`
 }
 
 // DesiredHost is one host's contribution to the fingerprint.

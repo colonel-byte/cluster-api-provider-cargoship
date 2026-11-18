@@ -271,6 +271,27 @@ type DistroSource struct {
 	// +optional
 	CABundleSecretRef *SecretReference `json:"caBundleSecretRef,omitempty"`
 
+	// signatureKeySecretRef is a secret holding the Cosign public key the package's signature is
+	// verified against, in its "cosign.pub" key.
+	//
+	// Empty verifies nothing. A signature with no key to check it against is not verification,
+	// so cargoship logs that it could not verify and converges anyway -- for a signed package
+	// exactly as for an unsigned one. Nothing else on this resource changes that.
+	//
+	// Naming a key makes verification a precondition: an unsigned package, a signature this key
+	// does not verify, and a signature in a form cargoship cannot check are all refused, and the
+	// refusal comes out of the package pull before anything is extracted or run on a host. This
+	// is the field for a fleet whose supply chain is the trust boundary rather than the
+	// registry's authentication.
+	//
+	// Unlike pullSecretRef and caBundleSecretRef it stands alongside fromZarfState rather than
+	// instead of it: Zarf's own state carries no signing key, so a Zarf registry's packages are
+	// verified through this field like any other. It is also read on every pass rather than only
+	// on the passes that converge, so a secret deleted under a converged fleet is reported rather
+	// than noticed the next time something changes.
+	// +optional
+	SignatureKeySecretRef *SecretReference `json:"signatureKeySecretRef,omitempty"`
+
 	// insecureSkipTLSVerify accepts the registry's certificate without verifying it, rather than
 	// trusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH
 	// connections to the fleet nor the workload cluster's API server.

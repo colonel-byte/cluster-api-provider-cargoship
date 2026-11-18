@@ -63,19 +63,21 @@ func (p stubProbe) Reachable(context.Context, converge.Host) (bool, error) {
 // for, which is what the pre-terminate and scale assertions are actually about: a converge that
 // ran is not the same as a converge that ran against the right fleet.
 type stubConverge struct {
-	mu   sync.Mutex
-	runs [][]string
-	err  error
+	mu       sync.Mutex
+	runs     [][]string
+	lastOpts converge.Options
+	err      error
 }
 
 // apply is the ConvergeFunc the reconciler is given.
-func (s *stubConverge) apply(_ context.Context, inv *converge.Inventory, _ converge.Options) (*converge.Run, error) {
+func (s *stubConverge) apply(_ context.Context, inv *converge.Inventory, opts converge.Options) (*converge.Run, error) {
 	s.mu.Lock()
 	addresses := make([]string, 0, len(inv.Hosts))
 	for _, h := range inv.Hosts {
 		addresses = append(addresses, h.Address)
 	}
 	s.runs = append(s.runs, addresses)
+	s.lastOpts = opts
 	err := s.err
 	s.mu.Unlock()
 
@@ -105,6 +107,18 @@ func (s *stubConverge) count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.runs)
+}
+
+// options is what the most recent converge was asked to do.
+func (s *stubConverge) options(t *testing.T) converge.Options {
+	t.Helper()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.runs) == 0 {
+		t.Fatal("no converge has been started")
+	}
+	return s.lastOpts
 }
 
 // last is the host set of the most recent converge.

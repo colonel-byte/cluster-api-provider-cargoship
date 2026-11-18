@@ -261,6 +261,12 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{}, err
 	}
 
+	signatureKey, err := r.signatureKey(ctx, cp)
+	if err != nil {
+		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "SignatureKeyUnusable", err.Error())
+		return ctrl.Result{}, err
+	}
+
 	applyRaw, err := json.Marshal(cp.Spec.Apply)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -275,6 +281,10 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		// into a converge nobody triggered.
 		DistroDigest: adoptRepublished(cp),
 		Apply:        applyRaw,
+		// Folded in so that naming a key, or rotating one, is an event. Without it an operator
+		// who turned verification on for a converged fleet would get silence: the fingerprint
+		// would match, the apply would be skipped, and nothing would ever be verified.
+		SignatureKey: signatureKey,
 	}.Fingerprint()
 	if err != nil {
 		return ctrl.Result{}, err
@@ -341,6 +351,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 			Source:                source,
 			Architecture:          cp.Spec.Distro.Arch,
 			CABundle:              caBundle,
+			SignatureKey:          signatureKey,
 			InsecureSkipTLSVerify: cp.Spec.Distro.InsecureSkipTLSVerify,
 			Concurrency:           int(cp.Spec.Apply.Concurrency),
 			WorkerConcurrent:      cp.Spec.Apply.WorkerConcurrent,
@@ -425,6 +436,10 @@ func convergingMessage(hosts int, run *converge.Run) string {
 // caBundleField is the key a CA bundle is conventionally kept under in a secret -- the same one
 // Kubernetes uses for the cluster's own certificate in a service account's token secret.
 const caBundleField = "ca.crt"
+
+// signatureKeyField is the key a Cosign public key is kept under -- the name cosign's own
+// keypair generation gives the public half, so a secret made from one needs no renaming.
+const signatureKeyField = "cosign.pub"
 
 // adoptRepublished is the discovered package's content digest when the annotation asking a
 // converge to follow a republished package is set, and empty otherwise.
@@ -561,6 +576,40 @@ func (r *CargoshipControlPlaneReconciler) caBundle(
 		return nil, fmt.Errorf("ca bundle secret %s has no %q field, or it is empty", key, caBundleField)
 	}
 	return bundle, nil
+}
+
+// signatureKey returns the Cosign public key spec.distro.signatureKeySecretRef names, and nil when
+// the field is unset, in which case nothing is verified: cargoship warns that it had no key to
+// check a signature against and pulls the package anyway, signed or not.
+//
+// Read in the reconcile, before the fingerprint, for the same reason the CA bundle is: a secret
+// that is missing or has the wrong key in it is worth a condition on the resource now rather than
+// a failed converge several minutes from now. Unlike the CA bundle it is read on every pass rather
+// than only on the ones that converge, which is the point -- a trust anchor deleted under a
+// converged fleet should say so at the next drift interval, not at the next change to the spec.
+// It touches nothing on the way, unlike the pull secret, which writes a file.
+func (r *CargoshipControlPlaneReconciler) signatureKey(
+	ctx context.Context,
+	cp *controlplanev1.CargoshipControlPlane,
+) ([]byte, error) {
+	if cp.Spec.Distro.SignatureKeySecretRef == nil {
+		return nil, nil
+	}
+
+	key, err := cp.Spec.Distro.SignatureKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)
+	if err != nil {
+		return nil, err
+	}
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, key, secret); err != nil {
+		return nil, fmt.Errorf("unable to read the signature key secret %s: %w", key, err)
+	}
+
+	pub := secret.Data[signatureKeyField]
+	if len(pub) == 0 {
+		return nil, fmt.Errorf("signature key secret %s has no %q field, or it is empty", key, signatureKeyField)
+	}
+	return pub, nil
 }
 
 // writePullSecret merges the registry credentials spec.distro.pullSecretRef names into the Docker
