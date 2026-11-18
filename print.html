@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-e80becf0.js";
+            window.path_to_searchindex_js = "searchindex-1bdb15b9.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-8b7a017e.js"></script>
@@ -234,6 +234,10 @@ spec:
     #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
     #   name: k3s
     #   packageVersion: 1.34.1
+    # Name a Cosign public key and the package's signature has to verify against it before
+    # anything reaches a host. See docs/guides/registry.md:
+    #   signatureKeySecretRef:
+    #     name: cosign-pubkey
     arch: amd64
   ssh:
     user: rocky
@@ -767,6 +771,77 @@ stringData:
 </ul>
 <p><code>insecureSkipTLSVerify: true</code> is the other option, and it is a different thing: it accepts whatever certificate the registry presents without checking it. Reach for it to prove a registry is otherwise reachable, not to run a fleet. It covers the package pull only - the SSH connections and the workload cluster’s API server are not affected by either field.</p>
 <p>What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with <code>mtlsStrategy</code> set to anything requiring one cannot be pulled from by this controller.</p>
+<h2 id="verifying-the-packages-signature"><a class="header" href="#verifying-the-packages-signature">Verifying the package’s signature</a></h2>
+<p>Everything above authenticates the <em>registry</em>. <code>signatureKeySecretRef</code> is the other half: the Cosign public key the package’s own signature is verified against, before anything is extracted and long before anything is run on a host.</p>
+<pre><code class="language-yaml">spec:
+  distro:
+    signatureKeySecretRef:
+      name: cosign-pubkey
+</code></pre>
+<h3 id="setting-the-secret-up"><a class="header" href="#setting-the-secret-up">Setting the secret up</a></h3>
+<p>The key is the public half of the Cosign keypair the package was signed with. <code>cosign generate-key-pair</code> writes the pair as <code>cosign.key</code> and <code>cosign.pub</code>, and <code>cosign.pub</code> is the half that belongs in the cluster - whoever signs the package keeps the other one.</p>
+<p>A secret holding it, in the same namespace as the <code>CargoshipControlPlane</code>:</p>
+<pre><code class="language-sh">kubectl create secret generic cosign-pubkey \
+  --namespace default \
+  --from-file=cosign.pub=cosign.pub
+</code></pre>
+<p><strong>Write <code>--from-file=cosign.pub=&lt;path&gt;</code> rather than <code>--from-file=&lt;path&gt;</code>.</strong> The short form takes the data key from the file’s own name, so a key saved as <code>fleet-signing.pub</code> lands under <code>fleet-signing.pub</code> and the controller - which reads <code>cosign.pub</code> and nothing else - rejects the secret. The long form names the data key on the left and the file on the right, so any local filename works.</p>
+<p>The declarative equivalent, for a key that lives in Git beside the cluster it verifies:</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: cosign-pubkey
+  namespace: default
+stringData:
+  cosign.pub: |
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+    -----END PUBLIC KEY-----
+</code></pre>
+<p>Four requirements, each of which is a rejection rather than a surprise later:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>What</th><th>Requirement</th></tr>
+</thead>
+<tbody>
+<tr><td>The data key</td><td><code>cosign.pub</code>, exactly. Nothing falls back to another key, and <code>tls.crt</code> - the shape the CA bundle secret uses - is not read</td></tr>
+<tr><td>The value</td><td>One PEM <code>PUBLIC KEY</code> block (or <code>RSA PUBLIC KEY</code>). <strong>An X.509 certificate is not a public key here</strong>: a <code>CERTIFICATE</code> block fails the converge with <code>unknown Public key PEM file type: CERTIFICATE</code>, so extract the key from the certificate first</td></tr>
+<tr><td>The secret’s type</td><td>Anything. <code>Opaque</code>, which <code>kubectl create secret generic</code> produces, is the ordinary one - no dedicated type is required or checked</td></tr>
+<tr><td>The secret’s namespace</td><td>The <code>CargoshipControlPlane</code>’s own, unless the field’s <code>namespace:</code> names another one <em>and</em> the controller was started with <code>--secret-namespaces</code> allowing it. See <a href="#a-secret-in-another-namespace">A secret in another namespace</a></td></tr>
+</tbody>
+</table>
+</div>
+<p>It has to be a <code>Secret</code>. A <code>ConfigMap</code> is arguably the better home for a public key - it is not secret, and a trust anchor in a ConfigMap is easier to review - but nothing reads one today; the field takes a secret reference and only that.</p>
+<p>What the cluster holds is checkable without leaving <code>kubectl</code>:</p>
+<pre><code class="language-sh">kubectl get secret cosign-pubkey --namespace default \
+  -o jsonpath='{.data.cosign\.pub}' | base64 -d | head -1
+</code></pre>
+<p>That should print <code>-----BEGIN PUBLIC KEY-----</code>. Anything else - a certificate, a private key, the whole keypair, an empty line - is the secret the controller will refuse.</p>
+<h3 id="when-it-goes-wrong"><a class="header" href="#when-it-goes-wrong">When it goes wrong</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>What you see on the <code>Converged</code> condition</th><th>What it means</th></tr>
+</thead>
+<tbody>
+<tr><td><code>SignatureKeyUnusable</code>: <code>unable to read the signature key secret ...</code></td><td>No such secret in that namespace, or a namespace the controller is not allowed to read</td></tr>
+<tr><td><code>SignatureKeyUnusable</code>: <code>... has no "cosign.pub" field, or it is empty</code></td><td>The secret exists, but the key is under another data key - usually the <code>--from-file</code> short form above</td></tr>
+<tr><td><code>ConvergeFailed</code>: <code>a public key was provided but the package is not signed</code></td><td>The key is fine and the package carries no signature. Sign it, or take the field off - it will not be ignored</td></tr>
+<tr><td><code>ConvergeFailed</code>: <code>signature verification failed: ...</code></td><td>The package is signed by a different key, or tampered with. This is the field doing its job</td></tr>
+<tr><td><code>ConvergeFailed</code>: <code>unknown Public key PEM file type</code></td><td>The value is PEM but not a public key - a certificate, most often</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="what-naming-it-changes"><a class="header" href="#what-naming-it-changes">What naming it changes</a></h3>
+<p>Four things:</p>
+<ul>
+<li><strong>With no key, nothing is verified.</strong> Not “signatures are checked where there is one” - a signature with no key to check it against is not verification, so cargoship logs <code>package signature not verified; continuing</code> and converges anyway, for a signed package exactly as for an unsigned one. This field is the only thing that changes that.</li>
+<li><strong>Naming it makes verification a precondition.</strong> An unsigned package, a signature the key does not verify, and a signature in a form cargoship cannot check - a keyless one, which is Fulcio-signed and no longer verifiable - are all refused. The refusal is a <code>ConvergeFailed</code> condition quoting cargoship’s own <code>signature verification failed</code>, and it comes before the package is extracted, so nothing from it has run anywhere. The controller will already have opened an SSH connection to the leader in that same pass, because it dials before it pulls to tell a booting machine apart from a broken one.</li>
+<li><strong>It stands alongside <code>fromZarfState</code></strong>, unlike <code>pullSecretRef</code> and <code>caBundleSecretRef</code>. Zarf’s state carries no signing key, so a package pulled from a Zarf registry is verified through this field like any other.</li>
+<li><strong>Turning it on converges the fleet</strong>, and so does rotating the key. The key is part of the desired state for exactly that reason: a fleet already matching its last converge would otherwise skip the apply, and the key would be read and never used.</li>
+</ul>
+<p>The package has to have been signed with the private half, or the controller will refuse it, which is the point. Cargoship signs at either end - creating a package takes a signing key, and so does publishing one - so a package already in a registry unsigned can be signed by publishing it again rather than rebuilt.</p>
 <h2 id="why-this-is-not-the-zarf-packages-problem"><a class="header" href="#why-this-is-not-the-zarf-packages-problem">Why this is not the Zarf package’s problem</a></h2>
 <p><a href="#installing-without-a-route-to-ghcrio">The Zarf package</a> installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.</p>
 <h2 id="letting-zarfs-own-state-answer-both"><a class="header" href="#letting-zarfs-own-state-answer-both">Letting Zarf’s own state answer both</a></h2>
@@ -818,7 +893,7 @@ stringData:
 <p>Both are explained in <a href="#a-package-is-discovered-by-name-through-the-registrys-own-records-never-by-catalogue">the decision record</a>.</p>
 <p>Written once per cluster <em>shape</em> rather than once per cluster, if you compose a <code>ClusterClass</code>: the four fields above live in the <code>CargoshipControlPlaneTemplate</code>’s <code>spec.template.spec.distro</code>, and every cluster built from that class inherits them. A package version that differs per cluster is a topology variable with a patch onto <code>/spec/template/spec/distro/packageVersion</code>. See <a href="#composing-a-clusterclass">Composing a ClusterClass</a>.</p>
 <h2 id="a-secret-in-another-namespace"><a class="header" href="#a-secret-in-another-namespace">A secret in another namespace</a></h2>
-<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>. Empty - and anything written before the field existed - means the namespace the <code>CargoshipControlPlane</code> itself is in, which is the only thing the controller allows by default:</p>
+<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code>, <code>signatureKeySecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>. Empty - and anything written before the field existed - means the namespace the <code>CargoshipControlPlane</code> itself is in, which is the only thing the controller allows by default:</p>
 <pre><code class="language-yaml">spec:
   distro:
     pullSecretRef:
@@ -1068,7 +1143,7 @@ kubectl delete -f out/envtest-crds/
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in"><a class="header" href="#a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in">A cross-namespace secret reference is refused unless an operator opts in</a></h1>
-<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>, and the controllers refuse any value other than the referring object’s own namespace unless they were started with <code>--secret-namespaces</code> naming it. The flag’s default is empty, which is the behaviour before the field existed: same namespace only.</p>
+<p><code>pullSecretRef</code>, <code>caBundleSecretRef</code>, <code>signatureKeySecretRef</code> and <code>ssh.privateKeySecretRef</code> each take an optional <code>namespace</code>, and the controllers refuse any value other than the referring object’s own namespace unless they were started with <code>--secret-namespaces</code> naming it. The flag’s default is empty, which is the behaviour before the field existed: same namespace only.</p>
 <h2 id="why-the-default-is-to-refuse-rather-than-to-allow"><a class="header" href="#why-the-default-is-to-refuse-rather-than-to-allow">Why the default is to refuse rather than to allow</a></h2>
 <p>The controller reads secrets through a cluster-wide <code>ClusterRole</code> - it has to, because a management cluster puts each workload cluster in its own namespace and the provider is installed once. The reference is therefore not an access check, it is a request the controller performs with its own permission. Allowing any namespace by default would mean anybody who can create a <code>CargoshipControlPlane</code> in a namespace they own can have the controller read a credential they do not.</p>
 <p>For the SSH key that is worse than reading the secret. The bootstrap provider derives the public half of whatever key the control plane names and publishes it into each machine’s bootstrap data, so the borrower ends up with a fleet that the borrowed key opens, while the namespace that owns the key sees nothing happen at all. A field that is harmless on a pull secret is a privilege escalation on that one, and they are the same field.</p>
