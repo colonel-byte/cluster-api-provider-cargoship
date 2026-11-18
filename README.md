@@ -72,6 +72,10 @@ spec:
     #   registry: zarf-docker-registry.zarf.svc.cluster.local:5000
     #   name: k3s
     #   packageVersion: 1.34.1
+    # Name a Cosign public key and the package's signature has to verify against it before
+    # anything reaches a host. See docs/guides/registry.md:
+    #   signatureKeySecretRef:
+    #     name: cosign-pubkey
     arch: amd64
   ssh:
     user: rocky

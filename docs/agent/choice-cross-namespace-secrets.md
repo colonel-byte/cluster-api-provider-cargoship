@@ -1,6 +1,6 @@
 # A cross-namespace secret reference is refused unless an operator opts in
 
-`pullSecretRef`, `caBundleSecretRef` and `ssh.privateKeySecretRef` each take an optional `namespace`, and the controllers refuse any value other than the referring object's own namespace unless they were started with `--secret-namespaces` naming it. The flag's default is empty, which is the behaviour before the field existed: same namespace only.
+`pullSecretRef`, `caBundleSecretRef`, `signatureKeySecretRef` and `ssh.privateKeySecretRef` each take an optional `namespace`, and the controllers refuse any value other than the referring object's own namespace unless they were started with `--secret-namespaces` naming it. The flag's default is empty, which is the behaviour before the field existed: same namespace only.
 
 ## Why the default is to refuse rather than to allow
 

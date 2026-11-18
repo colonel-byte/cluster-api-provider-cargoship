@@ -298,6 +298,45 @@ spec:
                             maxLength: 2048
                             minLength: 1
                             type: string
+                          signatureKeySecretRef:
+                            description: |-
+                              signatureKeySecretRef is a secret holding the Cosign public key the package's signature is
+                              verified against, in its "cosign.pub" key.
+
+                              Empty verifies nothing. A signature with no key to check it against is not verification,
+                              so cargoship logs that it could not verify and converges anyway -- for a signed package
+                              exactly as for an unsigned one. Nothing else on this resource changes that.
+
+                              Naming a key makes verification a precondition: an unsigned package, a signature this key
+                              does not verify, and a signature in a form cargoship cannot check are all refused, and the
+                              refusal comes out of the package pull before anything is extracted or run on a host. This
+                              is the field for a fleet whose supply chain is the trust boundary rather than the
+                              registry's authentication.
+
+                              Unlike pullSecretRef and caBundleSecretRef it stands alongside fromZarfState rather than
+                              instead of it: Zarf's own state carries no signing key, so a Zarf registry's packages are
+                              verified through this field like any other. It is also read on every pass rather than only
+                              on the passes that converge, so a secret deleted under a converged fleet is reported rather
+                              than noticed the next time something changes.
+                            properties:
+                              name:
+                                description: name of the referenced secret.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              namespace:
+                                description: |-
+                                  namespace of the referenced secret. Empty means the namespace of the object holding this
+                                  reference.
+
+                                  A namespace other than that one is refused unless the controller was started with
+                                  --secret-namespaces naming it, because reading it would otherwise be a credential the
+                                  referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+                                maxLength: 63
+                                type: string
+                            required:
+                            - name
+                            type: object
                         type: object
                         x-kubernetes-validations:
                         - message: set either ociRef, or both registry and name

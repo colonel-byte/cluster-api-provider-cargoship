@@ -57,6 +57,87 @@ Three things about it:
 
 What cannot be done at all: a registry configured for mTLS, where the client has to present a certificate of its own. Nothing on the pull path accepts a client certificate, so a Zarf registry with `mtlsStrategy` set to anything requiring one cannot be pulled from by this controller.
 
+## Verifying the package's signature
+
+Everything above authenticates the *registry*. `signatureKeySecretRef` is the other half: the Cosign public key the package's own signature is verified against, before anything is extracted and long before anything is run on a host.
+
+```yaml
+spec:
+  distro:
+    signatureKeySecretRef:
+      name: cosign-pubkey
+```
+
+### Setting the secret up
+
+The key is the public half of the Cosign keypair the package was signed with. `cosign generate-key-pair` writes the pair as `cosign.key` and `cosign.pub`, and `cosign.pub` is the half that belongs in the cluster - whoever signs the package keeps the other one.
+
+A secret holding it, in the same namespace as the `CargoshipControlPlane`:
+
+```sh
+kubectl create secret generic cosign-pubkey \
+  --namespace default \
+  --from-file=cosign.pub=cosign.pub
+```
+
+**Write `--from-file=cosign.pub=<path>` rather than `--from-file=<path>`.** The short form takes the data key from the file's own name, so a key saved as `fleet-signing.pub` lands under `fleet-signing.pub` and the controller - which reads `cosign.pub` and nothing else - rejects the secret. The long form names the data key on the left and the file on the right, so any local filename works.
+
+The declarative equivalent, for a key that lives in Git beside the cluster it verifies:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cosign-pubkey
+  namespace: default
+stringData:
+  cosign.pub: |
+    -----BEGIN PUBLIC KEY-----
+    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+    -----END PUBLIC KEY-----
+```
+
+Four requirements, each of which is a rejection rather than a surprise later:
+
+| What                   | Requirement                                                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The data key           | `cosign.pub`, exactly. Nothing falls back to another key, and `tls.crt` - the shape the CA bundle secret uses - is not read                                                                                                                       |
+| The value              | One PEM `PUBLIC KEY` block (or `RSA PUBLIC KEY`). **An X.509 certificate is not a public key here**: a `CERTIFICATE` block fails the converge with `unknown Public key PEM file type: CERTIFICATE`, so extract the key from the certificate first |
+| The secret's type      | Anything. `Opaque`, which `kubectl create secret generic` produces, is the ordinary one - no dedicated type is required or checked                                                                                                                |
+| The secret's namespace | The `CargoshipControlPlane`'s own, unless the field's `namespace:` names another one *and* the controller was started with `--secret-namespaces` allowing it. See [A secret in another namespace](#a-secret-in-another-namespace)                 |
+
+It has to be a `Secret`. A `ConfigMap` is arguably the better home for a public key - it is not secret, and a trust anchor in a ConfigMap is easier to review - but nothing reads one today; the field takes a secret reference and only that.
+
+What the cluster holds is checkable without leaving `kubectl`:
+
+```sh
+kubectl get secret cosign-pubkey --namespace default \
+  -o jsonpath='{.data.cosign\.pub}' | base64 -d | head -1
+```
+
+That should print `-----BEGIN PUBLIC KEY-----`. Anything else - a certificate, a private key, the whole keypair, an empty line - is the secret the controller will refuse.
+
+### When it goes wrong
+
+| What you see on the `Converged` condition                                   | What it means                                                                                                 |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SignatureKeyUnusable`: `unable to read the signature key secret ...`       | No such secret in that namespace, or a namespace the controller is not allowed to read                        |
+| `SignatureKeyUnusable`: `... has no "cosign.pub" field, or it is empty`     | The secret exists, but the key is under another data key - usually the `--from-file` short form above         |
+| `ConvergeFailed`: `a public key was provided but the package is not signed` | The key is fine and the package carries no signature. Sign it, or take the field off - it will not be ignored |
+| `ConvergeFailed`: `signature verification failed: ...`                      | The package is signed by a different key, or tampered with. This is the field doing its job                   |
+| `ConvergeFailed`: `unknown Public key PEM file type`                        | The value is PEM but not a public key - a certificate, most often                                             |
+
+### What naming it changes
+
+Four things:
+
+- **With no key, nothing is verified.** Not "signatures are checked where there is one" - a signature with no key to check it against is not verification, so cargoship logs `package signature not verified; continuing` and converges anyway, for a signed package exactly as for an unsigned one. This field is the only thing that changes that.
+- **Naming it makes verification a precondition.** An unsigned package, a signature the key does not verify, and a signature in a form cargoship cannot check - a keyless one, which is Fulcio-signed and no longer verifiable - are all refused. The refusal is a `ConvergeFailed` condition quoting cargoship's own `signature verification failed`, and it comes before the package is extracted, so nothing from it has run anywhere. The controller will already have opened an SSH connection to the leader in that same pass, because it dials before it pulls to tell a booting machine apart from a broken one.
+- **It stands alongside `fromZarfState`**, unlike `pullSecretRef` and `caBundleSecretRef`. Zarf's state carries no signing key, so a package pulled from a Zarf registry is verified through this field like any other.
+- **Turning it on converges the fleet**, and so does rotating the key. The key is part of the desired state for exactly that reason: a fleet already matching its last converge would otherwise skip the apply, and the key would be read and never used.
+
+The package has to have been signed with the private half, or the controller will refuse it, which is the point. Cargoship signs at either end - creating a package takes a signing key, and so does publishing one - so a package already in a registry unsigned can be signed by publishing it again rather than rebuilt.
+
 ## Why this is not the Zarf package's problem
 
 [The Zarf package](install.md#installing-without-a-route-to-ghcrio) installs the provider. The distro package is what the provider installs onto the fleet, it is pulled at converge time rather than at install time, and it is normally much larger - so it stays in the registry and the two are mirrored separately.
@@ -137,7 +218,7 @@ Written once per cluster *shape* rather than once per cluster, if you compose a 
 
 ## A secret in another namespace
 
-`pullSecretRef`, `caBundleSecretRef` and `ssh.privateKeySecretRef` each take an optional `namespace`. Empty - and anything written before the field existed - means the namespace the `CargoshipControlPlane` itself is in, which is the only thing the controller allows by default:
+`pullSecretRef`, `caBundleSecretRef`, `signatureKeySecretRef` and `ssh.privateKeySecretRef` each take an optional `namespace`. Empty - and anything written before the field existed - means the namespace the `CargoshipControlPlane` itself is in, which is the only thing the controller allows by default:
 
 ```yaml
 spec:

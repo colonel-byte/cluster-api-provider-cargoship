@@ -133,6 +133,14 @@ func TestFingerprintChanges(t *testing.T) {
 				d.Apply = json.RawMessage(`{"modifyFirewall":true}`)
 			},
 		},
+		{
+			// Turning signature verification on has to converge a fleet that already matches
+			// its last one, or the key is read and never used.
+			name: "a signature key is named",
+			mutate: func(d *DesiredState) {
+				d.SignatureKey = []byte("-----BEGIN PUBLIC KEY-----\naaaa\n-----END PUBLIC KEY-----\n")
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -145,5 +153,20 @@ func TestFingerprintChanges(t *testing.T) {
 				t.Errorf("the fingerprint did not change, so this would not trigger a converge")
 			}
 		})
+	}
+}
+
+// TestFingerprintDistinguishesSignatureKeys is the rotation case, which the table above cannot
+// cover: both of its states would differ from a base naming no key at all, and what matters is
+// that two different keys differ from each other.
+func TestFingerprintDistinguishesSignatureKeys(t *testing.T) {
+	t.Parallel()
+
+	first, second := baseState(), baseState()
+	first.SignatureKey = []byte("-----BEGIN PUBLIC KEY-----\naaaa\n-----END PUBLIC KEY-----\n")
+	second.SignatureKey = []byte("-----BEGIN PUBLIC KEY-----\nbbbb\n-----END PUBLIC KEY-----\n")
+
+	if a, b := fingerprint(t, first), fingerprint(t, second); a == b {
+		t.Errorf("two different signature keys fingerprinted the same, so a rotation would not converge: %s", a)
 	}
 }
