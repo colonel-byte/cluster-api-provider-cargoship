@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.0...v0.5.1) (2026-11-18)
+
+
+### Miscellaneous
+
+* **converge:** do not re-archive the distro package on load ([#78](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/78)) ([b0abc19](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/b0abc19251c42bf1dbcc98f032d02d23b70a1c59))
+
+
+### Build
+
+* **deps:** bump cargoship to 0.42.4 and drop the TMPDIR workaround ([#73](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/73)) ([8a3ecd0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/8a3ecd0cb568eb31a2db4edb49a921800236060a))
+* **deps:** bump github.com/sigstore/timestamp-authority/v2 from 2.2.0 to 2.2.1 ([#75](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/75)) ([0cc8bf5](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0cc8bf5fb092274204ec3819590caf9d124521e7))
+
 ## [0.5.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.4.1...v0.5.0) (2026-11-17)
 
 
