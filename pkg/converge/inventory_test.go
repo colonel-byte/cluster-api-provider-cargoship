@@ -178,12 +178,10 @@ func TestBuildInventoryAddressSelection(t *testing.T) {
 		wantPrivateAddress string
 	}{
 		{
-			name:        "internal is preferred by default",
-			addrs:       []clusterv1.MachineAddress{external("203.0.113.7"), internal("10.0.0.11")},
-			wantAddress: "10.0.0.11",
-			// The connection address already is the private one, so there is nothing to
-			// override and cargoship discovers it.
-			wantPrivateAddress: "",
+			name:               "internal is preferred by default",
+			addrs:              []clusterv1.MachineAddress{external("203.0.113.7"), internal("10.0.0.11")},
+			wantAddress:        "10.0.0.11",
+			wantPrivateAddress: "10.0.0.11",
 		},
 		{
 			name:               "an explicit order can prefer external",
@@ -193,9 +191,10 @@ func TestBuildInventoryAddressSelection(t *testing.T) {
 			wantPrivateAddress: "10.0.0.11",
 		},
 		{
-			name:        "falls through to a hostname",
-			addrs:       []clusterv1.MachineAddress{{Type: clusterv1.MachineHostName, Address: "cp-0.example"}},
-			wantAddress: "cp-0.example",
+			name:               "falls through to a hostname",
+			addrs:              []clusterv1.MachineAddress{{Type: clusterv1.MachineHostName, Address: "cp-0.example"}},
+			wantAddress:        "cp-0.example",
+			wantPrivateAddress: "cp-0.example",
 		},
 	}
 
