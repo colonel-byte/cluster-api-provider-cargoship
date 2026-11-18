@@ -111,6 +111,10 @@ release:
     # --flavor: that reads a template from the infrastructure provider's repository, which this is
     # not. See docs/guides/clusterclass.md.
     - glob: examples/cluster-template-clusterclass-vsphere.yaml
+  # release-please publishes the release, body and all, before this tag's goreleaser run starts.
+  # The default mode is keep-existing, which sees that body and discards everything below --
+  # including the footer. append keeps release-please's changelog and adds the footer under it.
+  mode: append
   prerelease: auto
   footer: |-
     ---
