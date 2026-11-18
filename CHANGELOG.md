@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.3...v0.5.4) (2026-11-18)
+
+
+### Bug Fixes
+
+* populate host private address for firewall and mount ssh dir ([#84](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/84)) ([7e656bb](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/7e656bb29a87383f3474314f9aaa26fb4ac73856))
+
 ## [0.5.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.2...v0.5.3) (2026-11-18)
 
 
