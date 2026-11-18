@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.2...v0.5.3) (2026-11-18)
+
+
+### CI/CD
+
+* **release:** append goreleaser's notes so the cosign footer survives ([#81](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/81)) ([2839455](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/28394553614ce42649363e9a148b813d8b1785f1))
+
+
+### Build
+
+* **deps:** bump cargoship to 0.42.5 ([#83](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/83)) ([9f25062](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/9f250628c139c58a6b4cd6334526cc995b5b0685))
+
 ## [0.5.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.1...v0.5.2) (2026-11-18)
 
 
