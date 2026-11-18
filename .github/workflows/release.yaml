@@ -148,7 +148,6 @@ jobs:
       packages: write
       id-token: write
     needs:
-      - goreleaser
       - publish-oci-artifact
     if: startsWith(github.ref_name, 'v')
     uses: ./.github/workflows/publish-zarf-package.yaml
