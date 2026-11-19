@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-1bdb15b9.js";
+            window.path_to_searchindex_js = "searchindex-f9a38975.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-8b7a017e.js"></script>
+        <script src="toc-db27eea1.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1140,6 +1140,40 @@ kubectl delete -f out/envtest-crds/
 <ul>
 <li><code>spec.topology.controlPlane.rollout.after</code> asks for a rollout after a timestamp. Nothing replaces machines here, so nothing happens.</li>
 <li>A topology that changes the package without changing the version converges the fleet with no approval needed, because the gate reads the version rather than the package. That is the same behaviour a hand-wired resource has.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="specclusterconfig-is-guarded-in-go-because-cel-cannot-be-pointed-at-it"><a class="header" href="#specclusterconfig-is-guarded-in-go-because-cel-cannot-be-pointed-at-it"><code>spec.clusterConfig</code> is guarded in Go, because CEL cannot be pointed at it</a></h1>
+<p><code>spec.clusterConfig</code> carries a cargoship cluster configuration verbatim, as an opaque object: <code>*apiextensionsv1.JSON</code> with <code>+kubebuilder:pruning:PreserveUnknownFields</code>, which generates a schema with no <code>type</code> and nothing but <code>x-kubernetes-preserve-unknown-fields: true</code>. The reasoning for carrying it that way is in the field’s own doc comment - the YAML an operator writes here is the YAML of a cargoship inventory, so it needs no translation and cannot drift from the schema cargoship validates against.</p>
+<p>The obvious way to guard the parts of it that are easy to get wrong - a profile’s <code>concurrency</code>, a firewall rule’s <code>port</code> - is a CEL validation rule, the way <code>DistroSource</code> guards its own combinations. <strong>It does not work, and it does not fail quietly.</strong> The CEL type resolver in apiextensions skips subtrees it has no schema information for, so a rule naming <code>self.clusterConfig.profiles</code> does not merely never fire: the expression does not compile, and the API server rejects the custom resource definition that carries it. There is no CEL for this field short of giving it a real schema, which means mirroring cargoship’s config types field by field and owning a copy that drifts on every cargoship release.</p>
+<p>So the guard is Go, in <code>converge.validateClusterConfig</code>, run from <code>DecodeClusterConfig</code>.</p>
+<h2 id="what-it-checks-and-what-it-deliberately-is-not"><a class="header" href="#what-it-checks-and-what-it-deliberately-is-not">What it checks, and what it deliberately is not</a></h2>
+<p>Every check calls the cargoship function that would run later anyway:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>What</th><th>cargoship’s own check</th><th>Where it would otherwise be found</th></tr>
+</thead>
+<tbody>
+<tr><td><code>registries</code></td><td><code>cluster.ValidateRegistries</code></td><td>A registry entry that configures nothing stays a no-op nobody is told about</td></tr>
+<tr><td><code>profiles.*.inherit</code></td><td><code>cluster.ResolveProfiles</code></td><td>On load, after the package is pulled</td></tr>
+<tr><td><code>profiles.*.concurrency</code></td><td><code>cluster.ParseConcurrency</code></td><td>Inside each phase as it sizes its batches, so part way through an apply</td></tr>
+<tr><td><code>profiles.*.host.firewall</code></td><td><code>FirewallConfig.Validate</code></td><td>Phase 11, three phases after SSH has reached every host in the fleet</td></tr>
+<tr><td><code>profiles.*.host.ports</code>, <code>...policy.*.ports</code></td><td><code>FirewallRule.Validate</code></td><td>Nowhere - it reaches the firewall backend and renders a broken rule</td></tr>
+</tbody>
+</table>
+</div>
+<p>Two things follow from “calls cargoship’s own”:</p>
+<ul>
+<li><strong>No check here is a second implementation of one.</strong> That is the whole point: a port parser written in this repository would be one more thing to keep in step with the one that decides whether an apply succeeds. The exposed ports are checked by building an equivalent <code>cluster.FirewallRule</code> and validating it, because cargoship’s port parser is unexported and <code>FirewallRule.Validate</code> is the only exported caller of it. A port with no protocol is handed <code>tcp</code>, which is what every firewall backend renders it as.</li>
+<li><strong>The profiles are folded before they are checked.</strong> <code>ResolveProfiles</code> is called and its result is what gets validated, so a profile inheriting a bad concurrency is refused like one spelling it out. The folded map is discarded: cargoship folds them again when it loads the cluster, so nothing here changes what the converge is given.</li>
+</ul>
+<p>This is validation, not admission. <code>kubectl apply</code> still succeeds, because nothing in this repository runs a webhook - there is no cert-manager wiring, no service, no kustomize patch and no release-manifest entry for one, and adding that stack to reject a handful of fields would be a far larger thing than the fields are worth. The failure is reported on the <code>Converged</code> condition with the reason <code>ClusterConfigInvalid</code>, and it is reported <em>as</em> a refused converge rather than as an incomplete inventory: the machines are fine, the document is wrong, and only an edit to it changes that. <code>converge.ErrClusterConfig</code> is what lets the reconcile tell those two apart.</p>
+<h2 id="the-schema-guards-that-are-possible"><a class="header" href="#the-schema-guards-that-are-possible">The schema guards that are possible</a></h2>
+<p>The fields this provider does own in its own schema are guarded there, where the API server can reject them on <code>kubectl apply</code>:</p>
+<ul>
+<li><code>spec.apply.workerConcurrent</code> matches a count or a percentage. Nothing in this repository parses it - cargoship does, as it sizes each phase’s batches - so without the pattern a typo lands part way through an apply with earlier phases already applied to hosts.</li>
+<li><code>spec.version</code> requires the leading <code>v</code> and a <code>major.minor.patch</code>, with anything after it allowed, because a distro package’s build suffix is part of the version it installs: <code>v1.31.2+k3s1</code>.</li>
+<li><code>spec.distro.registry</code> may not contain <code>://</code>. It is a host with an optional path prefix; a scheme there builds a reference like <code>oci://https://registry/...</code> and keys the pull credentials under a host of <code>https:</code>.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in"><a class="header" href="#a-cross-namespace-secret-reference-is-refused-unless-an-operator-opts-in">A cross-namespace secret reference is refused unless an operator opts in</a></h1>
