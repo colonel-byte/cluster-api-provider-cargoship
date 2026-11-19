@@ -128,8 +128,8 @@ func TestBuildInventory(t *testing.T) {
 	if cp.Role != RoleController {
 		t.Errorf("control-plane machine built role %q, want %q", cp.Role, RoleController)
 	}
-	if cp.Host.Profile != "" {
-		t.Errorf("control-plane host profile = %q, want empty", cp.Host.Profile)
+	if cp.Host.Profile != ProfileControlPlane {
+		t.Errorf("control-plane host profile = %q, want %q", cp.Host.Profile, ProfileControlPlane)
 	}
 	if cp.Address != "10.0.0.11" {
 		t.Errorf("control-plane address = %q, want 10.0.0.11", cp.Address)
@@ -510,6 +510,13 @@ func TestProfile(t *testing.T) {
 			name:   "a control-plane machine, stamped from no deployment",
 			labels: nil,
 			want:   "",
+		},
+		{
+			name: "a control-plane machine with the control-plane label",
+			labels: map[string]string{
+				clusterv1.MachineControlPlaneLabel: "",
+			},
+			want: ProfileControlPlane,
 		},
 	}
 
