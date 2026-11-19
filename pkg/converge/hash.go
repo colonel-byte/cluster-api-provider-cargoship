@@ -55,6 +55,15 @@ type DesiredState struct {
 	DistroDigest string `json:"distroDigest,omitempty"`
 	// Apply is the converge's own options, because they change what an apply does.
 	Apply json.RawMessage `json:"apply,omitempty"`
+	// RegistryAuthHash is the hash ApplyRegistryAuth returned over the credentials it resolved
+	// from the registry auth secret, when the caller wants a rotated secret to be an event.
+	//
+	// It is a hash of the applied credentials and never the credentials themselves, for the same
+	// reason SignatureKey below is the public half: nothing secret may sit in a fingerprint
+	// input. Callers whose credentialRotation is Drift leave it empty, which keeps their
+	// fingerprint exactly as it was.
+	RegistryAuthHash string `json:"registryAuthHash,omitempty"`
+
 	// SignatureKey is the Cosign public key the package's signature is verified against, where
 	// the caller has one.
 	//

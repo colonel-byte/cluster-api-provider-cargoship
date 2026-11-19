@@ -212,7 +212,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 	}
 
-	inv, clusterConfigRaw, err := r.buildInventory(ctx, cluster, cp, machines, endpoint)
+	inv, clusterConfigRaw, registryAuthHash, err := r.buildInventory(ctx, cluster, cp, machines, endpoint)
 	if err != nil {
 		if errors.Is(err, converge.ErrClusterConfig) {
 			// Reported as a converge that will not happen rather than as an inventory that is
@@ -293,6 +293,9 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		// into a converge nobody triggered.
 		DistroDigest: adoptRepublished(cp),
 		Apply:        applyRaw,
+		// Empty unless spec.apply.credentialRotation is Immediate, so with the Drift default a
+		// rotated secret changes nothing here and is delivered at the next drift converge.
+		RegistryAuthHash: registryAuthHash,
 		// Folded in so that naming a key, or rotating one, is an event. Without it an operator
 		// who turned verification on for a converged fleet would get silence: the fingerprint
 		// would match, the apply would be skipped, and nothing would ever be verified.
@@ -663,56 +666,63 @@ func (r *CargoshipControlPlaneReconciler) writePullSecret(
 // It returns the raw config alongside the inventory because the fingerprint hashes the bytes the
 // API server stored, not the decoded struct: a struct round-trip would drop any key cargoship
 // gained in a later version and quietly stop noticing changes to it.
+//
+// registryAuthHash is the hash of the credentials resolved from spec.registryAuthSecretRef, and
+// is empty unless spec.apply.credentialRotation is Immediate: delivering new credentials drains
+// and restarts every node, so a rotation only becomes a converge when the operator said it
+// should. With Drift the rotation still lands, at the next drift converge, because every
+// reconcile re-reads the secret.
 func (r *CargoshipControlPlaneReconciler) buildInventory(
 	ctx context.Context,
 	cluster *clusterv1.Cluster,
 	cp *controlplanev1.CargoshipControlPlane,
 	machines []*clusterv1.Machine,
 	endpoint string,
-) (*converge.Inventory, []byte, error) {
-	var raw []byte
+) (_ *converge.Inventory, raw []byte, registryAuthHash string, _ error) {
 	if cp.Spec.ClusterConfig != nil {
 		raw = cp.Spec.ClusterConfig.Raw
 	}
 
 	clusterConfig, err := converge.DecodeClusterConfig(raw)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	// Registry credentials are resolved from the secret into the decoded config, never into the
 	// resource: raw -- which the fingerprint hashes -- stays exactly what the API server stored.
-	// shortcut: that also means a rotated secret is only picked up at the drift interval, not on
-	// rotation; hash the resolved credentials into the fingerprint before this ships.
 	if cp.Spec.RegistryAuthSecretRef != nil {
 		key, err := cp.Spec.RegistryAuthSecretRef.Key(cp.Namespace, r.SecretNamespaces)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, "", err
 		}
 		authSecret := &corev1.Secret{}
 		if err := r.Get(ctx, key, authSecret); err != nil {
-			return nil, nil, fmt.Errorf("unable to read the registry auth secret %s: %w", key, err)
+			return nil, nil, "", fmt.Errorf("unable to read the registry auth secret %s: %w", key, err)
 		}
 		payload, ok := authSecret.Data[corev1.DockerConfigJsonKey]
 		if !ok {
-			return nil, nil, fmt.Errorf("registry auth secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
+			return nil, nil, "", fmt.Errorf("registry auth secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
 				key, corev1.DockerConfigJsonKey)
 		}
-		if err := converge.ApplyRegistryAuth(&clusterConfig, payload); err != nil {
-			return nil, nil, fmt.Errorf("registry auth secret %s: %w", key, err)
+		hash, err := converge.ApplyRegistryAuth(&clusterConfig, payload)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("registry auth secret %s: %w", key, err)
+		}
+		if cp.Spec.Apply.CredentialRotation == controlplanev1.CredentialRotationImmediate {
+			registryAuthHash = hash
 		}
 	}
 
 	secret := &corev1.Secret{}
 	key, err := cp.Spec.SSH.PrivateKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	if err := r.Get(ctx, key, secret); err != nil {
-		return nil, nil, fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)
+		return nil, nil, "", fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)
 	}
 	privateKey, err := sshkey.PrivateKey(secret)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	inv, err := converge.BuildInventory(converge.Input{
@@ -727,9 +737,9 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 		Machines: machines,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return inv, raw, nil
+	return inv, raw, registryAuthHash, nil
 }
 
 // endpoint is the host clients reach the API through.
@@ -925,6 +935,45 @@ func (r *CargoshipControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) err
 			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.controlPlanesForMachine),
 		).
+		// A rotated registry auth secret is only an event for a control plane that opted into
+		// Immediate credential rotation; everything else picks it up at the drift interval.
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.controlPlanesForRegistryAuthSecret),
+		).
 		Named("cargoshipcontrolplane").
 		Complete(r)
+}
+
+// controlPlanesForRegistryAuthSecret maps a Secret to the control planes that both reference it
+// as their registryAuthSecretRef and asked for Immediate credential rotation.
+//
+// The Drift ones are filtered out here rather than in the reconcile, because with Drift the
+// fingerprint does not see the credentials and the reconcile would be a guaranteed no-op: every
+// secret write in the management cluster would wake every control plane for nothing.
+func (r *CargoshipControlPlaneReconciler) controlPlanesForRegistryAuthSecret(ctx context.Context, obj client.Object) []ctrl.Request {
+	list := &controlplanev1.CargoshipControlPlaneList{}
+	if err := r.List(ctx, list); err != nil {
+		return nil
+	}
+
+	var out []ctrl.Request
+	for i := range list.Items {
+		cp := &list.Items[i]
+		if cp.Spec.RegistryAuthSecretRef == nil ||
+			cp.Spec.Apply.CredentialRotation != controlplanev1.CredentialRotationImmediate {
+			continue
+		}
+		// A reference whose namespace is not allowed maps to nothing: the reconcile could not
+		// have read that secret, so its rotation cannot be its event.
+		key, err := cp.Spec.RegistryAuthSecretRef.Key(cp.Namespace, r.SecretNamespaces)
+		if err != nil {
+			continue
+		}
+		if key.Namespace != obj.GetNamespace() || key.Name != obj.GetName() {
+			continue
+		}
+		out = append(out, ctrl.Request{NamespacedName: client.ObjectKeyFromObject(cp)})
+	}
+	return out
 }

@@ -121,7 +121,7 @@ func TestApplyRegistryAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := cluster.Config{Registries: tt.registries}
-			err := ApplyRegistryAuth(&cfg, tt.payload)
+			hash, err := ApplyRegistryAuth(&cfg, tt.payload)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected an error, got nil")
@@ -131,11 +131,48 @@ func TestApplyRegistryAuth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+			if hash == "" {
+				t.Error("expected a non-empty hash")
+			}
 			for i, want := range tt.want {
 				if got := cfg.Registries[i].Authentication; got != want {
 					t.Errorf("registry %s: got %+v, want %+v", cfg.Registries[i].Name, got, want)
 				}
 			}
 		})
+	}
+}
+
+// TestApplyRegistryAuthHash pins what makes the hash move: the credentials that landed on a
+// registry, and nothing else. It is what lets a rotated secret be a fingerprint event while an
+// irrelevant entry added to the same secret is not.
+func TestApplyRegistryAuthHash(t *testing.T) {
+	registries := func() []cluster.Registries {
+		return []cluster.Registries{
+			{Name: "registry.example.com"},
+		}
+	}
+	apply := func(t *testing.T, payload string) string {
+		t.Helper()
+		cfg := cluster.Config{Registries: registries()}
+		hash, err := ApplyRegistryAuth(&cfg, []byte(payload))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		return hash
+	}
+
+	base := `{"auths": {"registry.example.com": {"username": "u", "password": "p1"}}}`
+
+	if apply(t, base) != apply(t, base) {
+		t.Error("the same payload must hash the same")
+	}
+	rotated := `{"auths": {"registry.example.com": {"username": "u", "password": "p2"}}}`
+	if apply(t, base) == apply(t, rotated) {
+		t.Error("a rotated password must change the hash")
+	}
+	widened := `{"auths": {"registry.example.com": {"username": "u", "password": "p1"}, "unrelated.example.com": {"username": "x", "password": "y"}}}`
+	if apply(t, base) != apply(t, widened) {
+		t.Error("an entry for a registry the cluster does not name must not change the hash")
 	}
 }
