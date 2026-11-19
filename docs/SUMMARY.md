@@ -20,6 +20,7 @@
 # Decision records
 
 - [choice-clusterclass-template](agent/choice-clusterclass-template.md)
+- [choice-clusterconfig-validation](agent/choice-clusterconfig-validation.md)
 - [choice-cross-namespace-secrets](agent/choice-cross-namespace-secrets.md)
 - [choice-distro-pinning](agent/choice-distro-pinning.md)
 - [choice-in-memory-ssh-key](agent/choice-in-memory-ssh-key.md)

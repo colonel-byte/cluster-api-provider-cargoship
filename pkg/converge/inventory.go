@@ -22,6 +22,7 @@ package converge
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -211,6 +212,15 @@ func BuildInventory(in Input) (*Inventory, error) {
 	return inv, nil
 }
 
+// ErrClusterConfig marks every error DecodeClusterConfig returns.
+//
+// A caller needs to tell this apart from the rest of inventory building, because the two want
+// opposite answers: "no machine has an address yet" comes right on its own and is worth asking
+// again about shortly, while a malformed cluster config is a mistake in the resource that no
+// number of passes will fix, and reporting it as an incomplete inventory sends an operator to
+// look at their machines.
+var ErrClusterConfig = errors.New("spec.clusterConfig is not a valid cargoship cluster config")
+
 // DecodeClusterConfig reads spec.clusterConfig off a custom resource.
 //
 // The field is an opaque object in the custom resource and a typed struct here, so this is where a
@@ -227,9 +237,117 @@ func DecodeClusterConfig(raw []byte) (cluster.Config, error) {
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&out); err != nil {
-		return cluster.Config{}, fmt.Errorf("spec.clusterConfig is not a valid cargoship cluster config: %w", err)
+		return cluster.Config{}, fmt.Errorf("%w: %w", ErrClusterConfig, err)
+	}
+	if err := validateClusterConfig(out); err != nil {
+		return cluster.Config{}, fmt.Errorf("%w: %w", ErrClusterConfig, err)
 	}
 	return out, nil
+}
+
+// validateClusterConfig runs cargoship's own validators over a decoded config.
+//
+// It exists because the API server cannot: spec.clusterConfig is an opaque object with
+// x-kubernetes-preserve-unknown-fields, and the CEL type resolver skips subtrees it has no schema
+// for, so a validation rule naming self.clusterConfig.profiles does not merely fail to fire -- it
+// fails to compile and the API server rejects the custom resource definition. A guard for this
+// field has to be Go, and the only choice is where it runs.
+//
+// Here is the earliest point it can. Everything below checks something cargoship checks too, but
+// checks it late: a firewall port is validated in cargoship's eleventh phase, which is four
+// phases after it has opened an SSH connection to every host in the fleet, and a profile's
+// concurrency is parsed by each phase as it sizes its batches, so a typo in one surfaces after
+// earlier phases have already changed hosts. Both are plain mistakes in a hand-written document
+// and neither needs a single host to be reachable to find.
+//
+// Nothing here is a second implementation of those checks. Each one calls the cargoship function
+// that will run later anyway, so this cannot come to disagree with what an apply enforces.
+func validateClusterConfig(cfg cluster.Config) error {
+	if err := cluster.ValidateRegistries(cfg.Registries); err != nil {
+		return err
+	}
+
+	// Validated against the folded profiles rather than as written, which is what a host actually
+	// gets: a profile inheriting a bad concurrency from another is just as broken as one spelling
+	// it out. The fold is discarded -- cargoship does it again when it loads the cluster -- so
+	// this reads the config and changes nothing about what the converge is given.
+	resolved, err := cluster.ResolveProfiles(cfg.Profiles)
+	if err != nil {
+		return err
+	}
+	for _, name := range sortedKeys(resolved) {
+		profile := resolved[name]
+		where := fmt.Sprintf("profiles.%s", name)
+		if err := validateHostConfig(where+".host", profile.Host); err != nil {
+			return err
+		}
+		// Against one host, which is only a stand-in for the batch size: every value this
+		// rejects -- a negative count, a percentage over 100, anything not a number -- is
+		// rejected whatever the fleet size, and no fleet size makes a valid one invalid.
+		if _, err := cluster.ParseConcurrency(profile.Concurrency, 1); err != nil {
+			return fmt.Errorf("%s: %w", where, err)
+		}
+	}
+
+	return nil
+}
+
+// validateHostConfig checks the firewall rules, exposed ports and firewalld policies of one
+// profile's host overrides. A profile is the only place they can come from here: the hosts of this
+// inventory are built from Machines, so spec.clusterConfig carries no host of its own.
+func validateHostConfig(where string, host cluster.HostConfig) error {
+	if err := host.Firewall.Validate(); err != nil {
+		return fmt.Errorf("%s: %w", where, err)
+	}
+	for i, port := range host.Ports {
+		if err := validatePortSpec(fmt.Sprintf("%s.ports[%d]", where, i), port.Protocol, port.Port); err != nil {
+			return err
+		}
+	}
+	for _, name := range sortedKeys(host.Policy) {
+		for i, port := range host.Policy[name].Ports {
+			at := fmt.Sprintf("%s.policy.%s.ports[%d]", where, name, i)
+			if err := validatePortSpec(at, port.Protocol, port.Port); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// validatePortSpec checks one port and protocol pair through an equivalent firewall rule.
+//
+// cargoship's port parser is unexported and FirewallRule.Validate is the only exported thing that
+// calls it, so a rule is built to get at it. The alternative is a second port parser in this
+// repository, which would be the one thing this file is trying not to be: a copy of a check that
+// can come to disagree with the one that matters.
+func validatePortSpec(where, protocol, port string) error {
+	if protocol == "" {
+		// Every firewall backend renders a port with no protocol as tcp, so an empty one is
+		// valid here and must not be handed to a rule, which requires it.
+		protocol = "tcp"
+	}
+	rule := cluster.FirewallRule{
+		Action:    "allow",
+		Direction: "in",
+		Protocol:  protocol,
+		Port:      port,
+	}
+	if err := rule.Validate(); err != nil {
+		return fmt.Errorf("%s: %w", where, err)
+	}
+	return nil
+}
+
+// sortedKeys returns a map's keys in order, so a config with two mistakes in it reports the same
+// one every time rather than whichever the map iterated to first.
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // pickAddress returns the first address of the first type the order lists.

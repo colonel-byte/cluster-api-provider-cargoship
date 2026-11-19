@@ -325,8 +325,72 @@ func TestDecodeClusterConfig(t *testing.T) {
 			raw:  "null",
 		},
 		{
+			// The auth is not decoration: cargoship refuses a registry entry that configures
+			// nothing, on the grounds that a name on its own is a mistyped document rather than
+			// an intentional no-op.
 			name: "a registry and values decode",
-			raw:  `{"registries":[{"name":"registry.example"}],"values":{"cni":"cilium"}}`,
+			raw:  `{"registries":[{"name":"registry.example","auth":{"user":"u","pass":"p"}}],"values":{"cni":"cilium"}}`,
+		},
+		{
+			name: "a profile with a firewall rule, ports and a concurrency decodes",
+			raw: `{"profiles":{"gpu":{"concurrency":"25%","host":{"ports":[{"port":"8080","protocol":"tcp"}],` +
+				`"firewall":{"rules":[{"action":"allow","direction":"in","protocol":"tcp","port":"30000-32767"}]}}}}}`,
+		},
+		{
+			name:     "a profile naming a concurrency that is not a count or a percentage is refused",
+			raw:      `{"profiles":{"gpu":{"concurrency":"twenty-five%"}}}`,
+			wantErr:  true,
+			wantFrag: "profiles.gpu: invalid concurrency percentage",
+		},
+		{
+			name:     "a percentage over 100 is refused",
+			raw:      `{"profiles":{"gpu":{"concurrency":"150%"}}}`,
+			wantErr:  true,
+			wantFrag: "must be between 0 and 100",
+		},
+		{
+			// Inherited rather than written here, which is the whole reason the profiles are
+			// folded before they are checked.
+			name:     "a concurrency inherited from another profile is refused too",
+			raw:      `{"profiles":{"base":{"concurrency":"nope"},"gpu":{"inherit":"base"}}}`,
+			wantErr:  true,
+			wantFrag: "invalid concurrency",
+		},
+		{
+			name:     "a profile inheriting a profile that does not exist is refused",
+			raw:      `{"profiles":{"gpu":{"inherit":"missing"}}}`,
+			wantErr:  true,
+			wantFrag: "missing",
+		},
+		{
+			name:     "a firewall rule port out of range is refused",
+			raw:      `{"profiles":{"gpu":{"host":{"firewall":{"rules":[{"action":"allow","direction":"in","protocol":"tcp","port":"99999"}]}}}}}`,
+			wantErr:  true,
+			wantFrag: "profiles.gpu.host:",
+		},
+		{
+			name:     "an exposed port out of range is refused",
+			raw:      `{"profiles":{"gpu":{"host":{"ports":[{"port":"70000","protocol":"tcp"}]}}}}`,
+			wantErr:  true,
+			wantFrag: "profiles.gpu.host.ports[0]:",
+		},
+		{
+			// Every firewall backend renders a port with no protocol as tcp, so this is a valid
+			// document and the rule the port is checked through must not refuse it.
+			name: "an exposed port with no protocol decodes",
+			raw:  `{"profiles":{"gpu":{"host":{"ports":[{"port":"8080"}]}}}}`,
+		},
+		{
+			name:     "a firewalld policy port out of range is refused",
+			raw:      `{"profiles":{"gpu":{"host":{"policy":{"inbound":{"target":"ACCEPT","ports":[{"port":"0","protocol":"tcp"}]}}}}}}`,
+			wantErr:  true,
+			wantFrag: "profiles.gpu.host.policy.inbound.ports[0]:",
+		},
+		{
+			name:     "a registry entry that configures nothing is refused",
+			raw:      `{"registries":[{"name":"registry.example"}]}`,
+			wantErr:  true,
+			wantFrag: "registry.example",
 		},
 		{
 			// A silently dropped key is a setting an operator believes is in force. This config
