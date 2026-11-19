@@ -38,6 +38,9 @@ const (
 	RoleWorker     = "worker"
 )
 
+// ProfileControlPlane is the cargoship profile assigned to control-plane nodes.
+const ProfileControlPlane = "control-plane"
+
 // SSHParams is how the controller reaches the machines.
 type SSHParams struct {
 	// User is the login to connect as.
@@ -385,7 +388,7 @@ func role(m *clusterv1.Machine) string {
 // "gpu" selects spec.clusterConfig.profiles.gpu, and gets that profile's node labels, taints,
 // firewall rules and concurrency. A profile the config does not define is not an error -- the host
 // just takes the defaults -- so a deployment needs a profile entry only when it should differ.
-// Control-plane machines take no profile; they are not stamped from a deployment.
+// Control-plane machines select ProfileControlPlane ("control-plane").
 //
 // The topology label is read first, and is not an alternative spelling of the second: for a
 // deployment a ClusterClass generated, the two hold different things. Cluster API sets
@@ -401,6 +404,9 @@ func role(m *clusterv1.Machine) string {
 // at all, and takes the defaults without saying so -- which is why this is a fallback rather than
 // the answer. A hand-wired MachineDeployment carries only the second and is unaffected.
 func profile(m *clusterv1.Machine) string {
+	if _, ok := m.Labels[clusterv1.MachineControlPlaneLabel]; ok {
+		return ProfileControlPlane
+	}
 	if class, ok := m.Labels[clusterv1.ClusterTopologyMachineDeploymentNameLabel]; ok && class != "" {
 		return class
 	}
