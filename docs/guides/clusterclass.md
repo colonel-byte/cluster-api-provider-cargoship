@@ -165,7 +165,7 @@ spec:
 
 `valueFrom.variable`, not `value` - a `value` holding a `variable` key is a literal object and the patch would write it as one.
 
-The class is also what guarantees the same value reaches both this field and wherever the vip's own address is configured, which is the half of it that is easy to get wrong by hand.
+The class is also what guarantees the same value reaches both this field and wherever the vip's own address is configured, which is the half of it that is easy to get wrong by hand. Where the vip is the package's own - a kube-vip static pod the distro package ships - there is nothing to keep in step: the converge writes this field to cargoship's `spec.config.loadbalancer`, and the package's templates read it back as `{{ .Cluster.LoadBalancer }}`, so the variable is declared once and no second patch carries it.
 
 ## Rendering one with clusterctl
 
