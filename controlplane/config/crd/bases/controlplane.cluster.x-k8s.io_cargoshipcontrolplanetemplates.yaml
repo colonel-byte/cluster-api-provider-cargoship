@@ -134,9 +134,15 @@ spec:
                             minimum: 0
                             type: integer
                           workerConcurrent:
-                            description: workerConcurrent is the worker batch size,
-                              a count ("5") or a percentage ("25%").
+                            description: |-
+                              workerConcurrent is the worker batch size, a count ("5") or a percentage ("25%").
+
+                              Nothing in this repository parses it; cargoship does, as it sizes each phase's batches. So
+                              an unguarded typo here is found part way through an apply, with earlier phases already
+                              applied to hosts, which is the one failure in a converge that is worth a schema rule
+                              instead.
                             maxLength: 8
+                            pattern: ^([0-9]+|[0-9]{1,2}%|100%)$
                             type: string
                         type: object
                       clusterConfig:
@@ -351,6 +357,9 @@ spec:
                             CA, so pullSecretRef and caBundleSecretRef must be unset
                           rule: '!has(self.fromZarfState) || !self.fromZarfState ||
                             (!has(self.pullSecretRef) && !has(self.caBundleSecretRef))'
+                        - message: registry is a host with an optional path prefix
+                            and carries no scheme
+                          rule: '!has(self.registry) || !self.registry.contains("://")'
                       machineTemplate:
                         description: machineTemplate is the metadata and placement
                           each control-plane machine is created with.

@@ -24,9 +24,11 @@
 package controller
 
 import (
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -299,6 +301,54 @@ func TestReconcileRetriesAfterAFailedConverge(t *testing.T) {
 	}
 	if got := f.condition(t, controlplanev1.ConvergedCondition); got.Status != metav1.ConditionTrue {
 		t.Errorf("Converged = %s/%s after the retry, want True", got.Status, got.Reason)
+	}
+}
+
+// A cluster config the API server cannot check, because CEL is not given the contents of a
+// preserve-unknown-fields field, so the guard is the decode in pkg/converge. See
+// docs/agent/choice-clusterconfig-validation.md.
+func TestReconcileRefusesAnInvalidClusterConfig(t *testing.T) {
+	f := newFixture(t)
+	f.grow(t, 1)
+
+	// Converged first, so what the bad config interrupts is a working fleet rather than a cluster
+	// that never got off the ground.
+	f.reconcile(t)
+	f.waitForConverge(t)
+	f.reconcile(t)
+
+	f.refresh(t)
+	f.cp.Spec.ClusterConfig = &apiextensionsv1.JSON{
+		Raw: []byte(`{"profiles":{"gpu":{"concurrency":"a quarter"}}}`),
+	}
+	if err := f.c.Update(t.Context(), f.cp); err != nil {
+		t.Fatalf("setting spec.clusterConfig: %v", err)
+	}
+
+	// Through f.reconcile, which fails the test on an error: a document nobody can parse waits on
+	// a person to edit it, and an error here would log a stack trace per retry and back off a
+	// reconcile that has nothing to retry.
+	result := f.reconcile(t)
+
+	if f.converge.count() != 1 {
+		t.Errorf("%d converges, want the bad config to have started none of its own", f.converge.count())
+	}
+	got := f.condition(t, controlplanev1.ConvergedCondition)
+	if got.Reason != "ClusterConfigInvalid" {
+		t.Errorf("Converged reason = %q, want ClusterConfigInvalid", got.Reason)
+	}
+	// The reason cargoship gives, rather than one written here: the check that refused this is
+	// cargoship's own.
+	if !strings.Contains(got.Message, "invalid concurrency") {
+		t.Errorf("Converged message = %q, want it to mention the concurrency", got.Message)
+	}
+	// Reported on Converged, not on MachinesReady: the machines are addressable and saying
+	// otherwise sends an operator to look at them.
+	if ready := f.condition(t, controlplanev1.MachinesReadyCondition); ready.Status != metav1.ConditionTrue {
+		t.Errorf("MachinesReady = %s/%s, want it left True", ready.Status, ready.Reason)
+	}
+	if result.RequeueAfter != defaultDriftInterval {
+		t.Errorf("requeued after %s, want the drift interval %s", result.RequeueAfter, defaultDriftInterval)
 	}
 }
 

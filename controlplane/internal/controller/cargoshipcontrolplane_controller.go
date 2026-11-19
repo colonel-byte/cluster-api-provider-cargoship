@@ -18,6 +18,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -213,6 +214,17 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 
 	inv, clusterConfigRaw, err := r.buildInventory(ctx, cluster, cp, machines, endpoint)
 	if err != nil {
+		if errors.Is(err, converge.ErrClusterConfig) {
+			// Reported as a converge that will not happen rather than as an inventory that is
+			// not ready yet, which is what the machines are: they are fine, the document is
+			// wrong, and only an edit to it changes that.
+			setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionFalse, "ClusterConfigInvalid", err.Error())
+			r.updateStatusCounts(cp, controlPlaneMachines, false)
+			// Not an error, for the reason the refused version change below is not: it waits on
+			// a person, and an error here would log a stack trace per retry.
+			logger.V(1).Info("cluster config rejected", "reason", err.Error())
+			return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
+		}
 		setCondition(cp, controlplanev1.MachinesReadyCondition, metav1.ConditionFalse, "InventoryIncomplete", err.Error())
 		// Not an error to escalate: "no machine has an address yet" is the ordinary state of a
 		// cluster being created, and returning it as an error would log a stack trace per pass.

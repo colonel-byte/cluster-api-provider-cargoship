@@ -99,9 +99,19 @@ type CargoshipControlPlaneSpec struct {
 	// Changing it against a control plane that has already converged is refused unless
 	// ApproveVersionChangeAnnotation says otherwise, because what the converge would then do is
 	// an unsupervised in-place upgrade of every host rather than a rollout.
+	//
+	// The pattern enforces exactly what the sentence above says, and no more: a leading "v" and
+	// a major.minor.patch, with anything after it allowed. A distro package's build suffix is
+	// part of the version it installs -- "v1.31.2+k3s1", "v1.31.2+rke2r1" -- so an anchored tail
+	// would refuse the only versions this provider ever converges to. It is stricter than
+	// cluster-api itself, which parses a version with semver.ParseTolerant and would accept
+	// "1.31.2" (vendor/sigs.k8s.io/cluster-api/internal/contract/controlplane.go): the value is
+	// copied onto every Machine and reported as status.version, and a field documented as
+	// needing a leading "v" is better refused than tolerated into both.
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern=`^v[0-9]+\.[0-9]+\.[0-9]+`
 	Version string `json:"version,omitempty"`
 
 	// machineTemplate is the infrastructure and metadata each control-plane machine is created
@@ -132,8 +142,14 @@ type CargoshipControlPlaneSpec struct {
 	// trade. What it buys: the YAML here is the YAML of a cargoship inventory, so it needs no
 	// translation and cannot drift from the schema cargoship actually validates against -- and
 	// cargoship does validate it, against the package's own values schema, before any phase runs.
-	// What it costs: the API server will not reject a typo in it, so a mistake surfaces as a
-	// reconcile error on the custom resource rather than as a rejected apply.
+	// What it costs: the API server will not reject a typo in it. A validation rule cannot help
+	// -- CEL is not given the contents of a field with x-kubernetes-preserve-unknown-fields -- so
+	// a mistake surfaces as a reconcile error on the custom resource rather than as a rejected
+	// apply. The ones that can be found without reaching a host are found on the first reconcile
+	// and reported on the Converged condition as ClusterConfigInvalid: an unknown key, a
+	// registry that configures nothing, a profile inheriting one that does not exist, a port or
+	// a concurrency cargoship's own validators refuse. See
+	// docs/agent/choice-clusterconfig-validation.md.
 	//
 	// loadbalancer is ignored here; controlPlaneEndpoint above is the contract field for it.
 	// +optional
@@ -186,6 +202,7 @@ type CargoshipControlPlaneMachineTemplateSpec struct {
 // +kubebuilder:validation:XValidation:rule="has(self.name) == has(self.packageVersion)",message="a discovered package needs both name and packageVersion"
 // +kubebuilder:validation:XValidation:rule="!has(self.fromZarfState) || !self.fromZarfState || has(self.registry)",message="fromZarfState needs registry, which is the host its credentials are stored under"
 // +kubebuilder:validation:XValidation:rule="!has(self.fromZarfState) || !self.fromZarfState || (!has(self.pullSecretRef) && !has(self.caBundleSecretRef))",message="fromZarfState supplies the credentials and the CA, so pullSecretRef and caBundleSecretRef must be unset"
+// +kubebuilder:validation:XValidation:rule="!has(self.registry) || !self.registry.contains(\"://\")",message="registry is a host with an optional path prefix and carries no scheme"
 type DistroSource struct {
 	// ociRef is the package OCI reference, e.g. "oci://ghcr.io/example/k3s@sha256:...".
 	//
@@ -349,8 +366,14 @@ type ApplyConfig struct {
 	Concurrency int32 `json:"concurrency,omitempty"`
 
 	// workerConcurrent is the worker batch size, a count ("5") or a percentage ("25%").
+	//
+	// Nothing in this repository parses it; cargoship does, as it sizes each phase's batches. So
+	// an unguarded typo here is found part way through an apply, with earlier phases already
+	// applied to hosts, which is the one failure in a converge that is worth a schema rule
+	// instead.
 	// +optional
 	// +kubebuilder:validation:MaxLength=8
+	// +kubebuilder:validation:Pattern=`^([0-9]+|[0-9]{1,2}%|100%)$`
 	WorkerConcurrent string `json:"workerConcurrent,omitempty"`
 
 	// allowDowngrade lets a converge continue against a host already running a version newer than
