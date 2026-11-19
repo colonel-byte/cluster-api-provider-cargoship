@@ -164,7 +164,8 @@ func TestApplyRegistryAuthHash(t *testing.T) {
 
 	base := `{"auths": {"registry.example.com": {"username": "u", "password": "p1"}}}`
 
-	if apply(t, base) != apply(t, base) {
+	first, second := apply(t, base), apply(t, base)
+	if first != second {
 		t.Error("the same payload must hash the same")
 	}
 	rotated := `{"auths": {"registry.example.com": {"username": "u", "password": "p2"}}}`
