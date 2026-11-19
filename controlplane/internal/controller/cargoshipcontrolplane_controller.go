@@ -679,6 +679,28 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 	if err != nil {
 		return nil, nil, err
 	}
+	// Registry credentials are resolved from the secret into the decoded config, never into the
+	// resource: raw -- which the fingerprint hashes -- stays exactly what the API server stored.
+	// shortcut: that also means a rotated secret is only picked up at the drift interval, not on
+	// rotation; hash the resolved credentials into the fingerprint before this ships.
+	if cp.Spec.RegistryAuthSecretRef != nil {
+		key, err := cp.Spec.RegistryAuthSecretRef.Key(cp.Namespace, r.SecretNamespaces)
+		if err != nil {
+			return nil, nil, err
+		}
+		authSecret := &corev1.Secret{}
+		if err := r.Get(ctx, key, authSecret); err != nil {
+			return nil, nil, fmt.Errorf("unable to read the registry auth secret %s: %w", key, err)
+		}
+		payload, ok := authSecret.Data[corev1.DockerConfigJsonKey]
+		if !ok {
+			return nil, nil, fmt.Errorf("registry auth secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
+				key, corev1.DockerConfigJsonKey)
+		}
+		if err := converge.ApplyRegistryAuth(&clusterConfig, payload); err != nil {
+			return nil, nil, fmt.Errorf("registry auth secret %s: %w", key, err)
+		}
+	}
 
 	secret := &corev1.Secret{}
 	key, err := cp.Spec.SSH.PrivateKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)

@@ -156,6 +156,18 @@ type CargoshipControlPlaneSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ClusterConfig *apiextensionsv1.JSON `json:"clusterConfig,omitempty"`
 
+	// registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
+	// the registries named in clusterConfig.registries, so they need not be written into this
+	// resource in plain text.
+	//
+	// The controller matches each entry of the secret's auths map against each registry's name
+	// by host -- "https://index.docker.io/v1/" matches "docker.io" -- and fills that registry's
+	// auth in memory before the converge. A registry whose auth is set inline keeps it, and a
+	// secret that matches no registry at all is refused rather than ignored. The credentials
+	// never reach this resource or a filesystem.
+	// +optional
+	RegistryAuthSecretRef *SecretReference `json:"registryAuthSecretRef,omitempty"`
+
 	// apply tunes the converge.
 	// +optional
 	Apply ApplyConfig `json:"apply,omitempty,omitzero"`

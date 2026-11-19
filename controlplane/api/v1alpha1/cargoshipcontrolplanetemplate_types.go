@@ -85,6 +85,11 @@ type CargoshipControlPlaneTemplateResourceSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ClusterConfig *apiextensionsv1.JSON `json:"clusterConfig,omitempty"`
 
+	// registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
+	// the registries named in clusterConfig.registries.
+	// +optional
+	RegistryAuthSecretRef *SecretReference `json:"registryAuthSecretRef,omitempty"`
+
 	// apply tunes the converge.
 	// +optional
 	Apply ApplyConfig `json:"apply,omitempty,omitzero"`
