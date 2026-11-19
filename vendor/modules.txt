@@ -205,7 +205,7 @@ github.com/cloudflare/circl/sign/slhdsa
 github.com/cloudflare/circl/simd/keccakf1600
 github.com/cloudflare/circl/xof
 github.com/cloudflare/circl/xof/k12
-# github.com/colonel-byte/cargoship v0.42.5
+# github.com/colonel-byte/cargoship v0.43.0
 ## explicit; go 1.27.4
 github.com/colonel-byte/cargoship/api
 github.com/colonel-byte/cargoship/api/colonel-byte.dev/v1alpha1

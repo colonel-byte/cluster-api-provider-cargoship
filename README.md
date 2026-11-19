@@ -106,6 +106,8 @@ spec:
 
 Workers come from an ordinary `MachineDeployment` pointing at a `CargoshipConfigTemplate`. **The deployment's name is the cargoship profile**, so the `gpu` deployment below picks up the `gpu` profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a [`ClusterClass`](docs/guides/clusterclass.md) it is the machine-deployment class name instead, because Cluster API generates the object's name and carries the class in a label.
 
+`spec.controlPlaneEndpoint.host` reaches the package as well as the inventory. The converge writes it to cargoship's `spec.config.loadbalancer` - a `loadbalancer` in `clusterConfig` is ignored, because the endpoint is the Cluster API contract field for it - and an install-time template inside the package reads the same address as `{{ .Cluster.LoadBalancer }}`. So a package carrying its own kube-vip static pod advertises exactly the endpoint this control plane publishes, with the address written once and nothing to reconcile. Set it even for a single controller: with `controlPlaneEndpoint` empty the controller falls back to the first control-plane machine's address, which is right for one node and hands such a package a node IP to advertise as a VIP.
+
 ## How it differs from KubeadmControlPlane
 
 | | KubeadmControlPlane | CargoshipControlPlane |
