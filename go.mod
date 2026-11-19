@@ -27,7 +27,7 @@ require (
 	atomicgo.dev/keyboard v0.2.10 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.1 // indirect
-	cloud.google.com/go/longrunning v1.3.0 // indirect
+	cloud.google.com/go/longrunning v1.5.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/age v1.3.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
