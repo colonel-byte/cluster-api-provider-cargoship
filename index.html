@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-f9a38975.js";
+            window.path_to_searchindex_js = "searchindex-7a93b468.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-db27eea1.js"></script>
@@ -268,6 +268,7 @@ spec:
     labelNodes: true
 </code></pre>
 <p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a <a href="guides/clusterclass.html"><code>ClusterClass</code></a> it is the machine-deployment class name instead, because Cluster API generates the object’s name and carries the class in a label.</p>
+<p><code>spec.controlPlaneEndpoint.host</code> reaches the package as well as the inventory. The converge writes it to cargoship’s <code>spec.config.loadbalancer</code> - a <code>loadbalancer</code> in <code>clusterConfig</code> is ignored, because the endpoint is the Cluster API contract field for it - and an install-time template inside the package reads the same address as <code>{{ .Cluster.LoadBalancer }}</code>. So a package carrying its own kube-vip static pod advertises exactly the endpoint this control plane publishes, with the address written once and nothing to reconcile. Set it even for a single controller: with <code>controlPlaneEndpoint</code> empty the controller falls back to the first control-plane machine’s address, which is right for one node and hands such a package a node IP to advertise as a VIP.</p>
 <h2 id="how-it-differs-from-kubeadmcontrolplane"><a class="header" href="#how-it-differs-from-kubeadmcontrolplane">How it differs from KubeadmControlPlane</a></h2>
 <div class="table-wrapper">
 <table>

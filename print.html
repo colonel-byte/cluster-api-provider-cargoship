@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-f9a38975.js";
+            window.path_to_searchindex_js = "searchindex-7a93b468.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-db27eea1.js"></script>
@@ -266,6 +266,7 @@ spec:
     labelNodes: true
 </code></pre>
 <p>Workers come from an ordinary <code>MachineDeployment</code> pointing at a <code>CargoshipConfigTemplate</code>. <strong>The deployment’s name is the cargoship profile</strong>, so the <code>gpu</code> deployment below picks up the <code>gpu</code> profile above - its node labels, taints, firewall rules and concurrency - with nothing else to wire together. From a <a href="#composing-a-clusterclass"><code>ClusterClass</code></a> it is the machine-deployment class name instead, because Cluster API generates the object’s name and carries the class in a label.</p>
+<p><code>spec.controlPlaneEndpoint.host</code> reaches the package as well as the inventory. The converge writes it to cargoship’s <code>spec.config.loadbalancer</code> - a <code>loadbalancer</code> in <code>clusterConfig</code> is ignored, because the endpoint is the Cluster API contract field for it - and an install-time template inside the package reads the same address as <code>{{ .Cluster.LoadBalancer }}</code>. So a package carrying its own kube-vip static pod advertises exactly the endpoint this control plane publishes, with the address written once and nothing to reconcile. Set it even for a single controller: with <code>controlPlaneEndpoint</code> empty the controller falls back to the first control-plane machine’s address, which is right for one node and hands such a package a node IP to advertise as a VIP.</p>
 <h2 id="how-it-differs-from-kubeadmcontrolplane"><a class="header" href="#how-it-differs-from-kubeadmcontrolplane">How it differs from KubeadmControlPlane</a></h2>
 <div class="table-wrapper">
 <table>
@@ -448,7 +449,7 @@ spec:
                 variable: controlPlaneEndpointIP
 </code></pre>
 <p><code>valueFrom.variable</code>, not <code>value</code> - a <code>value</code> holding a <code>variable</code> key is a literal object and the patch would write it as one.</p>
-<p>The class is also what guarantees the same value reaches both this field and wherever the vip’s own address is configured, which is the half of it that is easy to get wrong by hand.</p>
+<p>The class is also what guarantees the same value reaches both this field and wherever the vip’s own address is configured, which is the half of it that is easy to get wrong by hand. Where the vip is the package’s own - a kube-vip static pod the distro package ships - there is nothing to keep in step: the converge writes this field to cargoship’s <code>spec.config.loadbalancer</code>, and the package’s templates read it back as <code>{{ .Cluster.LoadBalancer }}</code>, so the variable is declared once and no second patch carries it.</p>
 <h2 id="rendering-one-with-clusterctl"><a class="header" href="#rendering-one-with-clusterctl">Rendering one with clusterctl</a></h2>
 <p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml"><code>examples/cluster-template-clusterclass-vsphere.yaml</code></a> is all of the above as one renderable document: the class, both cargoship templates, a <code>Cluster</code> with a topology, and a vSphere infrastructure half to adapt. Every release publishes it.</p>
 <p><strong><code>--flavor</code> cannot reach it.</strong> clusterctl reads a flavoured template from the <em>infrastructure</em> provider’s repository - <code>ProviderRepositorySourceOptions.InfrastructureProvider</code> is “InfrastructureProvider to read the workload cluster template from” - so a control-plane provider cannot ship one. <code>--from</code> takes a URL or a path instead:</p>

@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f9a38975.js";
+            window.path_to_searchindex_js = "../searchindex-7a93b468.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-db27eea1.js"></script>
@@ -325,7 +325,7 @@ spec:
                 variable: controlPlaneEndpointIP
 </code></pre>
 <p><code>valueFrom.variable</code>, not <code>value</code> - a <code>value</code> holding a <code>variable</code> key is a literal object and the patch would write it as one.</p>
-<p>The class is also what guarantees the same value reaches both this field and wherever the vip’s own address is configured, which is the half of it that is easy to get wrong by hand.</p>
+<p>The class is also what guarantees the same value reaches both this field and wherever the vip’s own address is configured, which is the half of it that is easy to get wrong by hand. Where the vip is the package’s own - a kube-vip static pod the distro package ships - there is nothing to keep in step: the converge writes this field to cargoship’s <code>spec.config.loadbalancer</code>, and the package’s templates read it back as <code>{{ .Cluster.LoadBalancer }}</code>, so the variable is declared once and no second patch carries it.</p>
 <h2 id="rendering-one-with-clusterctl"><a class="header" href="#rendering-one-with-clusterctl">Rendering one with clusterctl</a></h2>
 <p><a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/examples/cluster-template-clusterclass-vsphere.yaml"><code>examples/cluster-template-clusterclass-vsphere.yaml</code></a> is all of the above as one renderable document: the class, both cargoship templates, a <code>Cluster</code> with a topology, and a vSphere infrastructure half to adapt. Every release publishes it.</p>
 <p><strong><code>--flavor</code> cannot reach it.</strong> clusterctl reads a flavoured template from the <em>infrastructure</em> provider’s repository - <code>ProviderRepositorySourceOptions.InfrastructureProvider</code> is “InfrastructureProvider to read the workload cluster template from” - so a control-plane provider cannot ship one. <code>--from</code> takes a URL or a path instead:</p>
