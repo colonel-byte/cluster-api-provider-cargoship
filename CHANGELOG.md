@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.6.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.5...v0.6.0) (2026-11-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** bump cargoship to 0.43.0 for .Cluster.LoadBalancer ([#92](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/92))
+
+### Features
+
+* **controlplane:** guard the cluster config and the fields the schema can reach ([#91](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/91)) ([0873148](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0873148592de1c5cd4cb21a444c564bf76f728de))
+* **controlplane:** verify package signatures against a public key secret ([#89](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/89)) ([a472009](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/a47200924ea3cdbff699d9149d0b14eb85548f2f))
+* **converge:** assign control-plane profile to control-plane machines ([#96](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/96)) ([a2aedf1](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/a2aedf1196742446ad51e77bec8868b4729ecebe))
+* **deps:** bump cargoship to 0.43.0 for .Cluster.LoadBalancer ([#92](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/92)) ([21456e7](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/21456e7af1a733712d6196fd79a5a541192b5cc2))
+
+
+### Build
+
+* **deps:** bump cloud.google.com/go/longrunning from 1.3.0 to 1.5.0 ([#94](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/94)) ([44777e3](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/44777e3b1d88db1039569a856a671b4397bf8e7f))
+* **deps:** bump j178/prek-action from 3.1.0 to 3.1.1 in the core group ([#95](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/95)) ([8be3f1b](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/8be3f1bb028ae87436cb016ee26627745c5f2597))
+* **deps:** bump the cluster-api group with 2 updates ([#93](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/93)) ([c0d8b91](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/c0d8b916f34a1bd1ad2345dc718e3dfcc3306cd4))
+
 ## [0.5.5](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.4...v0.5.5) (2026-11-18)
 
 
