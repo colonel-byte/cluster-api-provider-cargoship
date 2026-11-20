@@ -76,8 +76,8 @@ jobs:
       # stale at the next minor and fails naming the version rather than the drift.
       - name: Lay out a local provider repository
         run: |
-          major="$(sed -n 's/^[[:space:]]*-[[:space:]]*major:[[:space:]]*\([0-9]*\).*/\1/p' out/metadata.yaml)"
-          minor="$(sed -n 's/^[[:space:]]*minor:[[:space:]]*\([0-9]*\).*/\1/p' out/metadata.yaml)"
+          major="$(sed -n 's/^[[:space:]]*-[[:space:]]*major:[[:space:]]*\([0-9]*\).*x-release-please-major.*/\1/p' out/metadata.yaml)"
+          minor="$(sed -n 's/^[[:space:]]*minor:[[:space:]]*\([0-9]*\).*x-release-please-minor.*/\1/p' out/metadata.yaml)"
           version="v${major}.${minor}.0"
           echo "PROVIDER_VERSION=${version}" >> "${GITHUB_ENV}"
 
