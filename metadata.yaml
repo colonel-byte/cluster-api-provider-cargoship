@@ -22,7 +22,7 @@ apiVersion: clusterctl.cluster.x-k8s.io/v1alpha3
 kind: Metadata
 releaseSeries:
   - major: 0 # x-release-please-major
-    minor: 6 # x-release-please-minor
+    minor: 7 # x-release-please-minor
     contract: v1beta2
   # Past series, kept so `clusterctl upgrade` (and tools built on it, like Rancher Turtles) can
   # map the installed version while planning an upgrade to the current one. The entry above is

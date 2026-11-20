@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.7.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.6.0...v0.7.0) (2026-11-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **controlplane:** resolve registry credentials from a dockerconfigjson secret ([#97](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/97))
+
+### Features
+
+* **controlplane:** resolve registry credentials from a dockerconfigjson secret ([#97](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/97)) ([9d616b2](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/9d616b2f4b03a2855ff60cf8402633ce55211a97))
+
+
+### CI/CD
+
+* list every past release series in metadata.yaml ([#98](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/98)) ([8d13d55](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/8d13d559329449ebeada1053248a449f5c5305e7))
+
+
+### Build
+
+* **deps:** bump actions/setup-go from 7.0.0 to 7.1.0 in the core group ([#105](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/105)) ([9057569](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/9057569ff6b98db611ded5b33cb49641a4e73de5))
+* **deps:** bump github.com/go-openapi/validate from 1.0.1 to 1.0.2 ([#101](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/101)) ([1e1f02e](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/1e1f02ebfdda8a196e6f2e52076ac59701256f48))
+* **deps:** bump github.com/grpc-ecosystem/grpc-gateway/v2 from 2.33.0 to 2.34.0 ([#102](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/102)) ([c530008](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/c5300088308c730363a80e51217051ac5bf8cd75))
+* **deps:** bump github.com/sergi/go-diff from 1.4.0 to 1.4.5 ([#100](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/100)) ([466838f](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/466838f063822fbdac4a670314b57fa05e81e402))
+
 ## [0.6.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.5.5...v0.6.0) (2026-11-19)
 
 
