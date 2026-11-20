@@ -25,7 +25,7 @@ kind: ZarfPackageConfig
 metadata:
   name: cluster-api-provider-cargoship
   description: The cargoship bootstrap and control-plane providers for Cluster API
-  version: 0.7.0 # x-release-please-version
+  version: 0.7.1 # x-release-please-version
   annotations:
     org.opencontainers.image.source: https://github.com/colonel-byte/cluster-api-provider-cargoship
 components:
@@ -42,7 +42,7 @@ components:
         files:
           - out/bootstrap-components.yaml
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.7.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.7.1 # x-release-please-version
 
   - name: controlplane-provider
     description: CargoshipControlPlane, in cacpc-system
@@ -53,7 +53,7 @@ components:
         files:
           - out/control-plane-components.yaml
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.7.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.7.1 # x-release-please-version
 
   - name: rancher-turtle-artifacts
     description: Both halves' components as one OCI artifact, which the Cluster API Operator and Rancher Turtles install from
@@ -62,9 +62,9 @@ components:
     # installing this with clusterctl instead. Turtles has to be on the cluster first.
     optional: true
     images:
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.7.0 # x-release-please-version
-      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.7.0 # x-release-please-version
-      - name: ghcr.io/colonel-byte/turtle/cargoship:v0.7.0 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-bootstrap-controller:0.7.1 # x-release-please-version
+      - name: ghcr.io/colonel-byte/cluster-api-cargoship-controlplane-controller:0.7.1 # x-release-please-version
+      - name: ghcr.io/colonel-byte/turtle/cargoship:v0.7.1 # x-release-please-version
     # The ConfigMaps a CAPIProvider with a `fetchConfig` selector reads its components out of, and
     # the two CAPIProviders themselves -- so the operator's ConfigMap install path needs no
     # `kubectl create configmap` by hand on the inside. See docs/guides/rancher-turtles.md. No

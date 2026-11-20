@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.7.0...v0.7.1) (2026-11-20)
+
+
+### Features
+
+* **controlplane:** aggregate a Ready condition and print Ready and Status columns ([#109](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/109)) ([bbfb03c](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/bbfb03cc07dd459cf669275ca0441c091ee4210d))
+* **converge:** consume cargoship v0.43.1, exposing clusterConfig.tlsSan ([#110](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/110)) ([355d0fe](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/355d0fee1cc133d53566921f91ab055c1d7099c7))
+* **converge:** match mirror credentials to registries proxying through it ([#107](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/107)) ([47c4cb3](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/47c4cb3c02b085746d97adba3eeb5c80e89f4eaf))
+
+
+### Bug Fixes
+
+* **controlplane:** skip the re-apply when the fingerprint matches but machines have not joined ([#106](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/106)) ([fd7d8c3](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/fd7d8c300467ff604f508d726d4eb014d9271045))
+* **converge:** key host-key verification by Machine name instead of address ([#108](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/108)) ([f33881c](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/f33881ca317ab0f7158f3f33109a5cfe0158c2a6))
+
 ## [0.7.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.6.0...v0.7.0) (2026-11-20)
 
 
