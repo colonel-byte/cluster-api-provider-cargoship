@@ -312,12 +312,7 @@ func (f *fixture) machines(t *testing.T) []clusterv1.Machine {
 func (f *fixture) provision(t *testing.T, m *clusterv1.Machine, address string) {
 	t.Helper()
 
-	m.Finalizers = append(m.Finalizers, "test.cargoship/keep")
-	if err := f.c.Update(t.Context(), m); err != nil {
-		t.Fatalf("adding the test finalizer to %s: %v", m.Name, err)
-	}
-
-	m.Status.Addresses = []clusterv1.MachineAddress{{Type: clusterv1.MachineInternalIP, Address: address}}
+	f.provisionAddress(t, m, address)
 	m.Status.NodeRef = clusterv1.MachineNodeReference{Name: m.Name}
 	m.Status.Conditions = []metav1.Condition{{
 		Type:               clusterv1.MachineAvailableCondition,
@@ -326,6 +321,23 @@ func (f *fixture) provision(t *testing.T, m *clusterv1.Machine, address string) 
 		LastTransitionTime: metav1.Now(),
 		ObservedGeneration: m.Generation,
 	}}
+	if err := f.c.Status().Update(t.Context(), m); err != nil {
+		t.Fatalf("setting the status of %s: %v", m.Name, err)
+	}
+}
+
+// provisionAddress is provision without the node reference: the machine has booted and has an
+// address, but its Node never got a matching spec.providerID, so Cluster API has nothing to point
+// nodeRef at. The state a fleet with no cloud provider sits in indefinitely.
+func (f *fixture) provisionAddress(t *testing.T, m *clusterv1.Machine, address string) {
+	t.Helper()
+
+	m.Finalizers = append(m.Finalizers, "test.cargoship/keep")
+	if err := f.c.Update(t.Context(), m); err != nil {
+		t.Fatalf("adding the test finalizer to %s: %v", m.Name, err)
+	}
+
+	m.Status.Addresses = []clusterv1.MachineAddress{{Type: clusterv1.MachineInternalIP, Address: address}}
 	if err := f.c.Status().Update(t.Context(), m); err != nil {
 		t.Fatalf("setting the status of %s: %v", m.Name, err)
 	}

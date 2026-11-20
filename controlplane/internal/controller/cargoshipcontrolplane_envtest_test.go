@@ -269,6 +269,42 @@ func TestReconcileDoesNotConvergeAgainForTheSameState(t *testing.T) {
 	}
 }
 
+func TestReconcileDoesNotConvergeAgainWhileAMachineHasNotJoined(t *testing.T) {
+	f := newFixture(t)
+
+	// A machine with an address but no node reference: nothing stamps spec.providerID on the
+	// Nodes, so Cluster API never sets nodeRef and the machine sits in Provisioned forever.
+	f.reconcile(t)
+	machines := f.machines(t)
+	if len(machines) != 1 {
+		t.Fatalf("created %d machines, want 1", len(machines))
+	}
+	f.provisionAddress(t, &machines[0], "10.0.0.11")
+
+	f.reconcile(t)
+	f.waitForConverge(t)
+	f.reconcile(t)
+	if f.converge.count() != 1 {
+		t.Fatalf("%d converges to reach the desired state, want 1", f.converge.count())
+	}
+
+	// The fingerprint still matches, so another apply would change nothing about the missing
+	// node reference. Before the guard, every resync re-ran the whole SSH walk here.
+	result := f.reconcile(t)
+	if f.converge.count() != 1 {
+		t.Errorf("a resync started converge %d, want none", f.converge.count())
+	}
+	if result.RequeueAfter != defaultDriftInterval {
+		t.Errorf("requeued after %s, want the drift interval %s", result.RequeueAfter, defaultDriftInterval)
+	}
+	if got := f.condition(t, controlplanev1.ConvergedCondition); got.Status != metav1.ConditionTrue || got.Reason != "UpToDate" {
+		t.Errorf("Converged = %s/%s, want True/UpToDate", got.Status, got.Reason)
+	}
+	if got := f.condition(t, controlplanev1.MachinesReadyCondition); got.Status != metav1.ConditionFalse || got.Reason != "WaitingForNodeRef" {
+		t.Errorf("MachinesReady = %s/%s, want False/WaitingForNodeRef", got.Status, got.Reason)
+	}
+}
+
 func TestReconcileRetriesAfterAFailedConverge(t *testing.T) {
 	f := newFixture(t)
 	f.converge.err = errConvergeFailed
