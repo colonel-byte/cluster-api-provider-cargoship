@@ -339,12 +339,23 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		}
 	}
 
-	// 7. Nothing to do: the fleet matches the last successful converge and every machine has
-	//    joined. Requeue slowly to catch drift.
-	if cp.Status.LastAppliedHash == fingerprint && allJoined(machines) {
+	// 7. Nothing to do: the fleet matches the last successful converge, so another apply would
+	//    change nothing. Requeue slowly to catch drift.
+	if cp.Status.LastAppliedHash == fingerprint {
 		r.updateStatusCounts(cp, controlPlaneMachines, true)
 		setCondition(cp, controlplanev1.ConvergedCondition, metav1.ConditionTrue, "UpToDate",
 			"the fleet matches the desired state")
+		if n := unjoined(machines); n > 0 {
+			// A machine whose Node never appears usually means nothing is stamping
+			// spec.providerID on the Nodes, so Cluster API cannot match them up. Re-applying
+			// cannot change that -- a late machine address changes the fingerprint and lands
+			// in the branch below instead -- and the Machine watch wakes this reconcile the
+			// moment a node reference appears.
+			setCondition(cp, controlplanev1.MachinesReadyCondition, metav1.ConditionFalse, "WaitingForNodeRef",
+				fmt.Sprintf("%d of %d machines have no node reference yet; the fleet is converged, "+
+					"so this usually means nothing is setting spec.providerID on the Nodes",
+					n, len(machines)))
+		}
 		return ctrl.Result{RequeueAfter: r.driftInterval(cp)}, nil
 	}
 

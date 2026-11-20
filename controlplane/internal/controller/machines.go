@@ -421,18 +421,19 @@ func newest(machines []*clusterv1.Machine) *clusterv1.Machine {
 	return out
 }
 
-// allJoined reports whether every machine has a node reference, which is Cluster API's way of
-// saying the node turned up in the cluster.
-func allJoined(machines []*clusterv1.Machine) bool {
+// unjoined counts the machines without a node reference, which is Cluster API's way of
+// saying the node has not turned up in the cluster yet.
+func unjoined(machines []*clusterv1.Machine) int {
+	n := 0
 	for _, m := range machines {
 		if !m.DeletionTimestamp.IsZero() {
 			continue
 		}
 		if m.Status.NodeRef.Name == "" {
-			return false
+			n++
 		}
 	}
-	return true
+	return n
 }
 
 // isAvailable reports whether a machine is available, by its own condition.
