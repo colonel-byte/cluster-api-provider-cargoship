@@ -163,6 +163,11 @@ func TestBuildInventory(t *testing.T) {
 		if h.Host.ConnectionConfig.SSH.User != "rocky" {
 			t.Errorf("%s connects as %q, want rocky", h.Machine.Name, h.Host.ConnectionConfig.SSH.User)
 		}
+		// Keyed by machine identity, not address: a DHCP lease reused by a replacement machine
+		// must not collide in known_hosts with its predecessor's key.
+		if got := h.Host.ConnectionConfig.SSH.SSHConfigOptions["HostKeyAlias"]; got != h.Machine.Name {
+			t.Errorf("%s host key alias = %v, want the machine name", h.Machine.Name, got)
+		}
 	}
 }
 
