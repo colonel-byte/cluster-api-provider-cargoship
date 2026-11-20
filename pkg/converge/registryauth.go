@@ -80,6 +80,13 @@ func ApplyRegistryAuth(cfg *cluster.Config, payload []byte) (string, error) {
 		reg := &cfg.Registries[i]
 		entry, ok := auths[normalizeRegistryHost(string(reg.Name))]
 		if !ok {
+			// A registry proxying through a mirror pulls from the mirror's host, so credentials
+			// keyed by that host cover it too. Without this, a secret naming only the mirror
+			// leaves the proxied entry unauthenticated, and ValidateRegistries then rejects the
+			// two for configuring the same host with different auth.
+			entry, ok = auths[normalizeRegistryHost(reg.ConfigHost())]
+		}
+		if !ok {
 			continue
 		}
 		matched++
@@ -133,8 +140,8 @@ func (a dockerAuth) credentials() (cluster.RegistryAuth, error) {
 // compared: real dockerconfigjson files key Docker Hub as "https://index.docker.io/v1/" while a
 // cluster config names it "docker.io".
 //
-// shortcut: exact host match only -- a proxy URL's host and a port-qualified mismatch are not
-// considered; revisit when a fleet needs credentials matched against clusterConfig proxy mirrors.
+// shortcut: exact host match only -- a port-qualified mismatch is not considered; revisit when a
+// fleet keys its secret by a port-qualified host that the cluster config names bare.
 func normalizeRegistryHost(key string) string {
 	host := key
 	if _, rest, ok := strings.Cut(host, "://"); ok {
