@@ -93,6 +93,50 @@ func TestApplyRegistryAuth(t *testing.T) {
 			},
 		},
 		{
+			name: "a secret naming only the mirror host covers a registry proxying through it",
+			registries: []cluster.Registries{
+				{
+					Name:  "docker.io",
+					Proxy: &cluster.RegistryProxy{URL: "https://mirror.example.com/artifactory/api/docker/docker-remote"},
+				},
+			},
+			payload: []byte(`{"auths": {"mirror.example.com": {"username": "svc-user", "password": "svc-password"}}}`),
+			want: []cluster.RegistryAuth{
+				{Username: "svc-user", Password: "svc-password"},
+			},
+		},
+		{
+			name: "the mirror and the registry proxying through it end up with identical credentials",
+			registries: []cluster.Registries{
+				{Name: "mirror.example.com"},
+				{
+					Name:  "docker.io",
+					Proxy: &cluster.RegistryProxy{URL: "https://mirror.example.com/artifactory/api/docker/docker-remote"},
+				},
+			},
+			payload: []byte(`{"auths": {"mirror.example.com": {"username": "svc-user", "password": "svc-password"}}}`),
+			want: []cluster.RegistryAuth{
+				{Username: "svc-user", Password: "svc-password"},
+				{Username: "svc-user", Password: "svc-password"},
+			},
+		},
+		{
+			name: "an entry named for the registry wins over the mirror fallback",
+			registries: []cluster.Registries{
+				{
+					Name:  "docker.io",
+					Proxy: &cluster.RegistryProxy{URL: "https://mirror.example.com/artifactory/api/docker/docker-remote"},
+				},
+			},
+			payload: []byte(`{"auths": {
+				"mirror.example.com": {"username": "mirror-user", "password": "mirror-pass"},
+				"docker.io": {"username": "hub-user", "password": "hub-pass"}
+			}}`),
+			want: []cluster.RegistryAuth{
+				{Username: "hub-user", Password: "hub-pass"},
+			},
+		},
+		{
 			name: "a secret matching nothing is an error",
 			registries: []cluster.Registries{
 				{Name: "quay.io"},
@@ -140,6 +184,27 @@ func TestApplyRegistryAuth(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestApplyRegistryAuthMirrorPassesValidation pins the failure that motivated the mirror
+// fallback: a mirror and a registry proxying through it both configure the mirror's host, and
+// cargoship's ValidateRegistries rejects the pair when only one of them got the credentials.
+func TestApplyRegistryAuthMirrorPassesValidation(t *testing.T) {
+	cfg := cluster.Config{Registries: []cluster.Registries{
+		{Name: "mirror.example.com"},
+		{
+			Name:  "docker.io",
+			Proxy: &cluster.RegistryProxy{URL: "https://mirror.example.com/artifactory/api/docker/docker-remote"},
+		},
+	}}
+	payload := []byte(`{"auths": {"mirror.example.com": {"username": "svc-user", "password": "svc-password"}}}`)
+
+	if _, err := ApplyRegistryAuth(&cfg, payload); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := cluster.ValidateRegistries(cfg.Registries); err != nil {
+		t.Errorf("ValidateRegistries rejected the pair after auth was applied: %v", err)
 	}
 }
 
