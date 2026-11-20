@@ -33,8 +33,17 @@ spec:
       type: integer
     - description: Control-plane machines reporting ready
       jsonPath: .status.readyReplicas
-      name: Ready
+      name: Ready Replicas
+      priority: 10
       type: integer
+    - description: Control plane is converged and every machine has joined
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: What the control plane is doing or waiting on
+      jsonPath: .status.conditions[?(@.type=="Ready")].reason
+      name: Status
+      type: string
     - description: Observed Kubernetes version
       jsonPath: .status.version
       name: Version

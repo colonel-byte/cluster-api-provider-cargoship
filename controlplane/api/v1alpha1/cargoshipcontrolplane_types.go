@@ -75,6 +75,12 @@ const (
 
 	// MachinesReadyCondition reports whether every managed machine has an address and has joined.
 	MachinesReadyCondition = "MachinesReady"
+
+	// ReadyCondition aggregates the others into one answer: True when the fleet is converged and
+	// every machine has joined, False carrying the reason and message of whatever is blocking --
+	// an invalid cluster config, a refused version change, a converge in flight, a machine
+	// waiting for SSH. It is what the Ready printer column reads.
+	ReadyCondition = clusterv1.ReadyCondition
 )
 
 // CargoshipControlPlaneSpec is the desired state of a cargoship-installed control plane.
@@ -653,7 +659,9 @@ type HostStatus struct {
 // +kubebuilder:printcolumn:name="Initialized",type="string",JSONPath=".status.initialization.controlPlaneInitialized",description="Control plane is answering"
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="Desired control-plane machines"
 // +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".status.replicas",description="Control-plane machines that exist"
-// +kubebuilder:printcolumn:name="Ready",type="integer",JSONPath=".status.readyReplicas",description="Control-plane machines reporting ready"
+// +kubebuilder:printcolumn:name="Ready Replicas",type="integer",JSONPath=".status.readyReplicas",description="Control-plane machines reporting ready",priority=10
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=`.status.conditions[?(@.type=="Ready")].status`,description="Control plane is converged and every machine has joined"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=`.status.conditions[?(@.type=="Ready")].reason`,description="What the control plane is doing or waiting on"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".status.version",description="Observed Kubernetes version"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time since creation"
 
