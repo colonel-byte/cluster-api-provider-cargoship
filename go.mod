@@ -189,7 +189,7 @@ require (
 	github.com/pterm/pterm v0.12.84 // indirect
 	github.com/sassoftware/relic/v8 v8.2.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
-	github.com/sergi/go-diff v1.4.0 // indirect
+	github.com/sergi/go-diff v1.4.5 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shopspring/decimal v1.6.0 // indirect
 	github.com/sigstore/cosign/v3 v3.1.4 // indirect
