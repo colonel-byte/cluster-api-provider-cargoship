@@ -29,6 +29,7 @@ import (
 
 	"github.com/colonel-byte/cargoship/api/colonel-byte.dev/v1alpha1/cluster"
 	rigssh "github.com/k0sproject/rig/v2/protocol/ssh"
+	"github.com/k0sproject/rig/v2/sshconfig"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -178,6 +179,12 @@ func BuildInventory(in Input) (*Inventory, error) {
 			// Left on, rig would look for both on every connection and silently inherit
 			// whatever a base image happened to ship.
 			IgnoreSSHConfig: true,
+			// Host keys recorded under the Machine's name rather than its address. A DHCP
+			// lease reused by a replacement machine would otherwise collide in known_hosts
+			// with its predecessor's key and be refused as a changed host -- while a key that
+			// changes under a live Machine is still refused. Rig skips its known_hosts IP
+			// check when an alias is set, the way OpenSSH does.
+			SSHConfigOptions: sshconfig.OptionArguments{"HostKeyAlias": m.Name},
 		}
 
 		host := &cluster.Host{
