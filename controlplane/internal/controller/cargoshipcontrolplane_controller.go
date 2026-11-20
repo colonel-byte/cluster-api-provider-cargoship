@@ -147,6 +147,7 @@ func (r *CargoshipControlPlaneReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 	defer func() {
+		setReadyCondition(cp)
 		if err := patchHelper.Patch(ctx, cp); err != nil && reterr == nil {
 			reterr = err
 		}

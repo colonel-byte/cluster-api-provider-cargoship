@@ -458,6 +458,30 @@ func ownerRef(cp *controlplanev1.CargoshipControlPlane) *metav1.OwnerReference {
 }
 
 // setCondition records one condition on a control plane.
+// setReadyCondition rolls the other conditions into Ready, which is what `kubectl get` prints.
+//
+// Called once, just before the status patch, rather than at every return: whichever condition a
+// pass set last is the thing blocking readiness, and recomputing from the conditions themselves
+// means no return path can forget to keep Ready in step. A resource too young to have any
+// condition yet gets none, which prints as an empty column rather than a guess.
+func setReadyCondition(cp *controlplanev1.CargoshipControlPlane) {
+	for _, t := range []string{
+		controlplanev1.ConvergedCondition,
+		controlplanev1.MachinesReadyCondition,
+		controlplanev1.AvailableCondition,
+	} {
+		if c := apimeta.FindStatusCondition(cp.Status.Conditions, t); c != nil && c.Status == metav1.ConditionFalse {
+			setCondition(cp, controlplanev1.ReadyCondition, metav1.ConditionFalse, c.Reason, c.Message)
+			return
+		}
+	}
+	if apimeta.IsStatusConditionTrue(cp.Status.Conditions, controlplanev1.ConvergedCondition) &&
+		apimeta.IsStatusConditionTrue(cp.Status.Conditions, controlplanev1.MachinesReadyCondition) {
+		setCondition(cp, controlplanev1.ReadyCondition, metav1.ConditionTrue, "Ready",
+			"the control plane is converged and every machine has joined")
+	}
+}
+
 func setCondition(
 	cp *controlplanev1.CargoshipControlPlane,
 	conditionType string,

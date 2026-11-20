@@ -211,6 +211,9 @@ func TestReconcileConvergesAndPublishesTheKubeconfig(t *testing.T) {
 	if got := f.condition(t, controlplanev1.AvailableCondition); got.Status != metav1.ConditionTrue {
 		t.Errorf("Available = %s/%s, want True", got.Status, got.Reason)
 	}
+	if got := f.condition(t, controlplanev1.ReadyCondition); got.Status != metav1.ConditionTrue || got.Reason != "Ready" {
+		t.Errorf("Ready = %s/%s, want True/Ready", got.Status, got.Reason)
+	}
 	// The contract field that releases worker machines to be created.
 	if !ptr.Deref(f.cp.Status.Initialization.ControlPlaneInitialized, false) {
 		t.Error("status.initialization.controlPlaneInitialized is not set, so no worker would ever be created")
@@ -346,6 +349,10 @@ func TestReconcileRefusesAnInvalidClusterConfig(t *testing.T) {
 	// otherwise sends an operator to look at them.
 	if ready := f.condition(t, controlplanev1.MachinesReadyCondition); ready.Status != metav1.ConditionTrue {
 		t.Errorf("MachinesReady = %s/%s, want it left True", ready.Status, ready.Reason)
+	}
+	// The aggregate carries the blocking reason, which is what the Status column prints.
+	if ready := f.condition(t, controlplanev1.ReadyCondition); ready.Status != metav1.ConditionFalse || ready.Reason != "ClusterConfigInvalid" {
+		t.Errorf("Ready = %s/%s, want False/ClusterConfigInvalid", ready.Status, ready.Reason)
 	}
 	if result.RequeueAfter != defaultDriftInterval {
 		t.Errorf("requeued after %s, want the drift interval %s", result.RequeueAfter, defaultDriftInterval)
