@@ -342,6 +342,13 @@ func TestDecodeClusterConfig(t *testing.T) {
 				`"firewall":{"rules":[{"action":"allow","direction":"in","protocol":"tcp","port":"30000-32767"}]}}}}}`,
 		},
 		{
+			// New in cargoship v0.43.1. The decoder refuses unknown keys, so this case is what
+			// notices a vendored cargoship too old to know the field: it would fail with
+			// "unknown field" rather than decode.
+			name: "tlsSan decodes",
+			raw:  `{"tlsSan":["vip.example.com","203.0.113.10"]}`,
+		},
+		{
 			name:     "a profile naming a concurrency that is not a count or a percentage is refused",
 			raw:      `{"profiles":{"gpu":{"concurrency":"twenty-five%"}}}`,
 			wantErr:  true,

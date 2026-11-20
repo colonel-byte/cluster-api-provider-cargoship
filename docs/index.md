@@ -90,7 +90,7 @@ spec:
         kind: VSphereMachineTemplate
         name: fleet-cp
   clusterConfig:
-    # cargoship's own spec.config, verbatim: registries, profiles, values.
+    # cargoship's own spec.config, verbatim: tlsSan, registries, profiles, values.
     values:
       cni: cilium
     profiles:
