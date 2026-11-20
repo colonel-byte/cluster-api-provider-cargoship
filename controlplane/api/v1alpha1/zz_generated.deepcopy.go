@@ -173,6 +173,11 @@ func (in *CargoshipControlPlaneSpec) DeepCopyInto(out *CargoshipControlPlaneSpec
 		*out = new(v1.JSON)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.RegistryAuthSecretRef != nil {
+		in, out := &in.RegistryAuthSecretRef, &out.RegistryAuthSecretRef
+		*out = new(SecretReference)
+		**out = **in
+	}
 	out.Apply = in.Apply
 }
 
@@ -358,6 +363,11 @@ func (in *CargoshipControlPlaneTemplateResourceSpec) DeepCopyInto(out *Cargoship
 		in, out := &in.ClusterConfig, &out.ClusterConfig
 		*out = new(v1.JSON)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.RegistryAuthSecretRef != nil {
+		in, out := &in.RegistryAuthSecretRef, &out.RegistryAuthSecretRef
+		*out = new(SecretReference)
+		**out = **in
 	}
 	out.Apply = in.Apply
 }

@@ -90,6 +90,22 @@ spec:
                     format: int32
                     minimum: 0
                     type: integer
+                  credentialRotation:
+                    description: |-
+                      credentialRotation says when a rotated registryAuthSecretRef secret reaches the fleet.
+
+                      "Drift", the default, picks a rotation up at the next drift converge. "Immediate" folds
+                      the resolved credentials into the fingerprint and watches the secret, so a rotation
+                      converges the fleet as soon as it lands.
+
+                      Pushing new credentials is not free: the engine only reads registries.yaml at startup, so
+                      cargoship drains and restarts every node to deliver them. Immediate is for credentials
+                      that rotate rarely. A token that rotates every few minutes would roll the fleet
+                      continuously -- that wants a credential helper on the nodes, not a converge per rotation.
+                    enum:
+                    - Drift
+                    - Immediate
+                    type: string
                   driftIntervalSeconds:
                     description: |-
                       driftIntervalSeconds is how often a converged fleet is re-converged to catch drift. Zero
@@ -443,6 +459,36 @@ spec:
                     type: object
                 required:
                 - spec
+                type: object
+              registryAuthSecretRef:
+                description: |-
+                  registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
+                  the registries named in clusterConfig.registries, so they need not be written into this
+                  resource in plain text.
+
+                  The controller matches each entry of the secret's auths map against each registry's name
+                  by host -- "https://index.docker.io/v1/" matches "docker.io" -- and fills that registry's
+                  auth in memory before the converge. A registry whose auth is set inline keeps it, and a
+                  secret that matches no registry at all is refused rather than ignored. The credentials
+                  never reach this resource or a filesystem.
+                properties:
+                  name:
+                    description: name of the referenced secret.
+                    maxLength: 253
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: |-
+                      namespace of the referenced secret. Empty means the namespace of the object holding this
+                      reference.
+
+                      A namespace other than that one is refused unless the controller was started with
+                      --secret-namespaces naming it, because reading it would otherwise be a credential the
+                      referring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.
+                    maxLength: 63
+                    type: string
+                required:
+                - name
                 type: object
               replicas:
                 default: 1

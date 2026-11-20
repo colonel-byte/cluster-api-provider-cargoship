@@ -156,6 +156,18 @@ type CargoshipControlPlaneSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ClusterConfig *apiextensionsv1.JSON `json:"clusterConfig,omitempty"`
 
+	// registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
+	// the registries named in clusterConfig.registries, so they need not be written into this
+	// resource in plain text.
+	//
+	// The controller matches each entry of the secret's auths map against each registry's name
+	// by host -- "https://index.docker.io/v1/" matches "docker.io" -- and fills that registry's
+	// auth in memory before the converge. A registry whose auth is set inline keeps it, and a
+	// secret that matches no registry at all is refused rather than ignored. The credentials
+	// never reach this resource or a filesystem.
+	// +optional
+	RegistryAuthSecretRef *SecretReference `json:"registryAuthSecretRef,omitempty"`
+
 	// apply tunes the converge.
 	// +optional
 	Apply ApplyConfig `json:"apply,omitempty,omitzero"`
@@ -397,7 +409,29 @@ type ApplyConfig struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	DriftIntervalSeconds int32 `json:"driftIntervalSeconds,omitempty"`
+
+	// credentialRotation says when a rotated registryAuthSecretRef secret reaches the fleet.
+	//
+	// "Drift", the default, picks a rotation up at the next drift converge. "Immediate" folds
+	// the resolved credentials into the fingerprint and watches the secret, so a rotation
+	// converges the fleet as soon as it lands.
+	//
+	// Pushing new credentials is not free: the engine only reads registries.yaml at startup, so
+	// cargoship drains and restarts every node to deliver them. Immediate is for credentials
+	// that rotate rarely. A token that rotates every few minutes would roll the fleet
+	// continuously -- that wants a credential helper on the nodes, not a converge per rotation.
+	// +optional
+	// +kubebuilder:validation:Enum=Drift;Immediate
+	CredentialRotation string `json:"credentialRotation,omitempty"`
 }
+
+// The credentialRotation values, spelled out so the controller and the schema cannot drift.
+const (
+	// CredentialRotationDrift delivers rotated registry credentials at the drift interval.
+	CredentialRotationDrift = "Drift"
+	// CredentialRotationImmediate converges the fleet as soon as the secret changes.
+	CredentialRotationImmediate = "Immediate"
+)
 
 // SecretReference names a secret, in the referring object's namespace by default.
 type SecretReference struct {
