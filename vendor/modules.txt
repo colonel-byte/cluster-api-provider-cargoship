@@ -461,7 +461,7 @@ github.com/go-openapi/jsonpointer/jsonname
 ## explicit; go 1.26.0
 github.com/go-openapi/jsonreference
 github.com/go-openapi/jsonreference/internal
-# github.com/go-openapi/loads v0.25.3
+# github.com/go-openapi/loads v0.25.4
 ## explicit; go 1.26.0
 github.com/go-openapi/loads
 # github.com/go-openapi/runtime v0.33.4
