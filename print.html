@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b7d0a1fa.js";
+            window.path_to_searchindex_js = "searchindex-a1c686ee.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-db27eea1.js"></script>
@@ -546,8 +546,8 @@ rm cluster-key
 <p>One extracted package is as large as the package, so <strong>raise the limit to suit the packages in use</strong> - an <code>emptyDir</code> that fills takes the node’s filesystem with it. Replace it with a <code>persistentVolumeClaim</code> where the registry is far away: the blob cache survives a restart, which is the expensive part to lose.</p>
 <p>Note what the cache does and does not save. It saves the <em>fetch</em>. The package is extracted once per converge either way.</p>
 <h2 id="checking-it-is-up"><a class="header" href="#checking-it-is-up">Checking it is up</a></h2>
-<pre><code class="language-sh">kubectl -n cacpc-system logs deploy/cargoship-controlplane-controller-manager
-kubectl -n cabpc-system logs deploy/cargoship-bootstrap-controller-manager
+<pre><code class="language-sh">kubectl -n cacpc-system logs deploy/cacpc-controller-manager
+kubectl -n cabpc-system logs deploy/cabpc-controller-manager
 </code></pre>
 <p>A healthy control-plane controller logs the cache and temp paths it resolved at startup. If it exited instead, those paths are the reason: it refuses to start rather than fall back to a default that would put the cache on the pod’s writable layer.</p>
 <div style="break-before: page; page-break-before: always;"></div>
