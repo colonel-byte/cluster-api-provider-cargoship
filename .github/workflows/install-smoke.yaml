@@ -141,16 +141,16 @@ jobs:
       - name: Check both controllers are available
         run: |
           kubectl -n cabpc-system wait --for=condition=Available \
-            deploy/cargoship-bootstrap-controller-manager --timeout=180s
+            deploy/cabpc-controller-manager --timeout=180s
           kubectl -n cacpc-system wait --for=condition=Available \
-            deploy/cargoship-controlplane-controller-manager --timeout=180s
+            deploy/cacpc-controller-manager --timeout=180s
 
       # A controller that crash-loops on a bad flag or an unwritable cache path can still report
       # Available briefly, so the logs are checked for the two startup failures that are fatal.
       - name: Check the control-plane manager resolved its paths
         run: |
           kubectl -n cacpc-system logs \
-            deploy/cargoship-controlplane-controller-manager --tail=200 > cp.log
+            deploy/cacpc-controller-manager --tail=200 > cp.log
           cat cp.log
           if grep -q "unable to prepare the cargoship cache and temp directories" cp.log; then
             echo "::error::the control-plane manager could not use its cache or temp path"
@@ -165,6 +165,6 @@ jobs:
         if: failure()
         run: |
           kubectl get pods -A
-          kubectl -n cabpc-system describe deploy/cargoship-bootstrap-controller-manager || true
-          kubectl -n cacpc-system describe deploy/cargoship-controlplane-controller-manager || true
-          kubectl -n cabpc-system logs deploy/cargoship-bootstrap-controller-manager --tail=200 || true
+          kubectl -n cabpc-system describe deploy/cabpc-controller-manager || true
+          kubectl -n cacpc-system describe deploy/cacpc-controller-manager || true
+          kubectl -n cabpc-system logs deploy/cabpc-controller-manager --tail=200 || true
