@@ -117,8 +117,8 @@ Note what the cache does and does not save. It saves the *fetch*. The package is
 ## Checking it is up
 
 ```sh
-kubectl -n cacpc-system logs deploy/cargoship-controlplane-controller-manager
-kubectl -n cabpc-system logs deploy/cargoship-bootstrap-controller-manager
+kubectl -n cacpc-system logs deploy/cacpc-controller-manager
+kubectl -n cabpc-system logs deploy/cabpc-controller-manager
 ```
 
 A healthy control-plane controller logs the cache and temp paths it resolved at startup. If it exited instead, those paths are the reason: it refuses to start rather than fall back to a default that would put the cache on the pod's writable layer.
