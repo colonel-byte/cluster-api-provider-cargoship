@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.7.1...v0.8.0) (2026-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename managed resources to cabpc-/cacpc- prefixes ([#113](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/113))
+
+### Features
+
+* rename managed resources to cabpc-/cacpc- prefixes ([#113](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/113)) ([36511db](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/36511db980f75618d9ca9d1faafc9505d4cd78b4))
+
+
+### Miscellaneous
+
+* backfill the 0.7 series in metadata.yaml ([#112](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/112)) ([0c2a165](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0c2a1654fd2c8ce0960e216645362480ecd0cc3f))
+
 ## [0.7.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.7.0...v0.7.1) (2026-11-20)
 
 
