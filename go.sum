@@ -303,8 +303,8 @@ github.com/go-openapi/testify/enable/yaml/v2 v2.8.1 h1:BIMg/qqur4MXPPHLE3nftDfHd
 github.com/go-openapi/testify/enable/yaml/v2 v2.8.1/go.mod h1:74sM7nseyEwJFZ9yRNI77kCQAM5h8nZ4TmXI86voDHs=
 github.com/go-openapi/testify/v2 v2.8.1 h1:zk3S6KaDY1iQW91vsOJc25Ql1xm5bhPrZKdnL930bRQ=
 github.com/go-openapi/testify/v2 v2.8.1/go.mod h1:4gUN8jC+RqOE2qjW/vDmfyTvl5BCht4qL7oca0odrak=
-github.com/go-openapi/validate v1.0.2 h1:zRGDo6Nhrct2AAV1Rb566/oQWEhW4en1dqx39MwoeM4=
-github.com/go-openapi/validate v1.0.2/go.mod h1:BiEiYjD/jl+RVbk6wGF3vy+pQrnQLMBEzBvAoJ1U92o=
+github.com/go-openapi/validate v1.0.3 h1:07+o8E9v1LRSOO9iRxInfwFM8dfq4PKsPrKwj7+pnHM=
+github.com/go-openapi/validate v1.0.3/go.mod h1:BiEiYjD/jl+RVbk6wGF3vy+pQrnQLMBEzBvAoJ1U92o=
 github.com/go-rod/rod v0.116.2 h1:A5t2Ky2A+5eD/ZJQr1EfsQSe5rms5Xof/qj296e+ZqA=
 github.com/go-rod/rod v0.116.2/go.mod h1:H+CMO9SCNc2TJ2WfrG+pKhITz57uGNYU43qYHh438Mg=
 github.com/go-sprout/sprout v1.1.2 h1:SXwcvySDM3mUaLyM9TKoT1/z6qunYC4nmMhvm0mQmbE=
