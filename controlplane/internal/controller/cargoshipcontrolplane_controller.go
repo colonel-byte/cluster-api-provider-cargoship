@@ -85,6 +85,9 @@ type CargoshipControlPlaneReconciler struct {
 	Probe Prober
 	// Converge is the apply the Runner runs. Replaced in tests.
 	Converge ConvergeFunc
+	// Nodes lists the workload cluster's Nodes, for the gate on releasing a pre-terminate hook.
+	// Replaced in tests.
+	Nodes NodeListFunc
 	// Records reads what a registry holds, for a spec.distro that names a package rather than
 	// referencing one. Replaced in tests.
 	Records RecordLister
@@ -420,16 +423,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 			return ctrl.Result{}, err
 		}
 
-		// The survivors have now been converged without the departing hosts in the inventory,
-		// so their /etc/hosts and firewall rules no longer name a machine that is going. That
-		// is exactly the window the pre-terminate hook was held open for, so release it and let
-		// the infrastructure provider destroy the instances.
-		if err := r.releasePreTerminateHooks(ctx, machines); err != nil {
-			return ctrl.Result{}, err
-		}
-
 		r.recordHosts(cp, inv, run)
-		cp.Status.LastAppliedHash = fingerprint
 		cp.Status.Version = cp.Spec.Version
 		// The contract field that releases worker machines to be created. It is set once the
 		// credentials exist, which is the first moment anything could have talked to the API.
@@ -440,6 +434,25 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		setCondition(cp, controlplanev1.AvailableCondition, metav1.ConditionTrue, "Available",
 			"the control plane is answering")
 
+		// The survivors have now been converged without the departing hosts in the inventory,
+		// so their /etc/hosts and firewall rules no longer name a machine that is going. That is
+		// most of the window the pre-terminate hook was held open for -- the rest is the
+		// replacement having actually joined and been labelled, which the converge succeeding
+		// says nothing about. See holdPreTerminateHooks.
+		if hold := r.holdPreTerminateHooks(ctx, cluster, cp, machines); hold != "" {
+			setCondition(cp, controlplanev1.MachinesReadyCondition, metav1.ConditionFalse,
+				"WaitingForReplacementNodes", hold)
+			logger.Info("holding the pre-terminate hook", "reason", hold)
+			// Deliberately without recording the hash or forgetting the run: the hash would send
+			// the next pass down the up-to-date branch, which releases no hooks, and the runner
+			// answers with this same finished run rather than converging the fleet again.
+			return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
+		}
+		if err := r.releasePreTerminateHooks(ctx, machines); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		cp.Status.LastAppliedHash = fingerprint
 		if err := r.Runner.Forget(key); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -973,7 +986,7 @@ func (r *CargoshipControlPlaneReconciler) writeKubeConfig(
 				},
 			},
 		},
-		Data: map[string][]byte{"value": kubeconfig},
+		Data: map[string][]byte{kubeConfigSecretKey: kubeconfig},
 		Type: clusterv1.ClusterSecretType,
 	}
 
@@ -1000,6 +1013,9 @@ func (r *CargoshipControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) err
 	}
 	if r.Converge == nil {
 		r.Converge = converge.Apply
+	}
+	if r.Nodes == nil {
+		r.Nodes = r.workloadNodes
 	}
 	if r.Records == nil {
 		r.Records = distro.ListMirrored

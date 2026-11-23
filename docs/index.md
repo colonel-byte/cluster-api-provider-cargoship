@@ -120,7 +120,7 @@ Workers come from an ordinary `MachineDeployment` pointing at a `CargoshipConfig
 
 The scope row is the real difference and the reason for the design: a cargoship fleet shares an `/etc/hosts` file and a firewall across every host, so two uncoordinated SSH walks over it would fight. See [`docs/agent/choice-one-converge.md`](agent/choice-one-converge.md).
 
-The node-removal row is the second. A machine Cluster API is destroying needs no `cargoship reset` - but the machines that remain need their `/etc/hosts` and firewall rules rewritten without it, and a departing control-plane member needs to leave etcd first. Both are handled with a Cluster API pre-terminate hook: Cluster API drains the node and deletes the `Node` object, then blocks the infrastructure provider from destroying the instance until the controller releases the hook. The controller converges the survivors in that window and then lets the instance go.
+The node-removal row is the second. A machine Cluster API is destroying needs no `cargoship reset` - but the machines that remain need their `/etc/hosts` and firewall rules rewritten without it, and a departing control-plane member needs to leave etcd first. Both are handled with a Cluster API pre-terminate hook: Cluster API drains the node and deletes the `Node` object, then blocks the infrastructure provider from destroying the instance until the controller releases the hook. The controller converges the survivors in that window, waits for the replacement to have joined and - where `spec.apply.labelNodes` is on - to carry its role label, and then lets the instance go. See [`docs/guides/node-removal.md`](guides/node-removal.md).
 
 ## Not yet supported
 

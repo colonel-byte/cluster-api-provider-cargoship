@@ -19,6 +19,20 @@ When a machine is deleted, Cluster API:
 
 The controller uses that window. Its next reconcile builds the inventory from the machines that remain - the departing one has no `Node` and is being deleted, so it is simply not in the list - converges them, and only then removes the annotation.
 
+## What the hook waits for
+
+A converge that succeeded says the survivors no longer name the departing host. It does not say the machine replacing it has arrived, so the hook is held past the converge until every surviving machine:
+
+1. Has a node reference (`status.nodeRef.name`), which is Cluster API's record that its `Node` turned up.
+2. Has a live `Node` on the workload cluster that exists and is `Ready`.
+3. Carries `node-role.kubernetes.io/<profile>: "true"` on that `Node` - only where `spec.apply.labelNodes` is on, since nothing writes the label otherwise, and only for a machine that selects a profile at all.
+
+Cargoship's `LabelNodes` phase skips a host whose `Node` it could not find, and logs a warning rather than failing, so a fleet can converge cleanly with a replacement's role label missing. Releasing the hook then destroys the departing instance while nothing yet carries the label, and a workload whose affinity selects it - an infrastructure-only pod, say - goes unschedulable with nowhere to land.
+
+While the hook is held the `MachinesReady` condition reads `WaitingForReplacementNodes` and names the machine being waited on. There is no deadline on it, as there is nowhere in this provider: a replacement that takes eleven minutes to join holds the hook for eleven minutes. The reconcile observes the converge that already succeeded rather than starting another, and the Machine watch wakes it when the node reference appears.
+
+Tearing the whole control plane down is not gated. `reconcileDelete` releases every hook without a converge, because there are no survivors to wait for.
+
 The annotation has to be claimed **at creation**, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.
 
 ## Why this also keeps a safety check working

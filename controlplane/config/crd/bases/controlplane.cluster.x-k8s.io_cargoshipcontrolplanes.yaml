@@ -123,8 +123,10 @@ spec:
                     minimum: 0
                     type: integer
                   labelNodes:
-                    description: labelNodes adds the node-role.kubernetes.io/<profile>
-                      label to each node.
+                    description: |-
+                      labelNodes adds the node-role.kubernetes.io/<profile> label to each node. With it on, a
+                      machine being removed also keeps its pre-terminate hook until the surviving nodes carry
+                      their own role label, so a workload selecting one is never left without a node to run on.
                     type: boolean
                   modifyFirewall:
                     description: modifyFirewall lets cargoship open the ports the
