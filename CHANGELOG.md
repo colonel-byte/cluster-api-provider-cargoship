@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.0...v0.8.1) (2026-11-23)
+
+
+### Features
+
+* fill clusterConfig.values from ConfigMaps and Secrets, and generate CRD JSON Schemas ([#127](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/127)) ([41bc31a](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/41bc31a4ca5bdc5563d56561fcc1d0d991eaa8d1))
+
+
+### Documentation
+
+* **examples:** add a ClusterResourceSet template for vSphere credentials ([#128](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/128)) ([17ed3e4](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/17ed3e4eb699198888449c595ab3555767fae66a))
+
+
+### Build
+
+* **deps:** bump github.com/go-openapi/jsonpointer from 1.0.2 to 1.0.3 ([#125](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/125)) ([0332dcf](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0332dcf3cb97f907270fcd5a47a1d44d2d52a1ba))
+* **deps:** bump github.com/go-openapi/runtime from 0.33.4 to 0.33.5 ([#118](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/118)) ([4e6306c](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/4e6306c293c618bbee43bd726bfc7e1fa2a6bd46))
+* **deps:** bump github.com/go-openapi/validate from 1.0.2 to 1.0.3 ([#124](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/124)) ([59c7a62](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/59c7a62134e136089d5cb005a07af0a661822ef0))
+* **deps:** bump github.com/k0sproject/rig/v2 from 2.3.0 to 2.4.0 ([#122](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/122)) ([4854cda](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/4854cda5b6b002864b131204819b101984770bb2))
+* **deps:** bump github.com/klauspost/compress from 1.20.4 to 1.20.5 ([#120](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/120)) ([eea794e](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/eea794ee2a4fcc76ae84b925053ce69eec6ffefa))
+* **deps:** bump github.com/pb33f/go-yaml from 0.1.1 to 0.2.0 ([#123](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/123)) ([2d78896](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/2d78896aa796f9b26c4f641dd3a1ef95e01a900c))
+* **deps:** bump github.com/sigstore/rekor from 1.6.1 to 1.6.2 ([#117](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/117)) ([730b9c1](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/730b9c12d746bbeb9fc9ff2c990d425b2acce6d7))
+* **deps:** bump github.com/theupdateframework/go-tuf from 0.7.0 to 0.7.1 ([#116](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/116)) ([47acd88](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/47acd880b9d73455f2f4fec0edbd5d4db07ce168))
+* **deps:** bump the core group with 3 updates ([#121](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/121)) ([1064103](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/1064103ee32edb6eeb05307180841e5b8ee9f28d))
+* **deps:** bump the golang group with 2 updates ([#115](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/115)) ([32fcc8b](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/32fcc8bb39302c90542a9be28e337c2e72f5179c))
+
 ## [0.8.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.7.1...v0.8.0) (2026-11-21)
 
 
