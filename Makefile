@@ -56,7 +56,7 @@ help: ## Show this help.
 ##@ Generate
 
 .PHONY: generate
-generate: generate-deepcopy manifests docs ## Run every generator.
+generate: generate-deepcopy manifests schemas docs ## Run every generator.
 
 .PHONY: generate-deepcopy
 generate-deepcopy: ## Regenerate zz_generated.deepcopy.go.
@@ -79,6 +79,10 @@ manifests: ## Regenerate the CRDs and RBAC roles.
 	$(CONTROLLER_GEN) crd rbac:roleName=manager-role paths=./controlplane/... \
 		output:crd:artifacts:config=controlplane/config/crd/bases \
 		output:rbac:artifacts:config=controlplane/config/rbac
+
+.PHONY: schemas
+schemas: manifests ## Extract each CRD's openAPIV3Schema into schema/ as JSON Schema.
+	$(MAGE) generate:jsonSchema
 
 .PHONY: vendor
 vendor: ## Re-vendor dependencies. Use this, not `go mod vendor` directly.
@@ -139,6 +143,7 @@ GENERATED_PATHS := \
 	'**/zz_generated.deepcopy.go' \
 	bootstrap/config \
 	controlplane/config \
+	schema \
 	docs/index.md \
 	docs/SUMMARY.md
 

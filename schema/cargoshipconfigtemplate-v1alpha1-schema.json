@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "description": "CargoshipConfigTemplate is a template for CargoshipConfig, referenced by a MachineDeployment so\nits worker machines each get their own config.\n\nIt has no status and no controller: a template is never reconciled, only stamped by the\nMachineSet controller. That is the whole of the ConfigTemplate half of the bootstrap contract.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec is the desired state of CargoshipConfigTemplate.",
+      "properties": {
+        "template": {
+          "description": "template is the CargoshipConfig to create per machine.",
+          "properties": {
+            "metadata": {
+              "description": "metadata is the labels and annotations stamped onto the created CargoshipConfig.",
+              "minProperties": 1,
+              "properties": {
+                "annotations": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "annotations is an unstructured key value map stored with a resource that may be\nset by external tools to store and retrieve arbitrary metadata. They are not\nqueryable and should be preserved when modifying objects.\nMore info: http://kubernetes.io/docs/user-guide/annotations",
+                  "type": "object"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "spec": {
+              "description": "spec is the CargoshipConfig spec to stamp.",
+              "properties": {
+                "files": {
+                  "description": "files are written to the machine before cargoship connects.\n\nKeep this empty if you can. It exists for what must be true before SSH works at all -- a\nproxy configuration, a CA bundle the machine needs to resolve anything, a network script\nthe image does not carry. Everything after the first connection is a cargoship phase, and\na file placed here is a file no phase reports on and no receipt records.",
+                  "items": {
+                    "description": "File is a file written by the bootstrap data.",
+                    "properties": {
+                      "content": {
+                        "description": "content is the file's contents, written literally.\n\nA secret does not belong here: bootstrap data reaches the machine through the\ninfrastructure provider's user-data channel, which on most providers is readable from the\ninstance metadata service by anything running on the host. Use contentFrom.",
+                        "maxLength": 131072,
+                        "type": "string"
+                      },
+                      "contentFrom": {
+                        "description": "contentFrom reads the contents from a secret key in the CargoshipConfig's namespace.\n\nThis is no more private than content once the bootstrap secret is rendered -- the value is\ncopied into it either way. What it buys is that the value is not in the CargoshipConfig\nitself, so it is not in the Git repository the CR is applied from.",
+                        "properties": {
+                          "secret": {
+                            "description": "secret is the secret and key to read.",
+                            "properties": {
+                              "key": {
+                                "description": "key within the secret.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "name of the secret.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "name"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "secret"
+                        ],
+                        "type": "object"
+                      },
+                      "owner": {
+                        "description": "owner is the \"user:group\" the file is written as.",
+                        "maxLength": 65,
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "path is the absolute path to write to.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "permissions": {
+                        "description": "permissions is the file mode, as a string, because a leading zero in YAML is how \"0600\"\nbecomes 384.",
+                        "maxLength": 4,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 32,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "preCargoshipCommands": {
+                  "description": "preCargoshipCommands run on first boot, before cargoship connects. The same warning as\nfiles applies, and more strongly: a command here runs once, unreported, with no retry.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 32,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "sshAuthorizedKeys": {
+                  "description": "sshAuthorizedKeys are public keys appended to the user's authorized_keys.\n\nThe control plane's own key is added by the controller from its sshSecretRef, so this is\nfor the extra ones: an operator's key for breaking glass, a backup agent's. A config with\nnone is valid and normal.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 32,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "user": {
+                  "description": "user is the login cargoship connects as. The user must already exist in the image; this\nconfigures its authorized keys rather than creating it, because an image that does not\ncarry the account is a packaging problem a bootstrap script should not paper over.",
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "template"
+      ],
+      "type": "object"
+    }
+  },
+  "type": "object"
+}

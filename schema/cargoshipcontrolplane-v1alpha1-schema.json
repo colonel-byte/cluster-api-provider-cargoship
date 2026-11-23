@@ -1,0 +1,650 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "description": "CargoshipControlPlane is a Kubernetes control plane installed and converged by cargoship over\nSSH, in place of kubeadm.\n\nIt owns the whole fleet rather than only the control-plane machines, which is a deliberate\ndeparture from KubeadmControlPlane. Cargoship converges controllers and workers in one run, with\nits own per-profile concurrency, and splitting that across two controllers would mean two\nuncoordinated SSH walks over hosts that share an /etc/hosts file and a firewall. See\ndocs/agent/choice-one-converge.md.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec is the desired state of CargoshipControlPlane.",
+      "properties": {
+        "apply": {
+          "description": "apply tunes the converge.",
+          "properties": {
+            "allowDowngrade": {
+              "description": "allowDowngrade lets a converge continue against a host already running a version newer than\nthe package, rather than refusing.",
+              "type": "boolean"
+            },
+            "concurrency": {
+              "description": "concurrency caps how many hosts a phase acts on at once. Zero is unlimited.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "credentialRotation": {
+              "description": "credentialRotation says when a rotated registryAuthSecretRef secret reaches the fleet.\n\n\"Drift\", the default, picks a rotation up at the next drift converge. \"Immediate\" folds\nthe resolved credentials into the fingerprint and watches the secret, so a rotation\nconverges the fleet as soon as it lands.\n\nPushing new credentials is not free: the engine only reads registries.yaml at startup, so\ncargoship drains and restarts every node to deliver them. Immediate is for credentials\nthat rotate rarely. A token that rotates every few minutes would roll the fleet\ncontinuously -- that wants a credential helper on the nodes, not a converge per rotation.",
+              "enum": [
+                "Drift",
+                "Immediate"
+              ],
+              "type": "string"
+            },
+            "driftIntervalSeconds": {
+              "description": "driftIntervalSeconds is how often a converged fleet is re-converged to catch drift. Zero\ntakes 600.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "labelNodes": {
+              "description": "labelNodes adds the node-role.kubernetes.io/\u003cprofile\u003e label to each node.",
+              "type": "boolean"
+            },
+            "modifyFirewall": {
+              "description": "modifyFirewall lets cargoship open the ports the cluster needs in the host's own firewall.",
+              "type": "boolean"
+            },
+            "modifyHosts": {
+              "description": "modifyHosts lets cargoship write every node into each host's /etc/hosts.",
+              "type": "boolean"
+            },
+            "timeoutSeconds": {
+              "description": "timeoutSeconds bounds the retry loops inside each phase. Zero takes cargoship's own\ndefault, which is 15 minutes.\n\nThis is not a budget for the whole converge: it is how long one phase waits for one host to\nget where it is going. Nothing in this controller bounds the total, on purpose -- a machine\nthat takes eleven minutes to boot is not an error, and the reconcile that is waiting for it\ncosts nothing.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "workerConcurrent": {
+              "description": "workerConcurrent is the worker batch size, a count (\"5\") or a percentage (\"25%\").\n\nNothing in this repository parses it; cargoship does, as it sizes each phase's batches. So\nan unguarded typo here is found part way through an apply, with earlier phases already\napplied to hosts, which is the one failure in a converge that is worth a schema rule\ninstead.",
+              "maxLength": 8,
+              "pattern": "^([0-9]+|[0-9]{1,2}%|100%)$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "clusterConfig": {
+          "description": "clusterConfig is the cargoship cluster configuration's spec.config, verbatim.\n\nIt is carried as an opaque object rather than mirrored field by field, which is a deliberate\ntrade. What it buys: the YAML here is the YAML of a cargoship inventory, so it needs no\ntranslation and cannot drift from the schema cargoship actually validates against -- and\ncargoship does validate it, against the package's own values schema, before any phase runs.\nWhat it costs: the API server will not reject a typo in it. A validation rule cannot help\n-- CEL is not given the contents of a field with x-kubernetes-preserve-unknown-fields -- so\na mistake surfaces as a reconcile error on the custom resource rather than as a rejected\napply. The ones that can be found without reaching a host are found on the first reconcile\nand reported on the Converged condition as ClusterConfigInvalid: an unknown key, a\nregistry that configures nothing, a profile inheriting one that does not exist, a port or\na concurrency cargoship's own validators refuse. See\ndocs/agent/choice-clusterconfig-validation.md.\n\nloadbalancer is ignored here; controlPlaneEndpoint above is the contract field for it.",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "controlPlaneEndpoint": {
+          "description": "controlPlaneEndpoint is the host clients reach the API through, and becomes the cluster\nconfiguration's loadbalancer.\n\nIt is a contract field, so Cluster API copies it onto the Cluster. Leave it unset and the\ncontroller fills it in from the first control-plane machine's address, which is right for a\nsingle-controller cluster and wrong for any cluster that will grow one.",
+          "minProperties": 1,
+          "properties": {
+            "host": {
+              "description": "host is the hostname on which the API server is serving.",
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "port": {
+              "description": "port is the port on which the API server is serving.",
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "distro": {
+          "description": "distro is the cargoship package the fleet is converged to.",
+          "properties": {
+            "arch": {
+              "description": "arch is the package architecture to pull, \"amd64\" or \"arm64\". Empty takes the package's\nsole architecture, and fails if it carries more than one.",
+              "enum": [
+                "amd64",
+                "arm64"
+              ],
+              "type": "string"
+            },
+            "caBundleSecretRef": {
+              "description": "caBundleSecretRef is a secret holding PEM-encoded certificates to trust when pulling the\npackage, in its \"ca.crt\" key. They are trusted in addition to the controller's own roots,\nso a registry with a private CA does not stop the controller reaching anything else.\n\nThis is the way to pull from a registry serving a certificate nothing public signed - a\nZarf registry, usually. Prefer it to insecureSkipTLSVerify, which verifies nothing at all.",
+              "properties": {
+                "name": {
+                  "description": "name of the referenced secret.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "namespace of the referenced secret. Empty means the namespace of the object holding this\nreference.\n\nA namespace other than that one is refused unless the controller was started with\n--secret-namespaces naming it, because reading it would otherwise be a credential the\nreferring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.",
+                  "maxLength": 63,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "fromZarfState": {
+              "description": "fromZarfState reads the registry's credentials and its certificate authority out of the\nZarf deployment in the controller's own cluster, instead of from pullSecretRef and\ncaBundleSecretRef.\n\nThis is the air-gapped case with nothing to wire up: Zarf generated the credentials and\nsigned the registry's certificate itself, and both are already in the management cluster\nas the `zarf-state` and `zarf-registry-server-tls` secrets. The pull-only credentials are\npreferred over the push pair, and a registry Zarf manages mTLS for is reached with that\nCA and no client certificate: Zarf requires one only where it is offered, and the one it\nissues belongs to the per-node registry proxy.\n\nregistry is still named here rather than read from that state. Zarf records the address a\nnode reaches the registry at - a NodePort or an external host - and a controller inside\nthe cluster wants the service, which the state does not carry. See\ndocs/agent/choice-registry-credentials.md.",
+              "type": "boolean"
+            },
+            "insecureSkipTLSVerify": {
+              "description": "insecureSkipTLSVerify accepts the registry's certificate without verifying it, rather than\ntrusting it through caBundleSecretRef. It covers the package pull only, and neither the SSH\nconnections to the fleet nor the workload cluster's API server.",
+              "type": "boolean"
+            },
+            "name": {
+              "description": "name is the cargoship package to converge to, as the package declares itself - \"k3s\",\n\"rancher-rke2-multi-cilium\".",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "ociRef": {
+              "description": "ociRef is the package OCI reference, e.g. \"oci://ghcr.io/example/k3s@sha256:...\".\n\nA tag is resolved to a digest once and the digest is recorded in status.distro.digest.\nEvery later reconcile uses the digest, so a tag that moves underneath a running cluster\ndoes not silently change what the fleet converges to; change the reference to adopt it.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            "packageVersion": {
+              "description": "packageVersion is the package's own version to take, which is not spec.version: a package\ndeclares its own, and only the package knows which Kubernetes version that installs.\n\nRequired alongside name, rather than defaulting to the newest version recorded. Taking the\nnewest would make the registry the desired state and this resource a follower of it, so\npublishing a package on a Friday afternoon would move a cluster nobody touched. The\nversion a fleet runs is decided here; discovery resolves it to a reference and says what\nelse is on offer when it is wrong.",
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "pullSecretRef": {
+              "description": "pullSecretRef is a docker-registry secret for the registry holding the package. Empty uses\nanonymous access.\n\nThe secret must be of type kubernetes.io/dockerconfigjson, which is what\n`kubectl create secret docker-registry` produces. Its registries are merged into a Docker\nconfig file the controller keeps on its cache volume, because that file is the only place\nthe pull reads credentials from; see docs/agent/choice-registry-credentials.md.",
+              "properties": {
+                "name": {
+                  "description": "name of the referenced secret.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "namespace of the referenced secret. Empty means the namespace of the object holding this\nreference.\n\nA namespace other than that one is refused unless the controller was started with\n--secret-namespaces naming it, because reading it would otherwise be a credential the\nreferring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.",
+                  "maxLength": 63,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "registry": {
+              "description": "registry is where to discover the package, as a host with an optional path prefix -\n\"zarf-docker-registry.zarf.svc.cluster.local:5000\" or \"ghcr.io/example\". No scheme.\n\nThe records are read from \u003cregistry\u003e/cargoship, which is one tag listing rather than a\ncatalogue read, so the pull credentials pullSecretRef names are enough. See\ndocs/agent/choice-record-discovery.md.",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            "signatureKeySecretRef": {
+              "description": "signatureKeySecretRef is a secret holding the Cosign public key the package's signature is\nverified against, in its \"cosign.pub\" key.\n\nEmpty verifies nothing. A signature with no key to check it against is not verification,\nso cargoship logs that it could not verify and converges anyway -- for a signed package\nexactly as for an unsigned one. Nothing else on this resource changes that.\n\nNaming a key makes verification a precondition: an unsigned package, a signature this key\ndoes not verify, and a signature in a form cargoship cannot check are all refused, and the\nrefusal comes out of the package pull before anything is extracted or run on a host. This\nis the field for a fleet whose supply chain is the trust boundary rather than the\nregistry's authentication.\n\nUnlike pullSecretRef and caBundleSecretRef it stands alongside fromZarfState rather than\ninstead of it: Zarf's own state carries no signing key, so a Zarf registry's packages are\nverified through this field like any other. It is also read on every pass rather than only\non the passes that converge, so a secret deleted under a converged fleet is reported rather\nthan noticed the next time something changes.",
+              "properties": {
+                "name": {
+                  "description": "name of the referenced secret.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "namespace of the referenced secret. Empty means the namespace of the object holding this\nreference.\n\nA namespace other than that one is refused unless the controller was started with\n--secret-namespaces naming it, because reading it would otherwise be a credential the\nreferring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.",
+                  "maxLength": 63,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "set either ociRef, or both registry and name",
+              "rule": "has(self.ociRef) != (has(self.registry) \u0026\u0026 has(self.name))"
+            },
+            {
+              "message": "a discovered package needs both name and packageVersion",
+              "rule": "has(self.name) == has(self.packageVersion)"
+            },
+            {
+              "message": "fromZarfState needs registry, which is the host its credentials are stored under",
+              "rule": "!has(self.fromZarfState) || !self.fromZarfState || has(self.registry)"
+            },
+            {
+              "message": "fromZarfState supplies the credentials and the CA, so pullSecretRef and caBundleSecretRef must be unset",
+              "rule": "!has(self.fromZarfState) || !self.fromZarfState || (!has(self.pullSecretRef) \u0026\u0026 !has(self.caBundleSecretRef))"
+            },
+            {
+              "message": "registry is a host with an optional path prefix and carries no scheme",
+              "rule": "!has(self.registry) || !self.registry.contains(\"://\")"
+            }
+          ]
+        },
+        "machineTemplate": {
+          "description": "machineTemplate is the infrastructure and metadata each control-plane machine is created\nfrom.",
+          "properties": {
+            "metadata": {
+              "description": "metadata is the labels and annotations stamped onto each machine.",
+              "minProperties": 1,
+              "properties": {
+                "annotations": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "annotations is an unstructured key value map stored with a resource that may be\nset by external tools to store and retrieve arbitrary metadata. They are not\nqueryable and should be preserved when modifying objects.\nMore info: http://kubernetes.io/docs/user-guide/annotations",
+                  "type": "object"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "spec": {
+              "description": "spec is the machine template's own spec.",
+              "properties": {
+                "failureDomains": {
+                  "description": "failureDomains are the failure domains to spread control-plane machines across, in order.\nEmpty lets the infrastructure provider choose.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "infrastructureRef": {
+                  "description": "infrastructureRef is the infrastructure machine template each control-plane machine is\ncreated from.",
+                  "properties": {
+                    "apiGroup": {
+                      "description": "apiGroup is the group of the resource being referenced.\napiGroup must be fully qualified domain name.\nThe corresponding version for this reference will be looked up from the contract\nlabels of the corresponding CRD of the resource being referenced.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "kind of the resource being referenced.\nkind must consist of alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character.",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "name of the resource being referenced.\nname must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "apiGroup",
+                    "kind",
+                    "name"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "infrastructureRef"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "spec"
+          ],
+          "type": "object"
+        },
+        "registryAuthSecretRef": {
+          "description": "registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for\nthe registries named in clusterConfig.registries, so they need not be written into this\nresource in plain text.\n\nThe controller matches each entry of the secret's auths map against each registry's name\nby host -- \"https://index.docker.io/v1/\" matches \"docker.io\" -- and fills that registry's\nauth in memory before the converge. A registry whose pulls are redirected to a proxy\nmirror also matches an entry keyed by the mirror's host, so one entry for the mirror\ncovers every registry proxying through it. A registry whose auth is set inline keeps it, and a\nsecret that matches no registry at all is refused rather than ignored. The credentials\nnever reach this resource or a filesystem.",
+          "properties": {
+            "name": {
+              "description": "name of the referenced secret.",
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "namespace": {
+              "description": "namespace of the referenced secret. Empty means the namespace of the object holding this\nreference.\n\nA namespace other than that one is refused unless the controller was started with\n--secret-namespaces naming it, because reading it would otherwise be a credential the\nreferring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.",
+              "maxLength": 63,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "replicas": {
+          "default": 1,
+          "description": "replicas is the number of control-plane machines.\n\nAn even number is accepted rather than refused, because cargoship does not own the etcd\ntopology decision and an operator growing a cluster passes through even numbers. The\ncontroller warns.",
+          "format": "int32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ssh": {
+          "description": "ssh is how the controller reaches the machines.",
+          "properties": {
+            "port": {
+              "description": "port is the SSH port. Zero means 22.",
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "privateKeySecretRef": {
+              "description": "privateKeySecretRef is a secret holding the private key, in the \"ssh-privatekey\" key of a\nkubernetes.io/ssh-auth secret.\n\nThe key is read into memory and handed to the SSH client as an auth method. It is never\nwritten to the pod's filesystem, so the controller needs no writable mount for it and a\ncontainer compromise has to read process memory rather than a file.",
+              "properties": {
+                "name": {
+                  "description": "name of the referenced secret.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "namespace of the referenced secret. Empty means the namespace of the object holding this\nreference.\n\nA namespace other than that one is refused unless the controller was started with\n--secret-namespaces naming it, because reading it would otherwise be a credential the\nreferring namespace does not own. See docs/agent/choice-cross-namespace-secrets.md.",
+                  "maxLength": 63,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "useSudo": {
+              "default": true,
+              "description": "useSudo runs privileged commands through sudo rather than as the login user. Needed for any\nuser that is not root, which should be every user.",
+              "type": "boolean"
+            },
+            "user": {
+              "description": "user is the login to connect as.",
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "privateKeySecretRef",
+            "user"
+          ],
+          "type": "object"
+        },
+        "valuesFrom": {
+          "description": "valuesFrom fills entries of clusterConfig.values from ConfigMaps and Secrets, in the style\nof a Flux HelmRelease's valuesFrom, so a package value that is a credential -- a vCenter\npassword, say -- need not be written into this resource in plain text.\n\nEntries are merged in order, later over earlier, and a value set inline in\nclusterConfig.values wins over all of them. The resolved values never reach this resource:\nthey are merged in memory before the converge, and only a hash of them joins the\ndesired-state fingerprint, so rotating a referenced secret re-converges the fleet without\nthe credential appearing anywhere readable.",
+          "items": {
+            "description": "ValuesReference is one source of clusterConfig.values entries: a key of a ConfigMap or Secret\nin the referring object's own namespace, holding either a YAML document to merge or a single\nvalue for targetPath.\n\nIt is deliberately the shape of a Flux HelmRelease's valuesFrom, defaults included, so an\noperator who knows one knows the other. Unlike this API's SecretReference it carries no\nnamespace: the referent lives beside the control plane, the way Flux scopes it.",
+            "properties": {
+              "kind": {
+                "description": "kind of the values referent.",
+                "enum": [
+                  "ConfigMap",
+                  "Secret"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "description": "name of the referenced ConfigMap or Secret, in the same namespace as this resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              "optional": {
+                "description": "optional makes a missing ConfigMap or Secret a skip rather than an error. A referent that\nexists but lacks valuesKey is still an error, because that is a wiring mistake rather than\nan absence.",
+                "type": "boolean"
+              },
+              "targetPath": {
+                "description": "targetPath is a dotted path the key's content is set at as one value --\n\"addons.vsphere.auth.pass\" -- instead of the content being parsed as a YAML mapping.",
+                "maxLength": 250,
+                "type": "string"
+              },
+              "valuesKey": {
+                "description": "valuesKey is the data key the values are read from. Empty means \"values.yaml\". Without\ntargetPath the content is a YAML mapping, merged whole.",
+                "maxLength": 253,
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "version": {
+          "description": "version is the desired Kubernetes version, as the contract requires it: a semantic version\nwith a leading \"v\".\n\nIt must agree with what the distro package installs, and nothing checks that: the package\nis the authority on what lands on a host, so a value here that disagrees with it makes\nstatus.version wrong rather than failing.\n\nChanging it against a control plane that has already converged is refused unless\nApproveVersionChangeAnnotation says otherwise, because what the converge would then do is\nan unsupervised in-place upgrade of every host rather than a rollout.\n\nThe pattern enforces exactly what the sentence above says, and no more: a leading \"v\" and\na major.minor.patch, with anything after it allowed. A distro package's build suffix is\npart of the version it installs -- \"v1.31.2+k3s1\", \"v1.31.2+rke2r1\" -- so an anchored tail\nwould refuse the only versions this provider ever converges to. It is stricter than\ncluster-api itself, which parses a version with semver.ParseTolerant and would accept\n\"1.31.2\" (vendor/sigs.k8s.io/cluster-api/internal/contract/controlplane.go): the value is\ncopied onto every Machine and reported as status.version, and a field documented as\nneeding a leading \"v\" is better refused than tolerated into both.",
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+",
+          "type": "string"
+        }
+      },
+      "required": [
+        "distro",
+        "machineTemplate",
+        "ssh",
+        "version"
+      ],
+      "type": "object"
+    },
+    "status": {
+      "description": "status is the observed state of CargoshipControlPlane.",
+      "properties": {
+        "availableReplicas": {
+          "description": "availableReplicas is the number of control-plane machines that are available.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "conditions": {
+          "description": "conditions represent the observations of the control plane's current state.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "distro": {
+          "description": "distro records what was actually converged to, as opposed to what was asked for.",
+          "properties": {
+            "availableVersions": {
+              "description": "availableVersions are the other versions of this package the registry holds a published\nrecord of, newest first.\n\nAdvertisement, not intent: nothing here moves a cluster. It is what makes an upgrade a\ndecision an operator can make from `kubectl get cargoshipcontrolplane -o yaml` rather\nthan by reading a registry themselves, and it is set only for a package discovered\nthrough registry and name.",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "digest": {
+              "description": "digest is the package digest, set only when the reference named one.\n\nIt is empty for a tagged reference, which is also the case in which this provider cannot\ntell that a republished package has changed. Pin the reference to a digest where that\nmatters; see docs/agent/choice-distro-pinning.md.",
+              "maxLength": 256,
+              "type": "string"
+            },
+            "engine": {
+              "description": "engine is the distro engine the package carries: k3s, rke2, or upstream.",
+              "maxLength": 32,
+              "type": "string"
+            },
+            "recordDigest": {
+              "description": "recordDigest is the package content digest the registry's own record claims, set only when\nthe package was discovered through registry and name.\n\nIt is not a reference you can pull: it is the digest cargoship computes over a package's\ncontents, while a published package's root is a multi-architecture index whose digest\ndiffers. What it is good for is noticing a change - it moves when the contents move and\nnot otherwise - so it is in the desired-state fingerprint, and a version republished with\nnew contents re-converges the fleet.",
+              "maxLength": 256,
+              "type": "string"
+            },
+            "ref": {
+              "description": "ref is the package reference the fleet was converged to, exactly as spec.distro.ociRef\ngave it.",
+              "maxLength": 2048,
+              "type": "string"
+            },
+            "version": {
+              "description": "version is the Kubernetes version the package installs.",
+              "maxLength": 256,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "hosts": {
+          "description": "hosts is what the last converge did, per host.",
+          "items": {
+            "description": "HostStatus is one host's line in the last converge.",
+            "properties": {
+              "address": {
+                "description": "address is the host as the inventory addressed it, which is the identity cargoship's own\nrun receipt uses.",
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "changed": {
+                "description": "changed is whether the last converge changed anything on this host.",
+                "type": "boolean"
+              },
+              "machine": {
+                "description": "machine is the Machine this host came from.",
+                "maxLength": 253,
+                "type": "string"
+              },
+              "phasesNamed": {
+                "description": "phasesNamed is how many phases spoke for this host, and phasesReporting how many declared\nper-host results at all.\n\nThey are a pair because the first cannot be read without the second: a host named by two of\ntwo reporting phases is fully accounted for, one named by two of fifteen is not, and the\ntwo look identical without the denominator.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "phasesReporting": {
+                "description": "phasesReporting is the denominator for phasesNamed.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "role": {
+                "description": "role is controller or worker.",
+                "enum": [
+                  "controller",
+                  "worker"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "address"
+            ],
+            "type": "object"
+          },
+          "maxItems": 256,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "address"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "initialization": {
+          "description": "initialization provides observations of the initialization process.",
+          "properties": {
+            "controlPlaneInitialized": {
+              "description": "controlPlaneInitialized is true once the Kubernetes API has accepted a request, which is\nalso when the kubeconfig secret exists.\n\nThis field is part of the Cluster API contract and is what releases worker machines to be\ncreated. The v1beta1 spelling was status.initialized.",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "lastAppliedHash": {
+          "description": "lastAppliedHash is the desired-state fingerprint of the last successful converge: the host\nset, the cluster configuration and the pinned package digest.\n\nIt is what keeps a reconcile from re-running a multi-minute apply on every resync. A\nconverge is idempotent, so re-running one is safe rather than destructive -- this is a cost\ncontrol, not a correctness gate, and clearing it forces a converge.",
+          "maxLength": 64,
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "observedGeneration is the latest generation observed by the controller.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "readyReplicas": {
+          "description": "readyReplicas is the number of control-plane machines reporting ready.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "replicas": {
+          "description": "replicas is the number of control-plane machines that exist.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "selector": {
+          "description": "selector is the label selector in string form, for the scale subresource.",
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "upToDateReplicas": {
+          "description": "upToDateReplicas is the number of control-plane machines converged to the current desired\nstate.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "version": {
+          "description": "version is the lowest Kubernetes version observed across the control-plane machines.",
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
