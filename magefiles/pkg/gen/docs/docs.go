@@ -45,13 +45,18 @@ type chapter struct {
 
 // chapters is the book's structure, and the order is load-bearing twice over.
 //
-// docs/css/print.css drops everything from the first Development heading to the end of the
-// document out of the print page, which is why Development and the decision records come last and
-// in that order -- a chapter added after them is excluded from print too, and a chapter added
-// before Development is not. The sidebar order is the other reason, and the less important one.
+// docs/css/print.css is written to drop everything from the first Development heading to the end
+// of the document out of the print page, which is why Development, the workflow pages and the
+// decision records come last and in that order -- a chapter added after Development is excluded
+// from print too, and one added before it is not. The sidebar order is the other reason, and the
+// less important one.
+//
+// That rule currently selects an H1 this repository does not have, so nothing is actually being
+// excluded; the ordering here is what makes it a one-line fix rather than a reshuffle.
 var chapters = []chapter{
 	{title: "Guides", dir: "guides"},
 	{title: "Development", dir: "dev"},
+	{title: "Workflows", dir: "workflows"},
 	{title: "Decision records", dir: "agent"},
 }
 

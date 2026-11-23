@@ -17,6 +17,28 @@
 - [e2e-tests](dev/e2e-tests.md)
 - [manual-verification](dev/manual-verification.md)
 
+# Workflows
+
+- [check-go-mod](workflows/check-go-mod.md)
+- [check-kustomize-hold](workflows/check-kustomize-hold.md)
+- [codeql](workflows/codeql.md)
+- [commitlint](workflows/commitlint.md)
+- [dependabot-validate](workflows/dependabot-validate.md)
+- [deploy-book](workflows/deploy-book.md)
+- [fix-vendor-osv](workflows/fix-vendor-osv.md)
+- [install-smoke](workflows/install-smoke.md)
+- [pre-commit](workflows/pre-commit.md)
+- [publish-oci-artifact](workflows/publish-oci-artifact.md)
+- [publish-zarf-package](workflows/publish-zarf-package.md)
+- [release-guards](workflows/release-guards.md)
+- [release-please](workflows/release-please.md)
+- [release](workflows/release.md)
+- [scan-lint](workflows/scan-lint.md)
+- [scan-vuln](workflows/scan-vuln.md)
+- [scorecard](workflows/scorecard.md)
+- [unit-tests](workflows/unit-tests.md)
+- [verify-generated](workflows/verify-generated.md)
+
 # Decision records
 
 - [choice-clusterclass-template](agent/choice-clusterclass-template.md)
