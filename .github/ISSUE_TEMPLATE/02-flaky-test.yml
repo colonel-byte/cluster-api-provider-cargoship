@@ -1,0 +1,81 @@
+---
+name: Flaky or failing test
+description: A test that fails intermittently, or fails only in one environment.
+title: "test: "
+labels:
+  - bug
+  - test-flake
+body:
+  - type: dropdown
+    id: suite
+    attributes:
+      label: Which suite
+      # Keep this list in step with the test targets in the Makefile - see `make help`.
+      options:
+        - Unit tests - `make test`
+        - envtest - `make test-envtest`, drives both controllers against a real API server
+        - Install smoke test - `clusterctl init` against a kind cluster, in CI only
+    validations:
+      required: true
+  - type: input
+    id: test
+    attributes:
+      label: Test or subtest name
+      description: Subtests are named as sentences, and `go test` replaces spaces with underscores in a `-run` pattern.
+      placeholder: TestReconcile/no_address_yet_requeues
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command or make target
+      description: Anchor both elements of a `-run` pattern if several suite names share a prefix.
+      placeholder: go test -mod=vendor -race -count=1 -run '^TestReconcile$' ./controlplane/...
+    validations:
+      required: true
+  - type: input
+    id: rate
+    attributes:
+      label: How often does it fail
+      description: Failures out of total runs, so the next person knows how long to loop it for.
+      placeholder: 2 of 20
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it fail
+      options:
+        - Locally only
+        - In CI only
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Failure output
+      description: The assertion that failed and enough surrounding lines to place it. A race detector report belongs here in full - the two stacks are the whole finding.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: 1da789cd
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Host OS and architecture, plus the envtest Kubernetes version when the failure is in that suite.
+      placeholder: |
+        Host OS: Fedora 44, x86_64
+        envtest: 1.31.0
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: A theory about the race, a test that has to run before it to trigger the failure, or a requeue the test is racing against - a reconcile waits by requeueing, never by sleeping.

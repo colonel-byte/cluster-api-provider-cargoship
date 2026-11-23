@@ -1,0 +1,48 @@
+---
+name: Feature or enhancement request
+description: Something the provider should be able to do and cannot.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: The `Not yet supported` section of the [README](https://github.com/colonel-byte/cluster-api-provider-cargoship#not-yet-supported) lists the known gaps. Check it first - the one you want may already be recorded there.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do and where the provider stops you. Describe this before the solution - the problem usually has more than one answer.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The field, condition, or behaviour you have in mind. A sketch of the YAML is worth more than a paragraph.
+    validations:
+      required: true
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Which surfaces this touches
+      description: A change that crosses a surface boundary is a materially bigger one than a controller-only change.
+      options:
+        - label: The CRD API - a new or changed field, which is a contract change
+        - label: The bootstrap provider
+        - label: The control plane provider
+        - label: The converge, or the cargoship library surface it needs
+        - label: Install, RBAC, or the component manifests
+        - label: Documentation
+        - label: Not sure
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
+      description: The workaround, the hand-written manifest, or the manual step this would replace. Say so if there is no workaround.
+  - type: checkboxes
+    id: offer
+    attributes:
+      label: Implementation
+      options:
+        - label: I would be willing to open a pull request for this

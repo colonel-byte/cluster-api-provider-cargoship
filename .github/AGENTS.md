@@ -13,6 +13,20 @@ Four workflows here exist for failures no Go test and no lint run would catch. R
 
 `install-smoke.yaml` is the slow one at around four minutes. It is worth it: it is the only check in the repository that exercises the Cluster API contract rather than the Go code.
 
+## Keeping the issue forms current
+
+[`ISSUE_TEMPLATE/`](ISSUE_TEMPLATE/) holds YAML issue forms rather than Markdown templates, because the dropdowns, required fields, and `render: shell` blocks they rely on only exist in the forms schema. A Markdown template would be free text with a preamble.
+
+Three things in those forms go stale silently, and GitHub fails none of them in CI:
+
+- The `Which CI job` dropdown in [`ISSUE_TEMPLATE/01-failing-build.yml`](ISSUE_TEMPLATE/01-failing-build.yml) lists the `name:` a workflow displays in the checks list, not its filename, and only the workflows that run on a pull request. Adding, renaming, or removing one means updating that list in the same pull request.
+- The dropdowns that enumerate parts of the tree - the subsystem list in [`ISSUE_TEMPLATE/03-bug.yml`](ISSUE_TEMPLATE/03-bug.yml), the suite list in [`ISSUE_TEMPLATE/02-flaky-test.yml`](ISSUE_TEMPLATE/02-flaky-test.yml) - track the layout table in [`AGENTS.md`](../AGENTS.md) and the test targets in the `Makefile`. A new subsystem or suite belongs in both the code and the form.
+- Every label a form names in `labels:` has to exist on the repository. GitHub drops an unknown label from the created issue without reporting anything, so the issue arrives unlabelled and nothing says why. The forms use `bug`, `ci`, `test-flake`, `enhancement`, `documentation` and `stack-task`; check with `gh label list --repo colonel-byte/cluster-api-provider-cargoship`.
+
+A malformed form is reported as a banner on <https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/new/choose> and nowhere else. Open that page on the branch after changing a form; parsing as YAML is not enough to know it renders.
+
+Security reports are a `contact_links` entry in [`ISSUE_TEMPLATE/config.yml`](ISSUE_TEMPLATE/config.yml) pointing at the draft advisory form, not an issue form. [`SECURITY.md`](SECURITY.md) says not to open a public issue for a vulnerability; do not add a template that invites one. The same file links cargoship's issue tracker, because a defect in a phase belongs to the library rather than to this provider.
+
 ## Checking a workflow against OpenSSF Scorecard
 
 This repository publishes an [OpenSSF Scorecard](https://securityscorecards.dev/viewer/?uri=github.com/colonel-byte/cluster-api-provider-cargoship), and [`workflows/scorecard.yaml`](workflows/scorecard.yaml) recomputes it on every push to `main`. A workflow change can move that score without anything failing in CI, so run the checks that read workflows before opening the pull request, and name the ones you ran in the description.

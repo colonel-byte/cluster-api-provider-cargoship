@@ -1,0 +1,89 @@
+---
+name: Failing build or CI job
+description: A build, test, or workflow that fails - in CI or locally.
+title: "ci: "
+labels:
+  - bug
+  - ci
+body:
+  - type: markdown
+    attributes:
+      value: For a test that fails only sometimes, use the flaky test form instead - an intermittent failure needs a different set of answers.
+  - type: dropdown
+    id: job
+    attributes:
+      label: Which CI job
+      description: The name shown in the checks list, not the workflow filename. Pick `Other` or `Not a CI job - fails locally` when nothing matches.
+      # Keep this list in step with the `name:` of every workflow under .github/workflows/ that
+      # runs on a pull request. Adding, renaming, or removing one means updating this list in
+      # the same change - GitHub validates none of it.
+      options:
+        - Unit tests
+        - Install smoke test
+        - Verify generated files
+        - Release guards
+        - Check for go mod changes
+        - Validate Lint
+        - Validate pre-commit hooks
+        - Vulnerability scan
+        - CodeQL
+        - PR Title Check
+        - Other
+        - Not a CI job - fails locally
+    validations:
+      required: true
+  - type: input
+    id: run
+    attributes:
+      label: Link to the failing run
+      description: The URL of the workflow run or the individual check. Leave blank when the failure is local only.
+      placeholder: https://github.com/colonel-byte/cluster-api-provider-cargoship/actions/runs/0000000000
+  - type: input
+    id: command
+    attributes:
+      label: Command or make target
+      description: What you ran, or what the job runs. Say so when the failure is in a suite CI does not run, since there is no run to link.
+      placeholder: make test
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      description: The shortest decisive part of the log, not the whole run.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release the failure reproduces on, or the commit when the build never got far enough to produce one.
+      placeholder: 1da789cd
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Host OS and architecture of the machine the failure happened on, plus the versions of any toolchain the job needs.
+      placeholder: |
+        Host OS: Fedora 44, x86_64
+        go version: go1.27.2
+        docker version: 28.1.1
+  - type: dropdown
+    id: reproduces
+    attributes:
+      label: Does it reproduce
+      options:
+        - Every run
+        - Reproduces locally, not always in CI
+        - Reproduces in CI, not locally
+        - Only saw it once
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: The last change you believe worked, a dependency bump you suspect, or a diff that triggers it. A stale `vendor/` tree is worth ruling out first - every job builds with `-mod=vendor`.

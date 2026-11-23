@@ -1,0 +1,72 @@
+---
+name: Bug report
+description: The provider does something other than what it should.
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not report a vulnerability here. Open a draft advisory instead - the link is on the issue chooser. A defect in a cargoship phase itself belongs in [colonel-byte/cargoship](https://github.com/colonel-byte/cargoship/issues).
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead. A reconcile that keeps requeueing is usually waiting for something on purpose - say what it is waiting for if you know.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The resources you applied, in order, with their secrets removed. Include the `CargoshipConfig` or `CargoshipControlPlane`, or the relevant part of it.
+      placeholder: |
+        1. clusterctl init --bootstrap cargoship --control-plane cargoship
+        2. kubectl apply -f ./cluster.yaml
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which subsystem
+      # Keep this list in step with the layout table in AGENTS.md.
+      options:
+        - The bootstrap provider - CargoshipConfig, the cloud-init renderer
+        - The control plane provider - CargoshipControlPlane, machine and hook lifecycle
+        - The converge - pkg/converge, the inventory and the cargoship apply
+        - The SSH key - pkg/sshkey, the controller's key secret
+        - Install, RBAC, or the component manifests
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Controller logs or conditions
+      description: The shortest decisive part - the manager log around the failure, or `kubectl get cargoshipcontrolplane -o yaml` with its conditions. Redact hostnames, tokens, and credentials.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Provider version
+      description: The release, or the controller image tag you are running.
+      placeholder: v0.8.1
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: The Cluster API version in the management cluster, the infrastructure provider in use, and the OS of the fleet hosts.
+      placeholder: |
+        Cluster API: v1.11.0
+        Infrastructure provider: CAPV v1.13.0
+        Fleet hosts: Ubuntu 24.04, x86_64
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: A workaround you found, the last version that worked, or an upstream issue you think is behind it.
