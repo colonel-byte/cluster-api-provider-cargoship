@@ -492,6 +492,57 @@ spec:
                         - privateKeySecretRef
                         - user
                         type: object
+                      valuesFrom:
+                        description: |-
+                          valuesFrom fills entries of clusterConfig.values from ConfigMaps and Secrets. The referents
+                          are read in the namespace of each cluster the class stamps out.
+                        items:
+                          description: |-
+                            ValuesReference is one source of clusterConfig.values entries: a key of a ConfigMap or Secret
+                            in the referring object's own namespace, holding either a YAML document to merge or a single
+                            value for targetPath.
+
+                            It is deliberately the shape of a Flux HelmRelease's valuesFrom, defaults included, so an
+                            operator who knows one knows the other. Unlike this API's SecretReference it carries no
+                            namespace: the referent lives beside the control plane, the way Flux scopes it.
+                          properties:
+                            kind:
+                              description: kind of the values referent.
+                              enum:
+                              - ConfigMap
+                              - Secret
+                              type: string
+                            name:
+                              description: name of the referenced ConfigMap or Secret,
+                                in the same namespace as this resource.
+                              maxLength: 253
+                              minLength: 1
+                              type: string
+                            optional:
+                              description: |-
+                                optional makes a missing ConfigMap or Secret a skip rather than an error. A referent that
+                                exists but lacks valuesKey is still an error, because that is a wiring mistake rather than
+                                an absence.
+                              type: boolean
+                            targetPath:
+                              description: |-
+                                targetPath is a dotted path the key's content is set at as one value --
+                                "addons.vsphere.auth.pass" -- instead of the content being parsed as a YAML mapping.
+                              maxLength: 250
+                              type: string
+                            valuesKey:
+                              description: |-
+                                valuesKey is the data key the values are read from. Empty means "values.yaml". Without
+                                targetPath the content is a YAML mapping, merged whole.
+                              maxLength: 253
+                              type: string
+                          required:
+                          - kind
+                          - name
+                          type: object
+                        maxItems: 32
+                        type: array
+                        x-kubernetes-list-type: atomic
                     required:
                     - distro
                     - ssh

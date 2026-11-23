@@ -162,6 +162,20 @@ type CargoshipControlPlaneSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ClusterConfig *apiextensionsv1.JSON `json:"clusterConfig,omitempty"`
 
+	// valuesFrom fills entries of clusterConfig.values from ConfigMaps and Secrets, in the style
+	// of a Flux HelmRelease's valuesFrom, so a package value that is a credential -- a vCenter
+	// password, say -- need not be written into this resource in plain text.
+	//
+	// Entries are merged in order, later over earlier, and a value set inline in
+	// clusterConfig.values wins over all of them. The resolved values never reach this resource:
+	// they are merged in memory before the converge, and only a hash of them joins the
+	// desired-state fingerprint, so rotating a referenced secret re-converges the fleet without
+	// the credential appearing anywhere readable.
+	// +optional
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=atomic
+	ValuesFrom []ValuesReference `json:"valuesFrom,omitempty"`
+
 	// registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
 	// the registries named in clusterConfig.registries, so they need not be written into this
 	// resource in plain text.
@@ -440,6 +454,44 @@ const (
 	// CredentialRotationImmediate converges the fleet as soon as the secret changes.
 	CredentialRotationImmediate = "Immediate"
 )
+
+// ValuesReference is one source of clusterConfig.values entries: a key of a ConfigMap or Secret
+// in the referring object's own namespace, holding either a YAML document to merge or a single
+// value for targetPath.
+//
+// It is deliberately the shape of a Flux HelmRelease's valuesFrom, defaults included, so an
+// operator who knows one knows the other. Unlike this API's SecretReference it carries no
+// namespace: the referent lives beside the control plane, the way Flux scopes it.
+type ValuesReference struct {
+	// kind of the values referent.
+	// +required
+	// +kubebuilder:validation:Enum=ConfigMap;Secret
+	Kind string `json:"kind,omitempty"`
+
+	// name of the referenced ConfigMap or Secret, in the same namespace as this resource.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	Name string `json:"name,omitempty"`
+
+	// valuesKey is the data key the values are read from. Empty means "values.yaml". Without
+	// targetPath the content is a YAML mapping, merged whole.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	ValuesKey string `json:"valuesKey,omitempty"`
+
+	// targetPath is a dotted path the key's content is set at as one value --
+	// "addons.vsphere.auth.pass" -- instead of the content being parsed as a YAML mapping.
+	// +optional
+	// +kubebuilder:validation:MaxLength=250
+	TargetPath string `json:"targetPath,omitempty"`
+
+	// optional makes a missing ConfigMap or Secret a skip rather than an error. A referent that
+	// exists but lacks valuesKey is still an error, because that is a wiring mistake rather than
+	// an absence.
+	// +optional
+	Optional bool `json:"optional,omitempty"`
+}
 
 // SecretReference names a secret, in the referring object's namespace by default.
 type SecretReference struct {

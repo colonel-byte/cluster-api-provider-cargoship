@@ -29,6 +29,7 @@ package main
 
 import (
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/docs"
+	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/jsonschema"
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/ociartifact"
 	"github.com/colonel-byte/cluster-api-provider-cargoship/magefiles/pkg/gen/osv"
 	"github.com/magefile/mage/mg"
@@ -41,6 +42,12 @@ type Generate mg.Namespace
 func (Generate) Document() error {
 	// The repository root: mage runs from it, because the Makefile does.
 	return docs.Generate(".")
+}
+
+// JSONSchema extracts each generated CRD's openAPIV3Schema into schema/, one JSON Schema per
+// kind and version, for editors and validators that read JSON Schema rather than CRDs.
+func (Generate) JSONSchema() error {
+	return jsonschema.Generate(".")
 }
 
 // OCIArtifact packs the released component manifests in releaseDir into an OCI image layout
