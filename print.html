@@ -38,7 +38,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-f546373a.js";
+            window.path_to_searchindex_js = "searchindex-768d7d8d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-3b8763a5.js"></script>
@@ -283,7 +283,7 @@ spec:
 </table>
 </div>
 <p>The scope row is the real difference and the reason for the design: a cargoship fleet shares an <code>/etc/hosts</code> file and a firewall across every host, so two uncoordinated SSH walks over it would fight. See <a href="#the-control-plane-owns-the-whole-fleet-not-just-the-control-plane-machines"><code>docs/agent/choice-one-converge.md</code></a>.</p>
-<p>The node-removal row is the second. A machine Cluster API is destroying needs no <code>cargoship reset</code> - but the machines that remain need their <code>/etc/hosts</code> and firewall rules rewritten without it, and a departing control-plane member needs to leave etcd first. Both are handled with a Cluster API pre-terminate hook: Cluster API drains the node and deletes the <code>Node</code> object, then blocks the infrastructure provider from destroying the instance until the controller releases the hook. The controller converges the survivors in that window and then lets the instance go.</p>
+<p>The node-removal row is the second. A machine Cluster API is destroying needs no <code>cargoship reset</code> - but the machines that remain need their <code>/etc/hosts</code> and firewall rules rewritten without it, and a departing control-plane member needs to leave etcd first. Both are handled with a Cluster API pre-terminate hook: Cluster API drains the node and deletes the <code>Node</code> object, then blocks the infrastructure provider from destroying the instance until the controller releases the hook. The controller converges the survivors in that window, waits for the replacement to have joined and - where <code>spec.apply.labelNodes</code> is on - to carry its role label, and then lets the instance go. See <a href="#node-removal-and-the-pre-terminate-hook"><code>docs/guides/node-removal.md</code></a>.</p>
 <h2 id="not-yet-supported"><a class="header" href="#not-yet-supported">Not yet supported</a></h2>
 <p>Stated plainly, because each of these is a thing an operator will reach for:</p>
 <ul>
@@ -601,6 +601,16 @@ kubectl -n cabpc-system logs deploy/cabpc-controller-manager
 <li><strong>Stops</strong>, and waits for every <code>pre-terminate.delete.hook...</code> annotation to be removed before letting the infrastructure provider destroy the instance.</li>
 </ol>
 <p>The controller uses that window. Its next reconcile builds the inventory from the machines that remain - the departing one has no <code>Node</code> and is being deleted, so it is simply not in the list - converges them, and only then removes the annotation.</p>
+<h2 id="what-the-hook-waits-for"><a class="header" href="#what-the-hook-waits-for">What the hook waits for</a></h2>
+<p>A converge that succeeded says the survivors no longer name the departing host. It does not say the machine replacing it has arrived, so the hook is held past the converge until every surviving machine:</p>
+<ol>
+<li>Has a node reference (<code>status.nodeRef.name</code>), which is Cluster API’s record that its <code>Node</code> turned up.</li>
+<li>Has a live <code>Node</code> on the workload cluster that exists and is <code>Ready</code>.</li>
+<li>Carries <code>node-role.kubernetes.io/&lt;profile&gt;: "true"</code> on that <code>Node</code> - only where <code>spec.apply.labelNodes</code> is on, since nothing writes the label otherwise, and only for a machine that selects a profile at all.</li>
+</ol>
+<p>Cargoship’s <code>LabelNodes</code> phase skips a host whose <code>Node</code> it could not find, and logs a warning rather than failing, so a fleet can converge cleanly with a replacement’s role label missing. Releasing the hook then destroys the departing instance while nothing yet carries the label, and a workload whose affinity selects it - an infrastructure-only pod, say - goes unschedulable with nowhere to land.</p>
+<p>While the hook is held the <code>MachinesReady</code> condition reads <code>WaitingForReplacementNodes</code> and names the machine being waited on. There is no deadline on it, as there is nowhere in this provider: a replacement that takes eleven minutes to join holds the hook for eleven minutes. The reconcile observes the converge that already succeeded rather than starting another, and the Machine watch wakes it when the node reference appears.</p>
+<p>Tearing the whole control plane down is not gated. <code>reconcileDelete</code> releases every hook without a converge, because there are no survivors to wait for.</p>
 <p>The annotation has to be claimed <strong>at creation</strong>, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.</p>
 <h2 id="why-this-also-keeps-a-safety-check-working"><a class="header" href="#why-this-also-keeps-a-safety-check-working">Why this also keeps a safety check working</a></h2>
 <p><code>phase.DetectRemovedHosts</code> stops an apply when the cluster holds a <code>Node</code> that no host in the inventory accounts for. That check is worth keeping - a genuinely stray node is worth stopping on - and the provider runs with <code>AllowUnmanagedNodes: false</code> so it is live.</p>
