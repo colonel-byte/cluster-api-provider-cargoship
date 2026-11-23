@@ -541,8 +541,8 @@ func TestProfile(t *testing.T) {
 				},
 			}
 
-			if got := profile(m); got != tt.want {
-				t.Errorf("profile() = %q, want %q", got, tt.want)
+			if got := Profile(m); got != tt.want {
+				t.Errorf("Profile() = %q, want %q", got, tt.want)
 			}
 		})
 	}

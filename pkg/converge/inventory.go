@@ -189,7 +189,7 @@ func BuildInventory(in Input) (*Inventory, error) {
 
 		host := &cluster.Host{
 			Role:    role(m),
-			Profile: profile(m),
+			Profile: Profile(m),
 		}
 		host.ConnectionConfig.SSH = sshConfig
 
@@ -388,7 +388,7 @@ func role(m *clusterv1.Machine) string {
 	return RoleWorker
 }
 
-// profile is the cargoship profile the host selects, taken from the MachineDeployment that owns
+// Profile is the cargoship profile the host selects, taken from the MachineDeployment that owns
 // it.
 //
 // This is the join that makes a MachineDeployment mean something to cargoship: a deployment named
@@ -410,7 +410,7 @@ func role(m *clusterv1.Machine) string {
 // So reading only the second label means every pool declared through a class selects no profile
 // at all, and takes the defaults without saying so -- which is why this is a fallback rather than
 // the answer. A hand-wired MachineDeployment carries only the second and is unaffected.
-func profile(m *clusterv1.Machine) string {
+func Profile(m *clusterv1.Machine) string {
 	if _, ok := m.Labels[clusterv1.MachineControlPlaneLabel]; ok {
 		return ProfileControlPlane
 	}

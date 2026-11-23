@@ -59,6 +59,49 @@ func (p stubProbe) Reachable(context.Context, converge.Host) (bool, error) {
 	return p.reachable, p.err
 }
 
+// stubNodes stands in for the workload cluster's Nodes, which there is no workload cluster to
+// read: envtest runs an API server for the management cluster only. One Node per machine that has
+// a node reference, which is the state the pre-terminate gate wants to see, with the two things it
+// looks at settable.
+type stubNodes struct {
+	ready    bool
+	labelled bool
+	machines func() []clusterv1.Machine
+}
+
+func (s *stubNodes) list(context.Context, *clusterv1.Cluster) ([]corev1.Node, error) {
+	status := corev1.ConditionFalse
+	if s.ready {
+		status = corev1.ConditionTrue
+	}
+
+	var out []corev1.Node
+	for _, m := range s.machines() {
+		if m.Status.NodeRef.Name == "" {
+			continue
+		}
+		labels := map[string]string{}
+		if s.labelled {
+			labels[nodeRoleLabelPrefix+converge.Profile(&m)] = "true"
+		}
+		out = append(out, corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   m.Status.NodeRef.Name,
+				Labels: labels,
+			},
+			Status: corev1.NodeStatus{
+				Conditions: []corev1.NodeCondition{
+					{
+						Type:   corev1.NodeReady,
+						Status: status,
+					},
+				},
+			},
+		})
+	}
+	return out, nil
+}
+
 // stubConverge stands in for cargoship's apply. It records the host set each converge was asked
 // for, which is what the pre-terminate and scale assertions are actually about: a converge that
 // ran is not the same as a converge that ran against the right fleet.
@@ -141,6 +184,7 @@ type fixture struct {
 	cp       *controlplanev1.CargoshipControlPlane
 	r        *CargoshipControlPlaneReconciler
 	converge *stubConverge
+	nodes    *stubNodes
 }
 
 // newFixture creates a cluster whose infrastructure is provisioned and a one-replica control plane
@@ -239,19 +283,26 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	stub := &stubConverge{}
-	return &fixture{
-		c:       c,
-		ns:      ns,
-		cluster: cluster,
-		cp:      cp,
-		r: &CargoshipControlPlaneReconciler{
-			Client:   c,
-			Runner:   converge.NewRunner(),
-			Probe:    stubProbe{reachable: true},
-			Converge: stub.apply,
-		},
+	f := &fixture{
+		c:        c,
+		ns:       ns,
+		cluster:  cluster,
+		cp:       cp,
 		converge: stub,
+		nodes: &stubNodes{
+			ready:    true,
+			labelled: true,
+		},
 	}
+	f.nodes.machines = func() []clusterv1.Machine { return f.machines(t) }
+	f.r = &CargoshipControlPlaneReconciler{
+		Client:   c,
+		Runner:   converge.NewRunner(),
+		Probe:    stubProbe{reachable: true},
+		Converge: stub.apply,
+		Nodes:    f.nodes.list,
+	}
+	return f
 }
 
 // reconcile runs one pass and reloads the control plane, so a caller reads the status the pass

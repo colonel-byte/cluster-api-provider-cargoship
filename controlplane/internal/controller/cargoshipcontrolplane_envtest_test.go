@@ -424,6 +424,31 @@ func TestReconcileConvergesTheSurvivorsBeforeReleasingThePreTerminateHook(t *tes
 	}
 
 	f.waitForConverge(t)
+
+	// A converged fleet is not a joined one. Until the survivors' own Nodes are ready -- and
+	// labelled, where cargoship was asked to label them -- destroying the departing instance
+	// takes capacity a workload selecting that role label has nowhere else to get.
+	f.nodes.ready = false
+	result := f.reconcile(t)
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(&departing), &departing); err != nil {
+		t.Fatalf("reloading the departing machine: %v", err)
+	}
+	if _, ok := departing.Annotations[preTerminateAnnotation]; !ok {
+		t.Fatal("the pre-terminate hook was released while a surviving node was not ready")
+	}
+	if result.RequeueAfter != waitForInfrastructure {
+		t.Errorf("requeued after %s while the hook is held, want %s", result.RequeueAfter, waitForInfrastructure)
+	}
+	if got := f.condition(t, controlplanev1.MachinesReadyCondition); got.Reason != "WaitingForReplacementNodes" {
+		t.Errorf("MachinesReady = %s/%s, want False/WaitingForReplacementNodes", got.Status, got.Reason)
+	}
+	// Observed rather than converged again: the runner answers with the run that already
+	// succeeded for this fingerprint, so holding the hook does not walk the fleet per pass.
+	if f.converge.count() != 2 {
+		t.Errorf("%d converges, want the held pass to observe the finished one rather than start another", f.converge.count())
+	}
+
+	f.nodes.ready = true
 	f.reconcile(t)
 
 	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(&departing), &departing); err != nil {

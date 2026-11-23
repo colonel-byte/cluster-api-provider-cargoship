@@ -71,7 +71,7 @@
                       "type": "integer"
                     },
                     "labelNodes": {
-                      "description": "labelNodes adds the node-role.kubernetes.io/\u003cprofile\u003e label to each node.",
+                      "description": "labelNodes adds the node-role.kubernetes.io/\u003cprofile\u003e label to each node. With it on, a\nmachine being removed also keeps its pre-terminate hook until the surviving nodes carry\ntheir own role label, so a workload selecting one is never left without a node to run on.",
                       "type": "boolean"
                     },
                     "modifyFirewall": {

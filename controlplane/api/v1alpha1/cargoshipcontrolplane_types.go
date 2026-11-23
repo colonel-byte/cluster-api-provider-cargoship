@@ -390,7 +390,9 @@ type ApplyConfig struct {
 	// +optional
 	ModifyFirewall bool `json:"modifyFirewall,omitempty"`
 
-	// labelNodes adds the node-role.kubernetes.io/<profile> label to each node.
+	// labelNodes adds the node-role.kubernetes.io/<profile> label to each node. With it on, a
+	// machine being removed also keeps its pre-terminate hook until the surviving nodes carry
+	// their own role label, so a workload selecting one is never left without a node to run on.
 	// +optional
 	LabelNodes bool `json:"labelNodes,omitempty"`
 

@@ -5,7 +5,8 @@
     "1h"
   ],
   "go.buildFlags": [
-    "-tags=mage"
+    "-tags=mage",
+    "-tags=envtest"
   ],
   "git.ignoreLimitWarning": true,
   "gopls": {
