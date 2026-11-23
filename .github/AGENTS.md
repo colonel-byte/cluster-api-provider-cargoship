@@ -13,6 +13,16 @@ Four workflows here exist for failures no Go test and no lint run would catch. R
 
 `install-smoke.yaml` is the slow one at around four minutes. It is worth it: it is the only check in the repository that exercises the Cluster API contract rather than the Go code.
 
+## Keeping `docs/workflows/` in sync
+
+Every file under [`workflows/`](workflows/) has a matching explanation under [`docs/workflows/`](../docs/workflows/), named after the workflow file with its `.yaml` extension replaced by `.md` (`workflows/install-smoke.yaml` -> `docs/workflows/install-smoke.md`). The index is [`docs/SUMMARY.md`](../docs/SUMMARY.md), which `make docs` writes from what is on disk, so there is no hand-written list to keep in step - but there is also nothing that notices a page which was never written. Treat it as part of the change:
+
+- New workflow: add `docs/workflows/<name>.md`, then run `make docs` so the chapter picks it up.
+- Removed workflow: delete the page and regenerate.
+- Changed triggers, jobs, or behaviour: update the page. It is a summary rather than a mirror, so only what a reader needs in order to understand what the workflow does and why has to stay current - but a page that still describes the old triggers is worse than no page, because it will be believed.
+
+A page's links are checkable and nothing in the build checks them. `mdbook build` does not fail on a dead relative link, so a page can only reach another page under `docs/`; a workflow file, the `Makefile` or anything else outside the book has to be an absolute URL. Verify a claim rather than writing it from memory - the table in [`AGENTS.md`](../AGENTS.md) lists how to check each kind.
+
 ## Keeping the issue forms current
 
 [`ISSUE_TEMPLATE/`](ISSUE_TEMPLATE/) holds YAML issue forms rather than Markdown templates, because the dropdowns, required fields, and `render: shell` blocks they rely on only exist in the forms schema. A Markdown template would be free text with a preamble.
