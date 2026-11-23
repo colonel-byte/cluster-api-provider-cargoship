@@ -110,13 +110,13 @@ Workers come from an ordinary `MachineDeployment` pointing at a `CargoshipConfig
 
 ## How it differs from KubeadmControlPlane
 
-| | KubeadmControlPlane | CargoshipControlPlane |
-| --------------------- | ------------------------------------------ | ---------------------------------------------------------- |
-| Install mechanism     | cloud-init on each machine                 | SSH from the management cluster |
-| Bootstrap data        | the whole install                          | an authorized key, so cargoship can connect |
-| Scope                 | control-plane machines                     | the whole fleet, in one converge |
-| Worker joins          | a separate bootstrap provider per machine  | the same converge |
-| Node removal          | drain and delete                           | drain, delete, then re-converge the survivors |
+|                   | KubeadmControlPlane                       | CargoshipControlPlane                         |
+| ----------------- | ----------------------------------------- | --------------------------------------------- |
+| Install mechanism | cloud-init on each machine                | SSH from the management cluster               |
+| Bootstrap data    | the whole install                         | an authorized key, so cargoship can connect   |
+| Scope             | control-plane machines                    | the whole fleet, in one converge              |
+| Worker joins      | a separate bootstrap provider per machine | the same converge                             |
+| Node removal      | drain and delete                          | drain, delete, then re-converge the survivors |
 
 The scope row is the real difference and the reason for the design: a cargoship fleet shares an `/etc/hosts` file and a firewall across every host, so two uncoordinated SSH walks over it would fight. See [`docs/agent/choice-one-converge.md`](agent/choice-one-converge.md).
 

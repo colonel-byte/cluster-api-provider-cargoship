@@ -139,6 +139,8 @@ Markdown files should NOT have hard-wrapped or truncated lines. Write full parag
 
 Pad table cells so the columns line up, so that the source reads as a table and a reviewer can see the columns without rendering the file. Pad every cell to the width of the widest cell in its column, keep one space of padding inside each pipe, and run the dashes of the delimiter row out to that same width. Adding a wider row repads the whole table, which is expected - the alignment is part of the content.
 
+`make check-tables` reports every line that is not padded that way, and prints the form to write instead; the `markdown-table-padding` pre-commit hook runs it whenever a Markdown file changed. It reports rather than rewrites, because repadding a table is a content change and a formatter would make one in a commit that was about something else. The tables in this file and in `CLAUDE.md`, the symlink to it, are exempt.
+
 ## Commit messages
 
 Keep commit messages to a short title only - no body paragraph explaining the change. End with a `Co-Authored-By` trailer.

@@ -10,13 +10,13 @@ So the guard is Go, in `converge.validateClusterConfig`, run from `DecodeCluster
 
 Every check calls the cargoship function that would run later anyway:
 
-| What                                        | cargoship's own check               | Where it would otherwise be found                                              |
-| ------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------ |
-| `registries`                                | `cluster.ValidateRegistries`        | A registry entry that configures nothing stays a no-op nobody is told about     |
-| `profiles.*.inherit`                        | `cluster.ResolveProfiles`           | On load, after the package is pulled                                           |
-| `profiles.*.concurrency`                    | `cluster.ParseConcurrency`          | Inside each phase as it sizes its batches, so part way through an apply         |
-| `profiles.*.host.firewall`                  | `FirewallConfig.Validate`           | Phase 11, three phases after SSH has reached every host in the fleet            |
-| `profiles.*.host.ports`, `...policy.*.ports`| `FirewallRule.Validate`             | Nowhere - it reaches the firewall backend and renders a broken rule             |
+| What                                         | cargoship's own check        | Where it would otherwise be found                                           |
+| -------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| `registries`                                 | `cluster.ValidateRegistries` | A registry entry that configures nothing stays a no-op nobody is told about |
+| `profiles.*.inherit`                         | `cluster.ResolveProfiles`    | On load, after the package is pulled                                        |
+| `profiles.*.concurrency`                     | `cluster.ParseConcurrency`   | Inside each phase as it sizes its batches, so part way through an apply     |
+| `profiles.*.host.firewall`                   | `FirewallConfig.Validate`    | Phase 11, three phases after SSH has reached every host in the fleet        |
+| `profiles.*.host.ports`, `...policy.*.ports` | `FirewallRule.Validate`      | Nowhere - it reaches the firewall backend and renders a broken rule         |
 
 Two things follow from "calls cargoship's own":
 
