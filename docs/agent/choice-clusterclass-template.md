@@ -4,11 +4,11 @@ A `ClusterClass` names a control plane through `spec.controlPlane.templateRef`, 
 
 ## Three fields belong to the topology controller
 
-| Field                                     | On the live type         | Who fills it in when a class stamps one                            |
-| ----------------------------------------- | ------------------------ | ------------------------------------------------------------------ |
-| `version`                                 | `+required`              | `Cluster.spec.topology.version`                                    |
-| `replicas`                                | defaulted to 1           | `Cluster.spec.topology.controlPlane.replicas`                      |
-| `machineTemplate.spec.infrastructureRef`  | `+required`              | `ClusterClass.spec.controlPlane.machineInfrastructure.templateRef` |
+| Field                                    | On the live type | Who fills it in when a class stamps one                            |
+| ---------------------------------------- | ---------------- | ------------------------------------------------------------------ |
+| `version`                                | `+required`      | `Cluster.spec.topology.version`                                    |
+| `replicas`                               | defaulted to 1   | `Cluster.spec.topology.controlPlane.replicas`                      |
+| `machineTemplate.spec.infrastructureRef` | `+required`      | `ClusterClass.spec.controlPlane.machineInfrastructure.templateRef` |
 
 Wrapping `CargoshipControlPlaneSpec` carries all three into the template, where two are required. So an operator authoring a class would have to write a version and an infrastructure reference that the topology controller then overwrites, and the API server would refuse the template until they did. The bootstrap half has no such fields, which is why its template *can* wrap its spec and is not the precedent to follow.
 
@@ -16,10 +16,10 @@ Wrapping `CargoshipControlPlaneSpec` carries all three into the template, where 
 
 `KubeadmControlPlaneTemplate` takes exactly this shape. From the CRDs in the `sigs.k8s.io/cluster-api@v1.14.4` module, `v1beta2`:
 
-| CRD                           | `spec` required                | `machineTemplate.spec` holds                                               |
-| ----------------------------- | ------------------------------ | -------------------------------------------------------------------------- |
-| `kubeadmcontrolplanes`        | `machineTemplate`, `version`   | `deletion`, **`infrastructureRef`** (required), `readinessGates`, `taints` |
-| `kubeadmcontrolplanetemplates`| nothing                        | `deletion`, `taints`                                                       |
+| CRD                            | `spec` required              | `machineTemplate.spec` holds                                               |
+| ------------------------------ | ---------------------------- | -------------------------------------------------------------------------- |
+| `kubeadmcontrolplanes`         | `machineTemplate`, `version` | `deletion`, **`infrastructureRef`** (required), `readinessGates`, `taints` |
+| `kubeadmcontrolplanetemplates` | nothing                      | `deletion`, `taints`                                                       |
 
 The template drops `version`, drops `replicas`, drops `infrastructureRef`, and requires nothing. `CargoshipControlPlaneTemplateResourceSpec` and `CargoshipControlPlaneTemplateMachineTemplateSpec` are the same subtraction applied to this provider's fields.
 

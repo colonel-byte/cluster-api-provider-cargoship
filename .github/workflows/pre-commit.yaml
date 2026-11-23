@@ -15,12 +15,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # markdown-table-padding is `language: system` and shells out to make, which reaches the
+      # checker through `go tool mage`, so Go has to be on PATH before prek runs or the hook
+      # fails as "command not found".
+      - name: Setup golang
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+
       # Runs the hooks from .pre-commit-config.yaml, so licensing, formatting
       # and sorting can never drift from the local pre-commit setup. Skipped:
       #   controller-gen, kustomize-build - `repo: local` hooks that shell out to
       #     make and regenerate files; the Verify generated files workflow covers
       #     them with the full toolchain.
       #   golangci-lint - already covered by the Validate Lint workflow.
+      #
+      # markdown-table-padding is deliberately NOT skipped: it is a check rather than a rewrite,
+      # and nothing else in the repository reads a Markdown table.
       - name: Run hooks
         uses: j178/prek-action@7b101f8338a08d2bd6fdb3625e4e7692428763a3 # v3.1.1
         with:

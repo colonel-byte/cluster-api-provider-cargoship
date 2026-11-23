@@ -136,6 +136,13 @@ test-envtest: envtest-crds ## Run the tests that need a real API server.
 lint: ## Run go vet. golangci-lint comes from the pre-commit hooks, not from go.mod.
 	go vet ./...
 
+.PHONY: check-tables
+check-tables: ## Fail if a Markdown table is not padded the way AGENTS.md requires.
+	# A check, not a formatter: the padding is part of the content, so a tool that rewrote it
+	# would reflow a table in a commit that was about something else. This prints the expected
+	# form of each line and leaves the writing to a person.
+	$(MAGE) check:tables
+
 # Scoped to the paths the generators write, not the whole tree. A bare `git diff` here would
 # fail on any uncommitted edit and report it as "generated files are out of date", which sends
 # the reader to the wrong place.

@@ -17,13 +17,13 @@ This is what the original plan got wrong, and what is still outstanding.
 
 Run against a k3d cluster with core Cluster API 1.14.4, `ClusterTopology=true` and the Docker provider standing in for infrastructure. A `Cluster` with a topology stamped a `CargoshipControlPlane` carrying:
 
-| Stamped field                            | Value                                                | From                                  |
-| ---------------------------------------- | ---------------------------------------------------- | ------------------------------------- |
-| `spec.version`                           | `v1.34.1`                                            | `spec.topology.version`               |
-| `spec.replicas`                          | `3`                                                  | `spec.topology.controlPlane.replicas` |
-| `spec.machineTemplate.spec.infrastructureRef` | the generated `DockerMachineTemplate`           | the class's `machineInfrastructure`   |
-| `spec.distro`, `spec.ssh`, `spec.apply`  | as written                                           | the template                          |
-| the approval annotation                  | `approve-version-change: v1.34.1`                    | `spec.topology.controlPlane.metadata` |
+| Stamped field                                 | Value                                 | From                                  |
+| --------------------------------------------- | ------------------------------------- | ------------------------------------- |
+| `spec.version`                                | `v1.34.1`                             | `spec.topology.version`               |
+| `spec.replicas`                               | `3`                                   | `spec.topology.controlPlane.replicas` |
+| `spec.machineTemplate.spec.infrastructureRef` | the generated `DockerMachineTemplate` | the class's `machineInfrastructure`   |
+| `spec.distro`, `spec.ssh`, `spec.apply`       | as written                            | the template                          |
+| the approval annotation                       | `approve-version-change: v1.34.1`     | `spec.topology.controlPlane.metadata` |
 
 So all three omitted fields are filled in, which is the whole argument for the template spec being its own type, and the annotation route for approving an upgrade works as documented. The existing reconciler then took the stamped object and reported `Available=False WaitingForInfrastructure`, which is correct: the Docker provider cannot provision a cluster in that setup, and no control-plane machine is created until the cluster infrastructure is.
 

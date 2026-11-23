@@ -12,10 +12,10 @@ The alternative, finding packages by enumerating the registry's repositories, ca
 
 The two record kinds describe different things, and the difference matters more here than it does to `cargoship ls`:
 
-| Kind       | Written by                   | What is in the registry                                                       |
-| ---------- | ---------------------------- | ----------------------------------------------------------------------------- |
-| `package`  | `cargoship publish --record` | One artifact at `<registry>/<name>:<version>`, which is what a converge pulls  |
-| `mirror`   | `cargoship mirror`           | The images and files the package declares, pushed under their own references   |
+| Kind      | Written by                   | What is in the registry                                                       |
+| --------- | ---------------------------- | ----------------------------------------------------------------------------- |
+| `package` | `cargoship publish --record` | One artifact at `<registry>/<name>:<version>`, which is what a converge pulls |
+| `mirror`  | `cargoship mirror`           | The images and files the package declares, pushed under their own references  |
 
 A registry filled by `cargoship mirror` alone holds everything a *node* needs and nothing the *controller* does, because there is no package artifact in it to pull. That is the one failure worth its own message, and `pickRecord` gives it one: the fix is a `cargoship publish --record` into the same registry, not a different version. An air gap wants both halves, and they are two commands.
 

@@ -93,12 +93,12 @@ That is enough to create a `Cluster`, a `CargoshipControlPlane` and the `Machine
 
 The reconcile is a sequence of waits, and each one stops everything after it. To look at a later step, satisfy the earlier ones by hand - which is what the envtest fixture does, and what `kubectl` can do against a real cluster.
 
-| To reach                              | Satisfy                                                                     |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| machine creation                      | the `Cluster` owner reference, and `status.initialization.infrastructureProvisioned` |
-| the inventory                         | `status.addresses` on each `Machine`                                        |
-| the SSH probe                         | an address and port that accept TCP                                         |
-| package resolution, the version gate  | all of the above                                                            |
+| To reach                             | Satisfy                                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| machine creation                     | the `Cluster` owner reference, and `status.initialization.infrastructureProvisioned` |
+| the inventory                        | `status.addresses` on each `Machine`                                                 |
+| the SSH probe                        | an address and port that accept TCP                                                  |
+| package resolution, the version gate | all of the above                                                                     |
 
 ```sh
 # Cluster API's own controller writes these two; nothing else will.
@@ -127,12 +127,12 @@ A converge will not succeed this way - there is no host - but everything up to a
 
 The package resolution path is the one worth driving against a real registry, because its failures are all about credentials and certificates. Point a `CargoshipControlPlane` at the Zarf registry with `fromZarfState: true` and walk it to the resolution step as above; the condition says what happened:
 
-| Reason                 | Means                                                                       |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `ZarfStateUnreadable`  | no Zarf deployment, or the controller cannot read its secrets               |
-| `ZarfStateUnusable`    | the state carries no credentials                                            |
-| `DistroUnresolved`     | the registry answered, and holds no such package or version                 |
-| `Converging`           | resolution succeeded and the apply started                                  |
+| Reason                | Means                                                         |
+| --------------------- | ------------------------------------------------------------- |
+| `ZarfStateUnreadable` | no Zarf deployment, or the controller cannot read its secrets |
+| `ZarfStateUnusable`   | the state carries no credentials                              |
+| `DistroUnresolved`    | the registry answered, and holds no such package or version   |
+| `Converging`          | resolution succeeded and the apply started                    |
 
 A `DistroUnresolved` naming the versions the registry *does* hold is the read working. The same answer from outside the cluster, which is quicker to iterate on:
 

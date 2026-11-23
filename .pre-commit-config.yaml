@@ -94,3 +94,14 @@ repos:
         pass_filenames: false
         files: ^(bootstrap|controlplane)/config/.*
         entry: make release-manifests
+      # Runs over the whole tree, but only when a Markdown file changed: it reports a table a
+      # commit did not touch as readily as one it did. It has to run after controller-gen, which
+      # runs `make generate` and rewrites docs/index.md -- a table misaligned in README.md is
+      # misaligned in the generated copy too, and this is what reports the copy.
+      - id: markdown-table-padding
+        name: check-table-padding
+        language: system
+        pass_filenames: false
+        files: \.md$
+        exclude: vendor/.*
+        entry: make check-tables
