@@ -910,12 +910,17 @@ github.com/otiai10/mint/mquery
 # github.com/pandatix/go-abnf v0.5.5
 ## explicit; go 1.26.0
 github.com/pandatix/go-abnf
-# github.com/pb33f/go-yaml v0.1.1
+# github.com/pb33f/go-yaml v0.2.0
 ## explicit; go 1.18
 github.com/pb33f/go-yaml
 github.com/pb33f/go-yaml/internal/libyaml
 github.com/pb33f/go-yaml/internal/plugin
-github.com/pb33f/go-yaml/plugin/limit
+github.com/pb33f/go-yaml/internal/plugin/mergekey
+github.com/pb33f/go-yaml/plugin/aliasdata
+github.com/pb33f/go-yaml/plugin/errorformat/v3
+github.com/pb33f/go-yaml/plugin/errorformat/v4
+github.com/pb33f/go-yaml/plugin/loaderlimits
+github.com/pb33f/go-yaml/plugin/mergekey
 # github.com/pb33f/ordered-map/v2 v2.3.2
 ## explicit; go 1.24
 github.com/pb33f/ordered-map/v2
