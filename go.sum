@@ -454,8 +454,8 @@ github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnr
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/k0sproject/dig v0.4.0 h1:yBxFUUxNXAMGBg6b7c6ypxdx/o3RmhoI5v5ABOw5tn0=
 github.com/k0sproject/dig v0.4.0/go.mod h1:rlZ7N7ZEcB4Fi96TPXkZ4dqyAiDWOGLapyL9YpZ7Qz4=
-github.com/k0sproject/rig/v2 v2.3.0 h1:zdW3guzGlBwW4daD1C7fIRfEnhP3U3KfbfVzE6V4bYU=
-github.com/k0sproject/rig/v2 v2.3.0/go.mod h1:/LRvNvL09df5Qyu+eHf9V9bEPrOrqJUliuO1O7HpjHM=
+github.com/k0sproject/rig/v2 v2.4.0 h1:gIeMgvzHXyBFuAO6wqUIl0afjULl4LCVvqPun3sagpY=
+github.com/k0sproject/rig/v2 v2.4.0/go.mod h1:cgzqYe/A9+Ku4vVLttB8NsxhGZa36vpzP6jFNe7xpbM=
 github.com/kevinburke/ssh_config v1.6.0 h1:J1FBfmuVosPHf5GRdltRLhPJtJpTlMdKTBjRgTaQBFY=
 github.com/kevinburke/ssh_config v1.6.0/go.mod h1:q2RIzfka+BXARoNexmF9gkxEX7DmvbW9P4hIVx2Kg4M=
 github.com/klauspost/compress v1.4.1/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=

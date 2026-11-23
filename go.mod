@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/colonel-byte/cargoship v0.43.1
-	github.com/k0sproject/rig/v2 v2.3.0
+	github.com/k0sproject/rig/v2 v2.4.0
 	github.com/magefile/mage v1.17.2
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/zarf-dev/zarf v1.0.1
