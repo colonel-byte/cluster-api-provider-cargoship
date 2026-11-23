@@ -25,7 +25,7 @@ The one exception is the cargoship apply itself, which is a single blocking call
 | `pkg/sshkey/`               | Reads the controller's SSH key out of a secret, and derives the public half from it                                                                 |
 | `pkg/manager/`              | The flags, scheme and manager setup both binaries share                                                                                             |
 | `containers/manager/`       | One Dockerfile for both managers, selected by `MANAGER`                                                                                             |
-| `docs/`                     | The mdBook source. `docs/index.md` is generated from `README.md`                                                                                    |
+| `docs/`                     | The mdBook source. `docs/index.md` is generated from `README.md` and `docs/security.md` from `.github/SECURITY.md`                                  |
 | `docs/agent/choice-*.md`    | Records of non-obvious decisions and the tradeoffs behind them - read before reversing one                                                          |
 | `hack/`                     | `boilerplate.go.txt`, the licence header controller-gen stamps                                                                                      |
 
