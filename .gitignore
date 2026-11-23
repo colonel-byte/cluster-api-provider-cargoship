@@ -30,4 +30,9 @@ cover.out
 
 # Added for go mod vendor. The tree is committed: this follows colonel-byte/cargoship, whose
 # management node is air-gapped, so a build has to work with no module proxy reachable.
-!/vendor/
+# Note the `/**`. A bare `!/vendor/` un-ignores the directory entry and leaves every file
+# inside it to be matched against the patterns above, which is no protection whatsoever: an
+# unanchored `*.tgz` or `cover.out` then swallows a vendored file, and nothing reports it -
+# the tree builds locally because the file is on disk, and fails after a fresh clone because
+# it was never committed. Git takes the last matching pattern, so this stays the last line.
+!/vendor/**
