@@ -12,8 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package docs writes the two pages of the book that are generated rather than written: the
-// landing page, which is a copy of README.md, and SUMMARY.md, which is its table of contents.
+// Package docs writes the pages of the book that are generated rather than written: the landing
+// page, which is a copy of README.md; the security policy, which is a copy of
+// .github/SECURITY.md; and SUMMARY.md, which is the table of contents for the result.
+//
+// The two copies exist because a reader other than mdBook looks for each source where it is:
+// GitHub renders README.md as the repository's front page and .github/SECURITY.md as its security
+// policy, from the fixed paths it expects. Neither can move into docs/, so each is copied out of
+// its place and its links are rewritten for the book.
 //
 // It is a package rather than a function in the magefile so that the part worth testing -- which
 // label each chapter entry gets, and in what order -- can be tested without mage. The magefile is
@@ -69,9 +75,15 @@ const (
 	licenseAbsolute = "](https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/LICENSE)"
 )
 
-// Generate writes both generated pages, relative to the repository root.
+// Generate writes every generated page, relative to the repository root.
+//
+// Order matters: the summary is compiled from the tree the other generators just wrote, so it
+// runs last. A generator added here goes above it for the same reason.
 func Generate(root string) error {
 	if err := landingPage(root); err != nil {
+		return err
+	}
+	if err := securityPage(root); err != nil {
 		return err
 	}
 	return summary(root)
@@ -118,6 +130,7 @@ func summary(root string) error {
 	// A line before the first list item is a prefix chapter: mdBook gives it no number and places
 	// it ahead of every chapter, which is where the front page belongs.
 	b.WriteString("[Introduction](index.md)\n")
+	b.WriteString("[Security policy](security.md)\n")
 
 	for _, c := range chapters {
 		entries, err := chapterEntries(root, c.dir)

@@ -31,9 +31,12 @@ controlplane/config/rbac/role.yaml linguist-generated
 # extracted from the generated CRDs.
 schema/*-schema.json linguist-generated
 
-# `make docs` (magefiles/pkg/gen/docs). index.md is README.md with its links rewritten and
-# SUMMARY.md is built from the pages on disk; the pages themselves are hand-written.
+# `make docs` (magefiles/pkg/gen/docs). index.md is README.md and security.md is
+# .github/SECURITY.md, each with its links rewritten for the book; SUMMARY.md is built from the
+# pages on disk. The sources and the pages themselves are hand-written and stay unmarked - mark
+# what the generator writes, not what it reads.
 docs/index.md linguist-generated
+docs/security.md linguist-generated
 docs/SUMMARY.md linguist-generated
 
 # release-please

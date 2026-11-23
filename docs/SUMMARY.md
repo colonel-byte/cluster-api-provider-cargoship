@@ -3,6 +3,7 @@
 # Summary
 
 [Introduction](index.md)
+[Security policy](security.md)
 
 # Guides
 

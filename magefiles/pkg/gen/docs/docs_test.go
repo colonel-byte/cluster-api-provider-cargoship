@@ -41,6 +41,9 @@ func book(t *testing.T) string {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "README.md"),
 		"# provider\n\nSee [the guides](docs/guides/install.md) and the [license](LICENSE).\n")
+	write(t, filepath.Join(root, ".github", "SECURITY.md"),
+		"# Security Policy\n\nSee [the key](../cosign.pub) and [a record](../docs/agent/choice-one-converge.md).\n")
+	write(t, filepath.Join(root, "cosign.pub"), "a key\n")
 	write(t, filepath.Join(root, "docs", "guides", "install.md"), "# Installing the provider\n")
 	write(t, filepath.Join(root, "docs", "dev", "e2e-tests.md"), "# End-to-end tests\n")
 	write(t, filepath.Join(root, "docs", "agent", "choice-one-converge.md"),
@@ -70,6 +73,7 @@ func TestGenerateSummary(t *testing.T) {
 	want := generatedBanner + "\n\n" +
 		"# Summary\n\n" +
 		"[Introduction](index.md)\n" +
+		"[Security policy](security.md)\n" +
 		"\n# Guides\n\n" +
 		"- [install](guides/install.md)\n" +
 		"\n# Development\n\n" +
@@ -89,6 +93,7 @@ func TestGenerateSummaryOmitsAnEmptyChapter(t *testing.T) {
 
 	root := t.TempDir()
 	write(t, filepath.Join(root, "README.md"), "# provider\n")
+	write(t, filepath.Join(root, ".github", "SECURITY.md"), "# Security Policy\n")
 	write(t, filepath.Join(root, "docs", "guides", "install.md"), "# Installing the provider\n")
 
 	if err := Generate(root); err != nil {

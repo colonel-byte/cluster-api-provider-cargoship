@@ -65,9 +65,10 @@ generate-deepcopy: ## Regenerate zz_generated.deepcopy.go.
 
 .PHONY: docs
 docs: ## Write the book's landing page and its table of contents.
-	# Both pages are generated: index.md is README.md with its links rewritten, and SUMMARY.md is
-	# built from whatever pages are on disk, because a page that is added and not listed there is
-	# simply missing from the book and mdBook does not say so. The reasoning for each is on the
+	# Three pages are generated: index.md is README.md and security.md is .github/SECURITY.md,
+	# each copied in from outside docs/ with its links rewritten, and SUMMARY.md is built from
+	# whatever pages are on disk, because a page that is added and not listed there is simply
+	# missing from the book and mdBook does not say so. The reasoning for each is on the
 	# functions in magefiles/pkg/gen/docs.
 	$(MAGE) generate:document
 
@@ -152,6 +153,7 @@ GENERATED_PATHS := \
 	controlplane/config \
 	schema \
 	docs/index.md \
+	docs/security.md \
 	docs/SUMMARY.md
 
 .PHONY: verify
