@@ -63,6 +63,12 @@ type DesiredState struct {
 	// input. Callers whose credentialRotation is Drift leave it empty, which keeps their
 	// fingerprint exactly as it was.
 	RegistryAuthHash string `json:"registryAuthHash,omitempty"`
+	// ValuesFromHash is the hash ApplyValuesFrom returned over the merged values, when the caller
+	// resolved any. A hash and never the values themselves, because a valuesFrom source exists to
+	// carry a credential -- and unlike RegistryAuthHash it is always folded in, so a rotated
+	// source converges the fleet at the next reconcile rather than silently matching the last
+	// one.
+	ValuesFromHash string `json:"valuesFromHash,omitempty"`
 
 	// SignatureKey is the Cosign public key the package's signature is verified against, where
 	// the caller has one.

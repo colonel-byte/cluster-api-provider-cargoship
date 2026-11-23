@@ -106,6 +106,7 @@ type CargoshipControlPlaneReconciler struct {
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // Every infrastructure provider's machine kind, because the infrastructure machine each Machine
@@ -213,7 +214,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 	}
 
-	inv, clusterConfigRaw, registryAuthHash, err := r.buildInventory(ctx, cluster, cp, machines, endpoint)
+	inv, clusterConfigRaw, registryAuthHash, valuesFromHash, err := r.buildInventory(ctx, cluster, cp, machines, endpoint)
 	if err != nil {
 		if errors.Is(err, converge.ErrClusterConfig) {
 			// Reported as a converge that will not happen rather than as an inventory that is
@@ -297,6 +298,9 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		// Empty unless spec.apply.credentialRotation is Immediate, so with the Drift default a
 		// rotated secret changes nothing here and is delivered at the next drift converge.
 		RegistryAuthHash: registryAuthHash,
+		// Always folded in: a valuesFrom source exists to change what lands on the hosts, so a
+		// rotated one must not hash identical to the converge before it.
+		ValuesFromHash: valuesFromHash,
 		// Folded in so that naming a key, or rotating one, is an event. Without it an operator
 		// who turned verification on for a converged fleet would get silence: the fingerprint
 		// would match, the apply would be skipped, and nothing would ever be verified.
@@ -690,34 +694,47 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 	cp *controlplanev1.CargoshipControlPlane,
 	machines []*clusterv1.Machine,
 	endpoint string,
-) (_ *converge.Inventory, raw []byte, registryAuthHash string, _ error) {
+) (_ *converge.Inventory, raw []byte, registryAuthHash, valuesFromHash string, _ error) {
 	if cp.Spec.ClusterConfig != nil {
 		raw = cp.Spec.ClusterConfig.Raw
 	}
 
 	clusterConfig, err := converge.DecodeClusterConfig(raw)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", "", err
+	}
+
+	// Values are resolved from the referents into the decoded config the same way registry
+	// credentials are below: in memory, never into the resource, so raw -- which the fingerprint
+	// hashes -- stays exactly what the API server stored, and only the merged values' hash joins
+	// the fingerprint.
+	valuesSources, err := r.resolveValuesFrom(ctx, cp)
+	if err != nil {
+		return nil, nil, "", "", err
+	}
+	valuesFromHash, err = converge.ApplyValuesFrom(&clusterConfig, valuesSources)
+	if err != nil {
+		return nil, nil, "", "", err
 	}
 	// Registry credentials are resolved from the secret into the decoded config, never into the
 	// resource: raw -- which the fingerprint hashes -- stays exactly what the API server stored.
 	if cp.Spec.RegistryAuthSecretRef != nil {
 		key, err := cp.Spec.RegistryAuthSecretRef.Key(cp.Namespace, r.SecretNamespaces)
 		if err != nil {
-			return nil, nil, "", err
+			return nil, nil, "", "", err
 		}
 		authSecret := &corev1.Secret{}
 		if err := r.Get(ctx, key, authSecret); err != nil {
-			return nil, nil, "", fmt.Errorf("unable to read the registry auth secret %s: %w", key, err)
+			return nil, nil, "", "", fmt.Errorf("unable to read the registry auth secret %s: %w", key, err)
 		}
 		payload, ok := authSecret.Data[corev1.DockerConfigJsonKey]
 		if !ok {
-			return nil, nil, "", fmt.Errorf("registry auth secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
+			return nil, nil, "", "", fmt.Errorf("registry auth secret %s has no %q field: it must be a kubernetes.io/dockerconfigjson secret",
 				key, corev1.DockerConfigJsonKey)
 		}
 		hash, err := converge.ApplyRegistryAuth(&clusterConfig, payload)
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("registry auth secret %s: %w", key, err)
+			return nil, nil, "", "", fmt.Errorf("registry auth secret %s: %w", key, err)
 		}
 		if cp.Spec.Apply.CredentialRotation == controlplanev1.CredentialRotationImmediate {
 			registryAuthHash = hash
@@ -727,14 +744,14 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 	secret := &corev1.Secret{}
 	key, err := cp.Spec.SSH.PrivateKeySecretRef.Key(cp.Namespace, r.SecretNamespaces)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", "", err
 	}
 	if err := r.Get(ctx, key, secret); err != nil {
-		return nil, nil, "", fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)
+		return nil, nil, "", "", fmt.Errorf("unable to read the ssh key secret %s: %w", key, err)
 	}
 	privateKey, err := sshkey.PrivateKey(secret)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", "", err
 	}
 
 	inv, err := converge.BuildInventory(converge.Input{
@@ -749,9 +766,67 @@ func (r *CargoshipControlPlaneReconciler) buildInventory(
 		Machines: machines,
 	})
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", "", err
 	}
-	return inv, raw, registryAuthHash, nil
+	return inv, raw, registryAuthHash, valuesFromHash, nil
+}
+
+// resolveValuesFrom reads each spec.valuesFrom referent into the form ApplyValuesFrom merges.
+//
+// Referents live in the control plane's own namespace, the way a Flux HelmRelease scopes its
+// valuesFrom -- there is no cross-namespace form, so --secret-namespaces plays no part here. An
+// optional referent that does not exist is skipped; one that exists without the key is an error,
+// because that is a wiring mistake rather than an absence.
+func (r *CargoshipControlPlaneReconciler) resolveValuesFrom(
+	ctx context.Context,
+	cp *controlplanev1.CargoshipControlPlane,
+) ([]converge.ValuesSource, error) {
+	var out []converge.ValuesSource
+	for _, ref := range cp.Spec.ValuesFrom {
+		key := client.ObjectKey{Namespace: cp.Namespace, Name: ref.Name}
+		valuesKey := ref.ValuesKey
+		if valuesKey == "" {
+			valuesKey = "values.yaml"
+		}
+		name := fmt.Sprintf("valuesFrom %s %s key %q", strings.ToLower(ref.Kind), key, valuesKey)
+
+		var payload []byte
+		var found bool
+		switch ref.Kind {
+		case "Secret":
+			secret := &corev1.Secret{}
+			if err := r.Get(ctx, key, secret); err != nil {
+				if ref.Optional && apierrors.IsNotFound(err) {
+					continue
+				}
+				return nil, fmt.Errorf("unable to read %s: %w", name, err)
+			}
+			payload, found = secret.Data[valuesKey]
+		default: // ConfigMap; the schema admits nothing else.
+			cm := &corev1.ConfigMap{}
+			if err := r.Get(ctx, key, cm); err != nil {
+				if ref.Optional && apierrors.IsNotFound(err) {
+					continue
+				}
+				return nil, fmt.Errorf("unable to read %s: %w", name, err)
+			}
+			var s string
+			if s, found = cm.Data[valuesKey]; found {
+				payload = []byte(s)
+			} else {
+				payload, found = cm.BinaryData[valuesKey]
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("%s is missing", name)
+		}
+		out = append(out, converge.ValuesSource{
+			Name:       name,
+			Payload:    payload,
+			TargetPath: ref.TargetPath,
+		})
+	}
+	return out, nil
 }
 
 // endpoint is the host clients reach the API through.

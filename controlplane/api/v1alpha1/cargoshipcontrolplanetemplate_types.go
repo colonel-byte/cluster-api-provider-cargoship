@@ -85,6 +85,13 @@ type CargoshipControlPlaneTemplateResourceSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ClusterConfig *apiextensionsv1.JSON `json:"clusterConfig,omitempty"`
 
+	// valuesFrom fills entries of clusterConfig.values from ConfigMaps and Secrets. The referents
+	// are read in the namespace of each cluster the class stamps out.
+	// +optional
+	// +kubebuilder:validation:MaxItems=32
+	// +listType=atomic
+	ValuesFrom []ValuesReference `json:"valuesFrom,omitempty"`
+
 	// registryAuthSecretRef is a kubernetes.io/dockerconfigjson secret holding credentials for
 	// the registries named in clusterConfig.registries.
 	// +optional
