@@ -174,10 +174,11 @@ func TestApplyValuesFromHashMovesWithASource(t *testing.T) {
 		}
 		return hash
 	}
-	if hashOf("a: one\n") == hashOf("a: two\n") {
+	first := hashOf("a: one\n")
+	if first == hashOf("a: two\n") {
 		t.Fatal("a rotated source must change the hash")
 	}
-	if hashOf("a: one\n") != hashOf("a: one\n") {
+	if again := hashOf("a: one\n"); first != again {
 		t.Fatal("the same source must hash the same")
 	}
 }
