@@ -1,0 +1,12 @@
+---
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/colonel-byte/cluster-api-provider-cargoship/security/advisories/new
+    about: Report privately through a draft advisory. Do not open a public issue.
+  - name: Documentation
+    url: https://colonel-byte.github.io/cluster-api-provider-cargoship/
+    about: The project book - the install guide, the CRD schemas, and the developer guides.
+  - name: cargoship itself
+    url: https://github.com/colonel-byte/cargoship/issues
+    about: This provider consumes cargoship as a library. A defect in a phase, or anything needing a change to the library surface, is tracked there.
