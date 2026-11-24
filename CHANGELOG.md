@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.2...v0.8.3) (2026-11-24)
+
+
+### Features
+
+* **controlplane:** hold the pre-terminate hook on worker machines too ([#141](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/141)) ([467ca51](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/467ca512115defb385916d14d4643ce0bb4e771d))
+
 ## [0.8.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.1...v0.8.2) (2026-11-24)
 
 
