@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-768d7d8d.js";
+            window.path_to_searchindex_js = "../searchindex-b2b5ed07.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-3b8763a5.js"></script>
@@ -190,7 +190,7 @@
 <h2 id="the-reconcile-state-machine"><a class="header" href="#the-reconcile-state-machine">The reconcile state machine</a></h2>
 <pre><code class="language-sh">make test-envtest
 </code></pre>
-<p>This runs both controllers against a real API server - <code>envtest</code>, the kubebuilder control plane - with the cargoship apply stubbed out. It is where the provider’s own logic is covered: machines created one per pass, the pre-terminate hook claimed at creation and released only after the survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the bootstrap data rendered once and never again, and every state the reconcile waits in.</p>
+<p>This runs both controllers against a real API server - <code>envtest</code>, the kubebuilder control plane - with the cargoship apply stubbed out. It is where the provider’s own logic is covered: machines created one per pass, the pre-terminate hook claimed on every machine in the cluster and released only after the survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the bootstrap data rendered once and never again, and every state the reconcile waits in.</p>
 <p><strong>What it asserts is which state a pass lands in, never a duration measured on the clock.</strong> This provider’s answer to machines and API servers coming up on their own schedules is that nothing anywhere gives up, so there is no timing to assert; what is worth pinning down is that “no address yet”, “ssh not answering”, “converging” and “converged” each requeue and say why. A test that waited on wall-clock time here would be testing the one thing the design does not do.</p>
 <p>Two things it needs, and both are why it is <code>make test-envtest</code> rather than <code>go test</code>:</p>
 <ul>

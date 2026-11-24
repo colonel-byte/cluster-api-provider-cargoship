@@ -37,7 +37,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-768d7d8d.js";
+            window.path_to_searchindex_js = "../searchindex-b2b5ed07.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-3b8763a5.js"></script>
@@ -190,7 +190,8 @@
 </ol>
 <p>Both are handled with a Cluster API <strong>pre-terminate hook</strong>.</p>
 <h2 id="what-the-hook-does"><a class="header" href="#what-the-hook-does">What the hook does</a></h2>
-<p>The controller puts <code>pre-terminate.delete.hook.machine.cluster.x-k8s.io/cargoship</code> on every machine it creates, at creation time. <code>ensurePreTerminateHooks</code> adds it to any machine missing it - one adopted from elsewhere, or created by an older version of the controller.</p>
+<p>The controller puts <code>pre-terminate.delete.hook.machine.cluster.x-k8s.io/cargoship</code> on <strong>every machine in the cluster</strong>, workers included: the converge is one apply over the whole fleet, so a departing worker leaves the survivors’ <code>/etc/hosts</code> and firewall rules naming a host that is going, exactly as a departing control-plane member does.</p>
+<p>A control-plane machine gets it at creation, which is the earliest moment there is. A worker is created by a MachineDeployment rather than by this controller, so there is no creation to hook into: <code>ensurePreTerminateHooks</code> claims it on the first reconcile that sees the machine, and does the same for a control plane adopted from elsewhere or a machine created by an older version of the controller.</p>
 <p>When a machine is deleted, Cluster API:</p>
 <ol>
 <li>Cordons and drains the node.</li>
@@ -207,14 +208,15 @@
 </ol>
 <p>Cargoship’s <code>LabelNodes</code> phase skips a host whose <code>Node</code> it could not find, and logs a warning rather than failing, so a fleet can converge cleanly with a replacement’s role label missing. Releasing the hook then destroys the departing instance while nothing yet carries the label, and a workload whose affinity selects it - an infrastructure-only pod, say - goes unschedulable with nowhere to land.</p>
 <p>While the hook is held the <code>MachinesReady</code> condition reads <code>WaitingForReplacementNodes</code> and names the machine being waited on. There is no deadline on it, as there is nowhere in this provider: a replacement that takes eleven minutes to join holds the hook for eleven minutes. The reconcile observes the converge that already succeeded rather than starting another, and the Machine watch wakes it when the node reference appears.</p>
-<p>Tearing the whole control plane down is not gated. <code>reconcileDelete</code> releases every hook without a converge, because there are no survivors to wait for.</p>
-<p>The annotation has to be claimed <strong>at creation</strong>, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.</p>
+<p>Tearing the whole cluster down is not gated, in either order it happens in. Cluster API deletes a cluster’s workers before its control plane, so a worker’s hook is released by the ordinary reconcile as soon as the <code>Cluster</code> has a deletion timestamp, and the control plane’s own hooks by <code>reconcileDelete</code> once it has one of its own. Neither converges anything first: there are no survivors to wait for, and a cluster being deleted because it is broken would never satisfy a gate that waited for one.</p>
+<p>The annotation has to be claimed <strong>before</strong> a machine is deleted, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.</p>
 <h2 id="why-this-also-keeps-a-safety-check-working"><a class="header" href="#why-this-also-keeps-a-safety-check-working">Why this also keeps a safety check working</a></h2>
 <p><code>phase.DetectRemovedHosts</code> stops an apply when the cluster holds a <code>Node</code> that no host in the inventory accounts for. That check is worth keeping - a genuinely stray node is worth stopping on - and the provider runs with <code>AllowUnmanagedNodes: false</code> so it is live.</p>
 <p>The reason it does not fire during an ordinary scale-down is step 2 above: Cluster API deletes the <code>Node</code> object <em>before</em> the hook is consulted. By the time the controller’s converge runs, there is nothing unaccounted for.</p>
 <p><strong>If <code>DetectRemovedHosts</code> starts failing during a normal scale-down, the hook is not working.</strong> Do not reach for an option to silence the check - find out why the annotation is missing or why it was released early.</p>
 <h2 id="deleting-the-whole-control-plane"><a class="header" href="#deleting-the-whole-control-plane">Deleting the whole control plane</a></h2>
-<p><code>reconcileDelete</code> releases every hook and deletes every machine without converging anything. There are no survivors whose <code>/etc/hosts</code> needs correcting, and any converge still walking the fleet is cancelled so it does not hold SSH sessions open against hosts being destroyed.</p>
+<p><code>reconcileDelete</code> releases every hook and deletes every control-plane machine without converging anything. There are no survivors whose <code>/etc/hosts</code> needs correcting, and any converge still walking the fleet is cancelled so it does not hold SSH sessions open against hosts being destroyed.</p>
+<p>It releases the hook from every machine rather than only the ones being deleted, workers among them: the controller is about to drop its finalizer and stop watching, and a hook left behind would be held by nobody - the next deletion of that machine would wait on an annotation with no controller left to remove it. The reconcile takes the same way out as soon as the <code>Cluster</code> is deleted, for the same reason and one more: it is the only pass that runs while the workers are going.</p>
 <h2 id="the-one-thing-to-verify"><a class="header" href="#the-one-thing-to-verify">The one thing to verify</a></h2>
 <p>Whether k3s and RKE2 remove the etcd member on <code>Node</code> deletion. Both document that they do, through their own etcd controllers, and the ordering above gives them the chance to: the <code>Node</code> is deleted while the instance is still running and the etcd process is still up.</p>
 <p>If either turns out not to, the hook is the right place to add an explicit member removal - which is a reason to have the hook even if the answer is yes.</p>
