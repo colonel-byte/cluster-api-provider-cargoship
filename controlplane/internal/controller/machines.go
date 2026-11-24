@@ -41,6 +41,13 @@ import (
 var preTerminateAnnotation = fmt.Sprintf("%s/%s",
 	clusterv1.PreTerminateDeleteHookAnnotationPrefix, controlplanev1.PreTerminateHookName)
 
+// The two things releasePreTerminateHooks can be asked to release, named so a call site reads as
+// something other than a bare true.
+const (
+	deletingOnly = true
+	everyMachine = false
+)
+
 // clusterMachines returns every Machine belonging to the cluster, in a stable order.
 func (r *CargoshipControlPlaneReconciler) clusterMachines(
 	ctx context.Context,
@@ -271,9 +278,12 @@ func (r *CargoshipControlPlaneReconciler) failureDomain(cp *controlplanev1.Cargo
 
 // ensurePreTerminateHooks puts the hook annotation on any machine missing it.
 //
-// Machines created by this controller get it at creation. This covers the ones that did not: a
-// control plane adopted from somewhere else, or a machine created by a version of this controller
-// that did not set it.
+// This is the only thing that claims the hook on a worker, which is most of the fleet: workers are
+// created by a MachineDeployment rather than by this controller, so the earliest moment anything
+// here can annotate one is the reconcile that first sees it. Control-plane machines get it at
+// creation and pass through untouched, along with the ones that would otherwise have missed it --
+// a control plane adopted from somewhere else, or a machine created by a version of this
+// controller that did not set it.
 func (r *CargoshipControlPlaneReconciler) ensurePreTerminateHooks(ctx context.Context, machines []*clusterv1.Machine) error {
 	for _, m := range machines {
 		if _, ok := m.Annotations[preTerminateAnnotation]; ok {
@@ -297,7 +307,13 @@ func (r *CargoshipControlPlaneReconciler) ensurePreTerminateHooks(ctx context.Co
 	return nil
 }
 
-// releasePreTerminateHooks removes the hook from machines that are being deleted.
+// releasePreTerminateHooks removes the hook from the machines it is asked about: the ones being
+// deleted, with deletingOnly, or all of them with everyMachine.
+//
+// everyMachine is for a teardown, where the controller is about to stop watching these machines
+// and a hook left on one would be held by nobody: the next deletion would wait on an annotation
+// with no controller behind it. Everywhere else the hook is released only from a machine that is
+// already going.
 //
 // This is the other half of the removal story. Cluster API has, by this point, drained the node
 // and deleted the Node object, and is waiting on this annotation before letting the infrastructure
@@ -305,11 +321,11 @@ func (r *CargoshipControlPlaneReconciler) ensurePreTerminateHooks(ctx context.Co
 // hosts' /etc/hosts and firewall rules from an inventory the departing host is no longer in, so
 // releasing it now is safe -- and releasing it earlier would leave the survivors pointing at a
 // machine that no longer exists.
-func (r *CargoshipControlPlaneReconciler) releasePreTerminateHooks(ctx context.Context, machines []*clusterv1.Machine) error {
+func (r *CargoshipControlPlaneReconciler) releasePreTerminateHooks(ctx context.Context, machines []*clusterv1.Machine, onlyDeleting bool) error {
 	logger := log.FromContext(ctx)
 
 	for _, m := range machines {
-		if m.DeletionTimestamp.IsZero() {
+		if onlyDeleting && m.DeletionTimestamp.IsZero() {
 			continue
 		}
 		if _, ok := m.Annotations[preTerminateAnnotation]; !ok {
@@ -348,7 +364,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileDelete(
 	}
 	controlPlaneMachines := filterControlPlane(machines)
 
-	if err := r.releasePreTerminateHooks(ctx, controlPlaneMachines); err != nil {
+	if err := r.releasePreTerminateHooks(ctx, machines, everyMachine); err != nil {
 		return ctrl.Result{}, err
 	}
 

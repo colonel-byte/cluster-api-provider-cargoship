@@ -14,7 +14,7 @@ make test
 make test-envtest
 ```
 
-This runs both controllers against a real API server - `envtest`, the kubebuilder control plane - with the cargoship apply stubbed out. It is where the provider's own logic is covered: machines created one per pass, the pre-terminate hook claimed at creation and released only after the survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the bootstrap data rendered once and never again, and every state the reconcile waits in.
+This runs both controllers against a real API server - `envtest`, the kubebuilder control plane - with the cargoship apply stubbed out. It is where the provider's own logic is covered: machines created one per pass, the pre-terminate hook claimed on every machine in the cluster and released only after the survivors have converged, the kubeconfig secret published under the name clusterctl looks for, the bootstrap data rendered once and never again, and every state the reconcile waits in.
 
 **What it asserts is which state a pass lands in, never a duration measured on the clock.** This provider's answer to machines and API servers coming up on their own schedules is that nothing anywhere gives up, so there is no timing to assert; what is worth pinning down is that "no address yet", "ssh not answering", "converging" and "converged" each requeue and say why. A test that waited on wall-clock time here would be testing the one thing the design does not do.
 
