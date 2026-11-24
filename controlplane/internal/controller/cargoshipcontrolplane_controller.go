@@ -192,6 +192,17 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 		return ctrl.Result{}, err
 	}
 
+	// Cluster API deletes a cluster's workers before the control plane, so this is the reconcile
+	// that owns a worker's hook while the whole cluster is going -- and holding one here would
+	// gate a departing worker on a converge of survivors that are themselves about to be
+	// destroyed. A cluster being deleted because it is broken would never satisfy that, and
+	// nothing in this provider gives up, so the Cluster would wait forever.
+	if !cluster.DeletionTimestamp.IsZero() {
+		logger.V(1).Info("the cluster is being deleted, releasing the pre-terminate hooks")
+		r.Runner.Cancel(client.ObjectKeyFromObject(cp).String())
+		return ctrl.Result{}, r.releasePreTerminateHooks(ctx, machines, everyMachine)
+	}
+
 	controlPlaneMachines := filterControlPlane(machines)
 
 	// 1. Bring the control-plane machine count to spec.replicas, one machine per pass so each
@@ -203,7 +214,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 	// 2. The pre-terminate hook, on every machine we manage. It has to be in place before a
 	//    deletion rather than at deletion time, because by then the machine is already being
 	//    drained and there is no window left to claim.
-	if err := r.ensurePreTerminateHooks(ctx, controlPlaneMachines); err != nil {
+	if err := r.ensurePreTerminateHooks(ctx, machines); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -448,7 +459,7 @@ func (r *CargoshipControlPlaneReconciler) reconcileNormal(
 			// answers with this same finished run rather than converging the fleet again.
 			return ctrl.Result{RequeueAfter: waitForInfrastructure}, nil
 		}
-		if err := r.releasePreTerminateHooks(ctx, machines); err != nil {
+		if err := r.releasePreTerminateHooks(ctx, machines, deletingOnly); err != nil {
 			return ctrl.Result{}, err
 		}
 

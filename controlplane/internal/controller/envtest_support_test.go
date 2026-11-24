@@ -424,6 +424,41 @@ func (f *fixture) grow(t *testing.T, replicas int) {
 	}
 }
 
+// addWorker creates a provisioned worker machine, the kind a MachineDeployment would.
+//
+// Nothing in this suite reconciles a MachineDeployment, so the worker is written directly: what
+// matters to the control plane is a Machine carrying the cluster-name label without the
+// control-plane one, which is what it builds as a worker and converges alongside the rest.
+func (f *fixture) addWorker(t *testing.T, address string) *clusterv1.Machine {
+	t.Helper()
+
+	worker := &clusterv1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "worker-",
+			Namespace:    f.ns,
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel: f.cluster.Name,
+			},
+		},
+		Spec: clusterv1.MachineSpec{
+			ClusterName: f.cluster.Name,
+			Bootstrap: clusterv1.Bootstrap{
+				DataSecretName: ptr.To("worker-bootstrap"),
+			},
+			InfrastructureRef: clusterv1.ContractVersionedObjectReference{
+				APIGroup: "infrastructure.cluster.x-k8s.io",
+				Kind:     "TestInfraMachine",
+				Name:     "worker-infra",
+			},
+		},
+	}
+	if err := f.c.Create(t.Context(), worker); err != nil {
+		t.Fatalf("creating the worker machine: %v", err)
+	}
+	f.provision(t, worker, address)
+	return worker
+}
+
 // condition returns one condition from the control plane's status, or fails.
 func (f *fixture) condition(t *testing.T, conditionType string) metav1.Condition {
 	t.Helper()

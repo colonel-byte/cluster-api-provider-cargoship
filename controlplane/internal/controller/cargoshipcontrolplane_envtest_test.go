@@ -459,6 +459,99 @@ func TestReconcileConvergesTheSurvivorsBeforeReleasingThePreTerminateHook(t *tes
 	}
 }
 
+func TestReconcileClaimsAndHoldsPreTerminateHookOnWorkerMachines(t *testing.T) {
+	f := newFixture(t)
+	f.grow(t, 1)
+
+	worker := f.addWorker(t, "10.0.0.10")
+
+	f.reconcile(t)
+	f.waitForConverge(t)
+	f.reconcile(t)
+
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(worker), worker); err != nil {
+		t.Fatalf("reloading the worker machine: %v", err)
+	}
+	if _, ok := worker.Annotations[preTerminateAnnotation]; !ok {
+		t.Fatal("the worker machine did not receive the pre-terminate hook")
+	}
+
+	if err := f.c.Delete(t.Context(), worker); err != nil {
+		t.Fatalf("deleting the worker machine: %v", err)
+	}
+
+	f.reconcile(t)
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(worker), worker); err != nil {
+		t.Fatalf("reloading the deleting worker machine: %v", err)
+	}
+	if _, ok := worker.Annotations[preTerminateAnnotation]; !ok {
+		t.Fatal("the pre-terminate hook was released while the survivors' converge was still in flight")
+	}
+
+	f.waitForConverge(t)
+	f.nodes.ready = false
+	f.reconcile(t)
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(worker), worker); err != nil {
+		t.Fatalf("reloading the deleting worker machine while node unready: %v", err)
+	}
+	if _, ok := worker.Annotations[preTerminateAnnotation]; !ok {
+		t.Fatal("the pre-terminate hook was released while a surviving node was not ready")
+	}
+
+	f.nodes.ready = true
+	f.reconcile(t)
+
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(worker), worker); err != nil {
+		t.Fatalf("reloading the worker machine after converge: %v", err)
+	}
+	if _, ok := worker.Annotations[preTerminateAnnotation]; ok {
+		t.Error("the pre-terminate hook is still held after the survivors converged")
+	}
+}
+
+// A cluster is torn down workers first, so this reconcile -- not reconcileDelete, which only runs
+// once the control plane itself is being deleted -- is what holds a departing worker's hook while
+// the whole cluster is going. Gating it on a converge of survivors that are themselves about to be
+// destroyed would never finish on a cluster being deleted because it is broken, and nothing here
+// gives up, so the Cluster would wait on the annotation forever.
+func TestReconcileReleasesEveryHookOnceTheClusterIsDeleted(t *testing.T) {
+	f := newFixture(t)
+	f.grow(t, 1)
+	worker := f.addWorker(t, "10.0.0.10")
+
+	f.reconcile(t)
+	f.waitForConverge(t)
+	f.reconcile(t)
+
+	if err := f.c.Get(t.Context(), client.ObjectKeyFromObject(worker), worker); err != nil {
+		t.Fatalf("reloading the worker machine: %v", err)
+	}
+	if _, ok := worker.Annotations[preTerminateAnnotation]; !ok {
+		t.Fatal("the worker machine did not receive the pre-terminate hook")
+	}
+
+	// A finalizer of our own, because Cluster API's Cluster controller is not running here: without
+	// one the delete takes the object away and the reconcile stops at "waiting for the owning
+	// Cluster" instead of seeing the deletion timestamp.
+	f.cluster.Finalizers = append(f.cluster.Finalizers, "test.cargoship/hold")
+	if err := f.c.Update(t.Context(), f.cluster); err != nil {
+		t.Fatalf("holding the cluster with a finalizer: %v", err)
+	}
+	if err := f.c.Delete(t.Context(), f.cluster); err != nil {
+		t.Fatalf("deleting the cluster: %v", err)
+	}
+
+	// The gate the ordinary path would stop at, to show this one does not consult it.
+	f.nodes.ready = false
+	f.reconcile(t)
+
+	for _, m := range f.machines(t) {
+		if _, ok := m.Annotations[preTerminateAnnotation]; ok {
+			t.Errorf("machine %s still holds the pre-terminate hook while the cluster is being deleted", m.Name)
+		}
+	}
+}
+
 func TestReconcileDeleteRemovesTheMachinesAndTheFinalizer(t *testing.T) {
 	f := newFixture(t)
 	f.grow(t, 1)

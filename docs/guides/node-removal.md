@@ -9,7 +9,9 @@ Both are handled with a Cluster API **pre-terminate hook**.
 
 ## What the hook does
 
-The controller puts `pre-terminate.delete.hook.machine.cluster.x-k8s.io/cargoship` on every machine it creates, at creation time. `ensurePreTerminateHooks` adds it to any machine missing it - one adopted from elsewhere, or created by an older version of the controller.
+The controller puts `pre-terminate.delete.hook.machine.cluster.x-k8s.io/cargoship` on **every machine in the cluster**, workers included: the converge is one apply over the whole fleet, so a departing worker leaves the survivors' `/etc/hosts` and firewall rules naming a host that is going, exactly as a departing control-plane member does.
+
+A control-plane machine gets it at creation, which is the earliest moment there is. A worker is created by a MachineDeployment rather than by this controller, so there is no creation to hook into: `ensurePreTerminateHooks` claims it on the first reconcile that sees the machine, and does the same for a control plane adopted from elsewhere or a machine created by an older version of the controller.
 
 When a machine is deleted, Cluster API:
 
@@ -31,9 +33,9 @@ Cargoship's `LabelNodes` phase skips a host whose `Node` it could not find, and 
 
 While the hook is held the `MachinesReady` condition reads `WaitingForReplacementNodes` and names the machine being waited on. There is no deadline on it, as there is nowhere in this provider: a replacement that takes eleven minutes to join holds the hook for eleven minutes. The reconcile observes the converge that already succeeded rather than starting another, and the Machine watch wakes it when the node reference appears.
 
-Tearing the whole control plane down is not gated. `reconcileDelete` releases every hook without a converge, because there are no survivors to wait for.
+Tearing the whole cluster down is not gated, in either order it happens in. Cluster API deletes a cluster's workers before its control plane, so a worker's hook is released by the ordinary reconcile as soon as the `Cluster` has a deletion timestamp, and the control plane's own hooks by `reconcileDelete` once it has one of its own. Neither converges anything first: there are no survivors to wait for, and a cluster being deleted because it is broken would never satisfy a gate that waited for one.
 
-The annotation has to be claimed **at creation**, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.
+The annotation has to be claimed **before** a machine is deleted, not at deletion. By the time a machine is being deleted it is already draining, and Cluster API ignores an annotation added after deletion began.
 
 ## Why this also keeps a safety check working
 
@@ -45,7 +47,9 @@ The reason it does not fire during an ordinary scale-down is step 2 above: Clust
 
 ## Deleting the whole control plane
 
-`reconcileDelete` releases every hook and deletes every machine without converging anything. There are no survivors whose `/etc/hosts` needs correcting, and any converge still walking the fleet is cancelled so it does not hold SSH sessions open against hosts being destroyed.
+`reconcileDelete` releases every hook and deletes every control-plane machine without converging anything. There are no survivors whose `/etc/hosts` needs correcting, and any converge still walking the fleet is cancelled so it does not hold SSH sessions open against hosts being destroyed.
+
+It releases the hook from every machine rather than only the ones being deleted, workers among them: the controller is about to drop its finalizer and stop watching, and a hook left behind would be held by nobody - the next deletion of that machine would wait on an annotation with no controller left to remove it. The reconcile takes the same way out as soon as the `Cluster` is deleted, for the same reason and one more: it is the only pass that runs while the workers are going.
 
 ## The one thing to verify
 
