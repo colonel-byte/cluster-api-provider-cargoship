@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.8.2](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.1...v0.8.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **controlplane:** hold the pre-terminate hook until the replacements join ([#136](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/136)) ([8b7dd18](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/8b7dd18926cec90cdd03da1390d56aed023ecd13))
+* **gitignore:** un-ignore vendored files with a trailing /** negation ([#130](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/130)) ([c4dceb4](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/c4dceb44ddf685fc15065d60eb25d615f58829c3))
+
+
+### Documentation
+
+* **security:** publish the security policy in the book ([#133](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/133)) ([ede887a](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/ede887a872abbd288c08840f7405b607a44a0938))
+* **workflows:** explain every workflow in the book ([#132](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/132)) ([7de15a1](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/7de15a12eac3072aae2d08d71b038ed56ba2693d))
+
+
+### Miscellaneous
+
+* **github:** add issue forms and CODEOWNERS ([#129](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/129)) ([bfb7763](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/bfb77631cdb329b67e6baa34d02ac278b3c1a339))
+
+
+### CI/CD
+
+* **docs:** check Markdown table padding ([#131](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/131)) ([ca8727a](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/ca8727aff8238f9789ae7ae7baa2a4fe8cb9ce6d))
+
+
+### Build
+
+* **deps:** bump github.com/huandu/xstrings from 1.6.3 to 1.6.4 ([#138](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/138)) ([35754db](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/35754dbfd154e5d25ea973500ef92529d499dd47))
+* **deps:** bump github.com/sigstore/rekor from 1.6.2 to 1.6.3 ([#139](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/139)) ([87f33cd](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/87f33cd710e914000280c21041a49ac08eff32f4))
+* **deps:** bump go.opentelemetry.io/auto/sdk from 1.2.1 to 1.2.2 ([#137](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/137)) ([5901ed4](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/5901ed44855c2db7aceba466e1c9dedb973648b7))
+* **deps:** bump the core group with 3 updates ([#140](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/140)) ([ff97af5](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/ff97af5ee9b022dc2acce23b82073ddbc6bbf31a))
+
 ## [0.8.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.0...v0.8.1) (2026-11-23)
 
 
