@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.3...v0.9.0) (2026-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** update cargoship to v0.44.0 ([#144](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/144))
+
+### Miscellaneous
+
+* **deps:** update cargoship to v0.44.0 ([#144](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/144)) ([e6165a6](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e6165a6bc894c704f05a89d0d934ace30e28b806))
+
+
+### Build
+
+* **deps:** bump github.com/pierrec/lz4/v4 from 4.1.33 to 4.1.34 ([#143](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/143)) ([97100fa](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/97100fa6dbe8c291ef9740d0235be795dbc3b4f0))
+
 ## [0.8.3](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.2...v0.8.3) (2026-11-24)
 
 
