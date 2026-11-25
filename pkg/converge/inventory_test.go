@@ -349,6 +349,21 @@ func TestDecodeClusterConfig(t *testing.T) {
 			raw:  `{"tlsSan":["vip.example.com","203.0.113.10"]}`,
 		},
 		{
+			// New in cargoship v0.44.0, and the same canary as the case above: the decoder
+			// refuses unknown keys, so a vendored cargoship too old to know the field fails
+			// with "unknown field" rather than decode.
+			name: "trustedSources decodes, as a CIDR block and as an inclusive range",
+			raw:  `{"trustedSources":["10.0.0.0/16","10.1.2.2-10.1.2.150"]}`,
+		},
+		{
+			// Caught here rather than in cargoship's twenty-sixth phase, which is after SSH
+			// has connected to the fleet and earlier phases have already changed hosts.
+			name:     "a trustedSources entry that is neither a CIDR block nor a range is refused",
+			raw:      `{"trustedSources":["10.0.0.0"]}`,
+			wantErr:  true,
+			wantFrag: "trustedSources: invalid CIDR",
+		},
+		{
 			name:     "a profile naming a concurrency that is not a count or a percentage is refused",
 			raw:      `{"profiles":{"gpu":{"concurrency":"twenty-five%"}}}`,
 			wantErr:  true,

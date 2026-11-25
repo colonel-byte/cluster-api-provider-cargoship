@@ -273,6 +273,10 @@ func DecodeClusterConfig(raw []byte) (cluster.Config, error) {
 // Nothing here is a second implementation of those checks. Each one calls the cargoship function
 // that will run later anyway, so this cannot come to disagree with what an apply enforces.
 func validateClusterConfig(cfg cluster.Config) error {
+	if err := cluster.ValidateTrustedSources(cfg.TrustedSources); err != nil {
+		return err
+	}
+
 	if err := cluster.ValidateRegistries(cfg.Registries); err != nil {
 		return err
 	}
