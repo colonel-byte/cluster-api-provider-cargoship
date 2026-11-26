@@ -1016,9 +1016,10 @@ github.com/sigstore/cosign/v3/pkg/oci/remote
 github.com/sigstore/cosign/v3/pkg/oci/signed
 github.com/sigstore/cosign/v3/pkg/oci/static
 github.com/sigstore/cosign/v3/pkg/types
-# github.com/sigstore/protobuf-specs v0.5.2
+# github.com/sigstore/protobuf-specs v0.5.3-0.20261112181914-a84bc5ff572a
 ## explicit; go 1.23
 github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1
+github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v2
 github.com/sigstore/protobuf-specs/gen/pb-go/common/v1
 github.com/sigstore/protobuf-specs/gen/pb-go/dsse
 github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1
@@ -1076,7 +1077,7 @@ github.com/sigstore/rekor-tiles/v2/pkg/verifier/certificate
 github.com/sigstore/rekor-tiles/v2/pkg/verifier/identity
 github.com/sigstore/rekor-tiles/v2/pkg/verifier/publickey
 github.com/sigstore/rekor-tiles/v2/pkg/verify
-# github.com/sigstore/sigstore v1.11.3
+# github.com/sigstore/sigstore v1.11.4
 ## explicit; go 1.27
 github.com/sigstore/sigstore/pkg/cryptoutils
 github.com/sigstore/sigstore/pkg/cryptoutils/goodkey
@@ -1088,7 +1089,7 @@ github.com/sigstore/sigstore/pkg/signature/dsse
 github.com/sigstore/sigstore/pkg/signature/options
 github.com/sigstore/sigstore/pkg/signature/payload
 github.com/sigstore/sigstore/pkg/tuf
-# github.com/sigstore/sigstore-go v1.4.0
+# github.com/sigstore/sigstore-go v1.4.1
 ## explicit; go 1.27.0
 github.com/sigstore/sigstore-go/internal/certificate
 github.com/sigstore/sigstore-go/internal/limits
