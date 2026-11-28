@@ -24,7 +24,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-# Tool versions are pinned in go.mod as tool dependencies, so Dependabot owns them and
+# Tool versions are pinned in go.mod as tool dependencies, so Renovate owns them and
 # `go tool` resolves them without a network fetch at build time. See
 # docs/agent/choice-tool-dependencies.md.
 CONTROLLER_GEN := go tool controller-gen

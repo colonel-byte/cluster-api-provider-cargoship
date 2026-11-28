@@ -18,8 +18,8 @@ jobs:
       # The action installs the latest release when it is given no version, so CI ran 2.14.0
       # against a tree whose hooks pinned 2.13.2 -- a lint failure that reproduced nowhere
       # locally. The version is read from .pre-commit-config.yaml rather than written here as
-      # well: dependabot's pre-commit ecosystem bumps that rev, and its github-actions
-      # ecosystem updates `uses:` references, not inputs inside a `with:` block. A second pin
+      # well: Renovate's pre-commit manager bumps that rev, and its github-actions
+      # manager updates `uses:` references, not inputs inside a `with:` block. A second pin
       # here would be one nothing keeps in step with the first.
       - name: Read the golangci-lint version the hooks pin
         id: pinned

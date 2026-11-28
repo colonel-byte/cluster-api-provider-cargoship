@@ -17,7 +17,7 @@
 # One Dockerfile for both managers, selected by MANAGER. They differ only in which binary is
 # copied in, and two files that differed in one COPY line would drift.
 #
-# The digest is pinned, and Dependabot owns moving it -- see .github/dependabot.yaml. A floating
+# The digest is pinned, and Renovate owns moving it -- see .github/renovate.json5. A floating
 # tag in a controller image is how a management cluster ends up running something nobody chose.
 
 # Chainguard static, matching the cargoship base image: no shell, no package manager, nothing to

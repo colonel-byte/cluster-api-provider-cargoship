@@ -91,10 +91,12 @@ jobs:
       # golang/govulncheck-action produced in the job above. A wrapper that fails without saying
       # why is worse than four lines of curl.
       #
-      # TRIVY_VERSION is a pin no Dependabot ecosystem tracks, so it is bumped by hand. It is
-      # here rather than in a tool manifest because nothing else in this repository needs trivy.
+      # TRIVY_VERSION is a pin no real manager tracks, so the renovate annotation below is what
+      # moves it. It is here rather than in a tool manifest because nothing else in this
+      # repository needs trivy.
       - name: Run trivy
         env:
+          # renovate: datasource=github-releases depName=aquasecurity/trivy
           TRIVY_VERSION: "0.76.2"
         run: |
           curl -fsSL \

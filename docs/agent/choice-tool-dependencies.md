@@ -1,6 +1,6 @@
 # Tool versions live in `go.mod`, except golangci-lint
 
-`controller-gen`, `kustomize` and `setup-envtest` are `tool` directives in `go.mod`. The `Makefile` calls them through `go tool`, so there is no version to pin in two places, Dependabot owns the bumps, and a vendored checkout resolves them with no network access - which is the same property the rest of this repository has.
+`controller-gen`, `kustomize` and `setup-envtest` are `tool` directives in `go.mod`. The `Makefile` calls them through `go tool`, so there is no version to pin in two places, Renovate owns the bumps, and a vendored checkout resolves them with no network access - which is the same property the rest of this repository has.
 
 **`golangci-lint` is deliberately not one of them.** It runs from `.pre-commit-config.yaml`, which is also how `colonel-byte/cargoship` runs it.
 

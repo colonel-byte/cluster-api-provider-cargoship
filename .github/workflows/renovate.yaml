@@ -1,0 +1,130 @@
+---
+name: Renovate
+
+on:
+  schedule:
+    # Self-hosted Renovate only looks at the repository when this fires, so this cron is
+    # the whole schedule - .github/renovate.json5 sets no `schedule` of its own. If one is
+    # added there, this has to fire at least as often as that window is open, or the window
+    # is a no-op outside the few minutes this workflow happens to run.
+    #
+    # Hourly rather than every four hours, which only pays off with the package cache
+    # restored below: an uncached run re-resolves every module in the vendored tree and
+    # takes upwards of twenty minutes, and the `renovate` concurrency group below makes a
+    # run that outlasts its interval queue the next one rather than overlap it. The
+    # per-hour pull request ceiling is `prHourlyLimit` in the config, not this cron -
+    # firing more often shortens the wait for an update to be noticed, it does not open
+    # more of them.
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: Renovate log level
+        type: choice
+        default: info
+        options:
+          - info
+          - debug
+      dryRun:
+        description: Resolve updates and log them without opening anything
+        type: boolean
+        default: false
+  # Renovate re-reads its config and refreshes the dependency dashboard when the config
+  # itself lands, rather than waiting for the next scheduled run.
+  push:
+    branches:
+      - main
+    paths:
+      - .github/renovate.json5
+      - .github/workflows/renovate.yaml
+
+# No write anywhere: Renovate is handed the app token minted below and does every write
+# with that, so GITHUB_TOKEN is only along for the ride.
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      # The same app as release-please. Its installation token is what opens the branches
+      # and pull requests, so the app needs, at minimum: Contents write, Pull requests
+      # write, Issues write for the dependency dashboard, Workflows write - without it
+      # GitHub refuses any change to a file under .github/workflows/, so every action-pin
+      # update fails while every other update succeeds - Commit statuses write, which
+      # Renovate uses to report a branch's artifact errors and without which the first
+      # branch whose artifacts fail aborts the whole run as "Repository has changed during
+      # renovation", and Checks read for the CI results that gate a rebase.
+      #
+      # This also changes who the author is. The hosted app opens pull requests as
+      # `renovate[bot]`; self-hosted under this app they are opened as the app's own bot,
+      # `${{ steps.app-token.outputs.app-slug }}[bot]`. Any workflow gating on the author -
+      # a post-processing hook with `if: github.actor == 'renovate[bot]'`, a commitlint
+      # config selected by author, a CODEOWNERS exemption - has to be told the new name, and
+      # fails by silently never running rather than by erroring.
+      - name: Get Renovate token
+        id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_GITHUB_APP_SECRET }}
+
+      # Renovate re-resolves every dependency from scratch on a cold cache, which on a
+      # vendored tree is the bulk of the run. The cache holds resolved versions and
+      # changelogs, not credentials. `github.run_id` in the key makes every run write a
+      # fresh entry and `restore-keys` take the newest previous one, which is the documented
+      # way to keep a cache that is updated rather than written once - a fixed key would be
+      # immutable after its first write and go stale immediately.
+      - name: Restore Renovate cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /tmp/renovate/cache
+          key: renovate-cache-${{ github.run_id }}
+          restore-keys: |
+            renovate-cache-
+
+      # actions/cache restores as the runner (uid 1001) but the Renovate container runs as
+      # uid 12021 with /tmp bind-mounted, so it inherits a base dir it cannot write to and
+      # dies on `mkdir /tmp/renovate/repos`. An uncached run is unaffected, which is why the
+      # first run after the cache landed passed and every one since has failed.
+      - name: Make the restored cache writable by the container user
+        run: |
+          mkdir -p /tmp/renovate
+          sudo chmod -R a+rwX /tmp/renovate
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@1376d90bcd3a4d4e7393ae762eea56ac684aee38 # v48.0.0
+        with:
+          # Sets RENOVATE_TOKEN. An installation token is minted per run and expires in an
+          # hour, which is why this is a step rather than a long-lived secret.
+          token: ${{ steps.app-token.outputs.token }}
+          # renovate: datasource=docker depName=ghcr.io/renovatebot/renovate versioning=docker
+          renovate-version: 45.3.2
+        env:
+          # This repository only. Autodiscovery would walk every repository the app is
+          # installed on, which is not what a per-repository workflow should do.
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun == true && 'full' || '' }}
+          # The cache restored above holds two separate things: the package cache (resolved
+          # versions and changelogs - the bulk of the size and the whole speedup), and the
+          # repository cache (cached branch SHAs and pull request state). The package cache
+          # works regardless of this setting. The repository cache has to stay disabled: a
+          # run that restores PR state from before a Renovate PR merged sees it "merge
+          # during the run" and aborts with "Repository has changed during renovation", and
+          # because an aborted run still saves its cache, the stale state propagates to
+          # every following run.
+          RENOVATE_REPOSITORY_CACHE: disabled
+          # Must agree with the cached path above: the action sets RENOVATE_BASE_DIR to
+          # /tmp/renovate, and the cache lives under it.
+          RENOVATE_BASE_DIR: /tmp/renovate
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          # The other half of `postUpgradeTasks` in .github/renovate.json5, which re-writes the
+          # generated osv-scanner.toml files that Renovate's own `go mod vendor` deletes.
+          # `allowedCommands` is global-only config - Renovate will not read it from a
+          # repository file, by design, since a repository could otherwise run anything on this
+          # runner. An anchored regex per command, so widening it is a deliberate edit here.
+          RENOVATE_ALLOWED_COMMANDS: '["^make vendor-osv$"]'

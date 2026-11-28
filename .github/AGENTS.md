@@ -94,7 +94,7 @@ A `uses:` names the forty-character commit and carries the tag in a trailing com
 - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 ```
 
-Dependabot reads the comment to offer the bump, so keep it accurate when you move the SHA.
+Renovate reads the comment to offer the bump, so keep it accurate when you move the SHA.
 
 ### Pass an untrusted value through `env`, not into `run:`
 

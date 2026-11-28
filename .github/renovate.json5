@@ -1,38 +1,360 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
-    "config:recommended"
+    "config:recommended",
+    // Pin GitHub Actions to a commit SHA with the tag in a trailing comment. That is the
+    // only immutable form and what OpenSSF Scorecard's Pinned-Dependencies counts. Without
+    // this, Renovate rewrites a pinned `uses:` back to a tag.
+    "helpers:pinGitHubActionDigests",
   ],
+
+  reviewers: [
+    "team:maintainers",
+  ],
+
+  // PR titles must pass the conventional-commit lint in .github/workflows/commitlint.yaml.
+  // config:recommended only auto-detects this from recent commit history, so state it:
+  // every Renovate PR title is `chore(deps): ...`, regardless of what history looks like.
+  semanticCommits: "enabled",
+
+  // config:recommended ships an ignorePaths that includes `**/test/**` and `**/tests/**`,
+  // which would silently hide any module or manifest that ever lands under a test tree, so
+  // it is restated without them. `**/vendor/**` stays: a vendored module's own go.mod is
+  // upstream's, not ours to bump, and rewriting one would make the next `go mod vendor`
+  // look like a change nobody made. The rest are carried over from the preset unchanged.
+  ignorePaths: [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__fixtures__/**",
+  ],
+
+  ignoreUnstable: false,
+  separateMajorMinor: false,
   dependencyDashboard: {
     "enabled": true,
     "autoclose": false,
     "title": "Dependency Dashboard",
-    "header": "This issue lists Renovate updates and detected dependencies. Read the [Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) docs to learn more.",
-    "osvVulnerabilitySummary": "none",
+    "header": "This issue lists Renovate updates and detected dependencies.",
+    "osvVulnerabilitySummary": "unresolved",
     "reportAbandonment": true,
-    "pinned": true,
+    "pinned": false,
     "customize": {}
   },
-  // Only the Zarf release is tracked. Action digests, Go modules and the images zarf.yaml names
-  // are each pinned by something else in this repository - release-please rewrites the package
-  // version, and the digest comments beside `uses:` are updated by hand - so widening this
-  // config would open pull requests nothing is ready to merge.
-  enabledManagers: [
-    "custom.regex"
+
+  // Every update is reviewed and merged by a person. Stated rather than left to the default,
+  // so a preset added to `extends` above cannot quietly turn it on - `config:recommended`
+  // does not, but several of the `:automergeX` presets do, and the grouped rules below would
+  // then merge a whole family of modules on one green run.
+  automerge: false,
+
+  prConcurrentLimit: 0,
+  prHourlyLimit: 2,
+  branchConcurrentLimit: 5,
+
+  // Commit through the GitHub API rather than over git. Renovate recommends this when the
+  // token is a GitHub App installation token, which is what .github/workflows/renovate.yaml
+  // mints - it is also what gets the commits attributed to the app and signed by GitHub.
+  // Drop it if this repository goes back to the hosted renovate[bot] app.
+  platformCommit: "enabled",
+
+  packageRules: [
+    // Container images (Dockerfile bases, workflow runner images) move separately from the
+    // annotated release pins: an image digest bump and a tool-version bump are reviewed by
+    // different evidence. No groupName on purpose - each image gets its own branch, so one
+    // image's digest bump is reviewed and reverted on its own.
+    {
+      matchDatasources: [
+        "docker",
+      ],
+      addLabels: [
+        "renovate/oci",
+      ],
+      matchPackageNames: [
+        "*",
+      ],
+    },
+    // The annotated pins - everything the custom regex managers below surface.
+    {
+      matchDatasources: [
+        "regex",
+        "git-tags",
+        "github-releases",
+      ],
+      addLabels: [
+        "renovate/pin",
+      ],
+      groupName: "release pins",
+      groupSlug: "release-pins",
+      matchPackageNames: [
+        "*",
+      ],
+    },
+    {
+      matchManagers: ["github-actions"],
+      addLabels: [
+        "renovate/action",
+      ],
+      groupName: "all-actions",
+      groupSlug: "all-actions",
+      matchPackageNames: [
+        "*",
+      ],
+    },
+    {
+      matchManagers: ["gomod"],
+      addLabels: [
+        "renovate/gomod",
+      ],
+      groupName: "go direct",
+      groupSlug: "gomod-direct",
+      matchPackageNames: [
+        "*",
+      ],
+    },
+    // gomod leaves `// indirect` requirements alone by default; opt them in so the grouped
+    // go-modules PRs carry them too.
+    {
+      matchManagers: ["gomod"],
+      matchDepTypes: ["indirect"],
+      enabled: true,
+    },
+    {
+      matchManagers: ["pre-commit"],
+      addLabels: [
+        "renovate/pre-commit",
+      ],
+      groupName: "pre-commit hooks",
+      groupSlug: "all-pre-commit",
+    },
+    // The only npm in the tree is the pinned commitlint CLI that the PR Title Check workflow
+    // installs with `npm ci`. Grouped so its packages, which share a version, move together
+    // rather than as pull requests that each fail until the other lands.
+    {
+      matchManagers: ["npm"],
+      addLabels: [
+        "renovate/npm",
+      ],
+      groupName: "commitlint",
+      groupSlug: "commitlint",
+    },
+    // Indirect majors are not upgrade decisions, and Renovate's are mostly not real: it
+    // resolves a major by probing `module/vN`, and where that path does not exist it falls
+    // back to the repository's git tags, which invents majors and outright downgrades.
+    // Nothing in this module imports an indirect requirement, so its major is not ours to
+    // pick - it arrives when a direct dependency asks for it. Disabling them also avoids
+    // Renovate skipping `go mod tidy` on major branches (it only tidies majors when
+    // `gomodUpdateImportPaths` is set, which is deliberately absent below), which
+    // check-go-mod.yaml would then fail on the tidy diff. A direct major still reaches us,
+    // and still needs tidy by hand.
+    {
+      matchManagers: ["gomod"],
+      matchDepTypes: ["indirect"],
+      matchUpdateTypes: ["major"],
+      enabled: false,
+    },
+    // Ungroup gomod by default: a branch per module, named `renovate/<module>-<major>.x`.
+    // The rules above keep applying their labels and enablement - `groupName: null` removes
+    // only the grouping. The family rules below this one win over it (rules apply in order,
+    // last match wins), so a member of a named family rides its family PR and everything
+    // else stays one PR per module, throttled by the limits at the top of this file.
+    {
+      matchManagers: ["gomod"],
+      groupName: null,
+    },
+    // Named families, re-grouped out of the per-module default above. Each is a vendor
+    // whose modules version together, so one PR per family is one vendored diff and one CI
+    // run instead of a dozen. These must stay below the ungrouping rule or it dissolves
+    // them.
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "k8s.io/**",
+        "sigs.k8s.io/**",
+      ],
+      groupName: "k8s",
+      groupSlug: "k8s",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "golang.org/x/**",
+      ],
+      groupName: "golang",
+      groupSlug: "golang",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/go-openapi/**",
+      ],
+      groupName: "openapi",
+      groupSlug: "openapi",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/aws/**",
+        "github.com/awslabs/**",
+      ],
+      groupName: "aws",
+      groupSlug: "aws",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/Azure/**",
+        "github.com/AzureAD/**",
+      ],
+      groupName: "azure",
+      groupSlug: "azure",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "cloud.google.com/go/**",
+        "github.com/GoogleCloudPlatform/**",
+        "github.com/google/**",
+        "github.com/googleapis/**",
+        "google.golang.org/**",
+      ],
+      groupName: "google",
+      groupSlug: "google",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/AliyunContainerService/**",
+        "github.com/alibabacloud-go/**",
+        "github.com/mozillazg/docker-credential-acr-helper/**",
+      ],
+      groupName: "alibaba",
+      groupSlug: "alibaba",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/sigstore/**",
+        "github.com/spiffe/**",
+        "github.com/theupdateframework/**",
+        "github.com/transparency-dev/**",
+      ],
+      groupName: "sigstore",
+      groupSlug: "sigstore",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: ["github.com/hashicorp/**"],
+      groupName: "hashicorp",
+      groupSlug: "hashicorp",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: ["go.opentelemetry.io/**"],
+      groupName: "opentelemetry",
+      groupSlug: "opentelemetry",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchPackageNames: [
+        "github.com/containerd/**",
+        "github.com/docker/**",
+        "github.com/moby/**",
+        "github.com/opencontainers/**",
+      ],
+      groupName: "containers",
+      groupSlug: "containers",
+    },
+    // cargoship is consumed as a library and its version is chosen deliberately: a bump has
+    // to be checked against what pkg/converge calls, and the provider's own release notes
+    // should say which cargoship it carries. An automated bump would make that invisible.
+    {
+      matchPackageNames: [
+        "github.com/colonel-byte/cargoship",
+      ],
+      enabled: false,
+    },
+    // The `go` directive and the toolchain line are a decision about the language version,
+    // not a dependency update, so they are not Renovate's to move.
+    {
+      matchDepTypes: ["golang"],
+      enabled: false,
+    },
   ],
+
+  // A vendored tree has to be regenerated in the same commit, or the branch does not build.
+  // `gomodUpdateImportPaths` is deliberately absent: the import-path rewriter loads the
+  // package graph, which a vendored tree forces into -mod=vendor against a vendor/ that has
+  // not been regenerated yet, so every grouped PR carrying a major bump would fail its
+  // artifact step and land as a bare go.mod edit. The majors that reach the grouped PRs are
+  // all indirect - nothing here imports them, so there is no path to rewrite. A direct
+  // major bump gets its import paths rewritten by hand.
+  postUpdateOptions: [
+    "gomodTidy",
+  ],
+
+  // Renovate re-runs `go mod vendor` for every gomod update, and that deletes the generated
+  // osv-scanner.toml files under vendor/ - so without this every dependency bump would
+  // arrive with the vendor check red and need a hand-written commit to put them back;
+  // .github/workflows/fix-vendor-osv.yaml closes the same gap as a backstop.
+  //
+  // This is the self-hosted-only half of the config, and it is inert without its other
+  // half: `allowedCommands` is a global option Renovate refuses to read from a repository
+  // config, so it must be set as RENOVATE_ALLOWED_COMMANDS in the workflow that runs
+  // Renovate. A command that does not match it is skipped with a warning in the log and
+  // nothing else - the failure mode is a red pull request, not an error here.
+  //
+  // `executionMode: "branch"` runs it once after all of a branch's updates rather than once
+  // per upgrade; the files do not vary by module, so per-upgrade runs would be identical
+  // work. `fileFilters` is what lets Renovate commit the result: files a post-upgrade task
+  // writes are discarded unless they match, and these are exactly the paths the target
+  // writes.
+  postUpgradeTasks: {
+    commands: [
+      "make vendor-osv",
+    ],
+    fileFilters: [
+      "**/osv-scanner.toml",
+    ],
+    executionMode: "branch",
+  },
+
   customManagers: [
     {
       customType: "regex",
       description: [
-        "The Zarf release `zarf package create` runs at, annotated at its setup-zarf version input"
+        "Process custom dependencies",
       ],
       managerFilePatterns: [
-        "/(^|/)\\.github/workflows/.+\\.ya?ml$/"
+        "/(^|/).+\\.ya?ml(\\.j2)?$/",
       ],
       matchStrings: [
-        "(?m:# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)( versioning=(?<versioning>\\S+))?\\n\\s+version: (?<currentValue>\\S+)$)"
+        "(?m:# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z-0-9]+?))?( repository=(?<registryUrl>\\S+))?\n.+?: ?\"?(?<currentValue>[^\"\\s]+)\"?$)",
+        "(?m:# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z-0-9]+?))?( repository=(?<registryUrl>\\S+))?\n.+?(?<currentValue>(?:v|\\d|\\.)+)$)",
+        "(?m:# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z-0-9]+?))?\n.+?/(?<currentValue>(v|\\d)[^/]+)\\S+$)",
       ],
-      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
-    }
-  ]
+      datasourceTemplate: "{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}",
+      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
+    },
+    // How a pin that lives in a Go constant, a Dockerfile, or a shell script gets an owner
+    // rather than a bump procedure: annotate the line above the pin with
+    // `// renovate: datasource=… depName=…` and Renovate moves it.
+    {
+      customType: "regex",
+      description: [
+        "Pins annotated in Go source, Dockerfiles, and shell scripts",
+      ],
+      managerFilePatterns: [
+        "/(^|/).+\\.go$/",
+        "/(^|/)Dockerfile[^/]*$/",
+        "/(^|/).+\\.sh$/",
+      ],
+      matchStrings: [
+        "(?m:(?:#|//) renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>[a-z-0-9]+?))?(?: extractVersion=(?<extractVersion>\\S+?))?\n.*?\"?v?(?<currentValue>\\d+(?:\\.\\d+)+(?:-[^\"\\s]+)?)\"?.*$)",
+      ],
+      datasourceTemplate: "{{#if datasource}}{{{datasource}}}{{else}}github-releases{{/if}}",
+      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
+    },
+  ],
 }

@@ -9,7 +9,7 @@ name: Check the kustomize hold
 # Nothing in the tree records when that stops being true, and the hold is on tool-only
 # dependencies nobody imports, so it would sit there unnoticed. This job tries the bump every
 # week and opens an issue the week it compiles. It never commits anything: picking versions is
-# Dependabot's job, and the lift wants a human to run the tests.
+# Renovate's job, and the lift wants a human to run the tests.
 on:
   schedule:
     # Run at 06:00 UTC every Monday
@@ -91,7 +91,7 @@ jobs:
             cat gomod.patch
             echo '```'
             echo
-            echo "Merge Dependabot's next \`tools\` group pull request, or reproduce it locally:"
+            echo "Merge Renovate's next \`k8s\` group pull request, or reproduce it locally:"
             echo
             echo '```sh'
             echo "go get sigs.k8s.io/kustomize/api@latest sigs.k8s.io/kustomize/cmd/config@latest \\"

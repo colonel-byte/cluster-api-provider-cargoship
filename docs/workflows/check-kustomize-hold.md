@@ -6,7 +6,7 @@ Source: [`check-kustomize-hold.yaml`](https://github.com/colonel-byte/cluster-ap
 
 Nothing in the tree records when that stops being true, and the hold is on tool-only dependencies nobody imports, so it would sit there unnoticed indefinitely. This job tries the bump every week - `go get ...@latest`, `go mod tidy`, `go mod vendor`, `go build ./...` - and opens or updates an issue the week it compiles.
 
-It never commits anything. Picking versions is Dependabot's job, and the lift wants a human to run the tests; the issue carries the `go.mod` diff and asks for `make verify` to be run by hand on the real change.
+It never commits anything. Picking versions is Renovate's job, and the lift wants a human to run the tests; the issue carries the `go.mod` diff and asks for `make verify` to be run by hand on the real change.
 
 An unchanged `go.mod` means kustomize is already at the latest release, so there is no hold left to lift and nothing is reported. That is checked before the build, because a no-op upgrade builds fine and would otherwise open an issue every week.
 

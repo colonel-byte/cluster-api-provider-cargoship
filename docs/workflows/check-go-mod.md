@@ -12,4 +12,4 @@ This matters more here than in most repositories: `vendor/` is committed and eve
 
 The `k8s.io/*` modules are held at the versions `sigs.k8s.io/cluster-api` was built against. Read [tool dependencies](../agent/choice-tool-dependencies.md) before raising a pin: a newer patch wants `structured-merge-diff/v7` while cluster-api pins v6, and the module stops compiling.
 
-Dependabot re-vendors on every gomod update and trips the `vendor/` check every time; [fix-vendor-osv](fix-vendor-osv.md) pushes the regenerated overrides back onto its branch.
+Renovate re-vendors on every gomod update and trips the `vendor/` check every time; [fix-vendor-osv](fix-vendor-osv.md) pushes the regenerated overrides back onto its branch.
