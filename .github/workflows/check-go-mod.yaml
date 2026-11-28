@@ -51,7 +51,7 @@ jobs:
       # point at. Both that and a dropped module need an edit to Overrides in
       # magefiles/pkg/gen/osv, which is why they are left to fail here.
       #
-      # Dependabot re-vendors on every gomod update and trips the step above every time;
+      # Renovate re-vendors on every gomod update and trips the step above every time;
       # fix-vendor-osv.yaml pushes the regenerated overrides back onto its branch.
       - name: Check the vendored osv-scanner overrides
         run: make verify-vendor

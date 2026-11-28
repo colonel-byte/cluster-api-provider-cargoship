@@ -45,11 +45,15 @@ jobs:
       # and the PR title becomes the final commit message. wagoid/commitlint-github-action
       # lints commit messages instead, so it isn't a drop-in replacement for this step.
       #
-      # Dependabot gets .commitlintrc.dependabot.yaml, which is the same config with
-      # header-max-length off: it cannot shorten a module path, and ten of the modules in
-      # go.mod overflow a 100-char title. Skipping the job for it instead would leave
-      # title_check without a result, and that is a required status check on main. See
-      # docs/agent/choice-dependabot-title-length.md.
+      # Any `*[bot]` author gets .commitlintrc.bot.yaml, which is the same config with
+      # header-max-length off: a bot cannot shorten a module path, and a long import path
+      # overflows a 100-char title. Matched on the suffix rather than on a list of names
+      # deliberately -- self-hosted Renovate opens pull requests as whichever GitHub App
+      # minted its token, so the name is not knowable from here, and a stale hard-coded
+      # name fails by silently linting a bot's title against the strict config.
+      #
+      # Skipping the job for a bot instead would leave title_check without a result, and it
+      # is a required status check on main.
       - name: Lint PR title
         if: github.event_name == 'pull_request'
         working-directory: .github/commitlint
@@ -60,7 +64,7 @@ jobs:
           set -euo pipefail
 
           config=.commitlintrc.yaml
-          if [ "${PR_AUTHOR}" = "dependabot[bot]" ]; then
-            config=.commitlintrc.dependabot.yaml
-          fi
+          case "${PR_AUTHOR}" in
+            *'[bot]') config=.commitlintrc.bot.yaml ;;
+          esac
           echo "$PR_TITLE" | npx commitlint --config "${config}"

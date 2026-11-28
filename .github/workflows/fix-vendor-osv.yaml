@@ -1,10 +1,12 @@
 ---
 name: Fix vendored osv-scanner overrides
 
-# Dependabot re-runs `go mod vendor` for every gomod update rather than going through make. That
+# Renovate re-runs `go mod vendor` for every gomod update rather than going through make. That
 # deletes and recreates vendor/, which takes the three generated osv-scanner.toml files with it,
 # and check-go-mod then fails a pull request nobody can fix without a manual commit. This job
-# makes that commit instead. See docs/agent/choice-osv-vendor-overrides.md.
+# makes that commit instead - a backstop behind the `postUpgradeTasks` in .github/renovate.json5,
+# and the no-op guard below keeps the two from fighting. See
+# docs/agent/choice-osv-vendor-overrides.md.
 on:
   pull_request_target:
     types:
@@ -28,9 +30,11 @@ concurrency:
 
 jobs:
   regenerate:
-    # Dependabot branches live in this repository, so the app token can push to them. A fork
-    # cannot be pushed to at all, and no other actor re-vendors on its own.
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    # Bot branches live in this repository, so the app token can push to them. A fork cannot be
+    # pushed to at all, and no other actor re-vendors on its own. Matched on the suffix rather
+    # than a list of names - self-hosted Renovate opens pull requests as whichever GitHub App
+    # minted its token, so the name is not knowable from here.
+    if: endsWith(github.event.pull_request.user.login, '[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Get token
@@ -72,7 +76,7 @@ jobs:
           set -euo pipefail
 
           # The head sha is read now rather than taken from the event payload, so the commit is
-          # parented on what the branch actually points at. If Dependabot pushes again while this
+          # parented on what the branch actually points at. If the bot pushes again while this
           # runs, the ref update below is no longer a fast-forward and fails loudly instead of
           # overwriting the newer commit.
           head_sha="$(gh api "repos/${REPO}/git/ref/heads/${HEAD_REF}" --jq '.object.sha')"

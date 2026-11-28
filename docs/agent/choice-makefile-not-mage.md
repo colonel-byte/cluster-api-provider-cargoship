@@ -18,7 +18,7 @@ This repository started with one generator, `controller-gen`, which is a single 
 
 That was a `cp` and two `sed` expressions, and it could not have grown into the summary generator without becoming unreadable and untestable. It is now `magefiles/pkg/gen/docs`, an ordinary Go package with tests, called by `make docs`, which `make generate` depends on. Shell in a Makefile recipe has no unit tests and no way to get them.
 
-mage is pinned in `go.mod` as a tool dependency, the same way `controller-gen` and `kustomize` are, so `make docs` needs nothing installed and Dependabot owns the version - see [choice-tool-dependencies](choice-tool-dependencies.md).
+mage is pinned in `go.mod` as a tool dependency, the same way `controller-gen` and `kustomize` are, so `make docs` needs nothing installed and Renovate owns the version - see [choice-tool-dependencies](choice-tool-dependencies.md).
 
 ## The rule for anything added later
 
@@ -28,4 +28,4 @@ The second half of that matters as much as the first: `mage` is never the docume
 
 ## What is kept from cargoship's pattern
 
-Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, Dependabot with the same grouping and daily cadence, the same pre-commit hooks, a vendored `vendor/` tree, and `.gitattributes` grouped by the generator that writes each path. The generator layout is now shared too - `magefiles/pkg/gen/...`, with the magefile holding no logic of its own.
+Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, automated dependency updates with the same grouping, the same pre-commit hooks, a vendored `vendor/` tree, and `.gitattributes` grouped by the generator that writes each path. The generator layout is now shared too - `magefiles/pkg/gen/...`, with the magefile holding no logic of its own.
