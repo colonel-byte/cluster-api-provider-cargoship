@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,12 +183,12 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="fix-vendored-osv-scanner-overrides"><a class="header" href="#fix-vendored-osv-scanner-overrides">Fix vendored osv-scanner overrides</a></h1>
-<p>Source: <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/fix-vendor-osv.yaml"><code>fix-vendor-osv.yaml</code></a>. Runs on a Dependabot pull request that touches <code>vendor/**</code>.</p>
-<p>Dependabot re-runs <code>go mod vendor</code> for every gomod update rather than going through <code>make</code>. That deletes and recreates <code>vendor/</code>, which takes the generated <code>osv-scanner.toml</code> files with it, and <a href="check-go-mod.html">check-go-mod</a> then fails a pull request nobody can fix without a manual commit. This job makes that commit instead - <code>make vendor-osv</code>, pushed back onto the Dependabot branch. See <a href="../agent/choice-osv-vendor-overrides.html">osv vendor overrides</a>.</p>
+<p>Source: <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/fix-vendor-osv.yaml"><code>fix-vendor-osv.yaml</code></a>. Runs on a bot pull request that touches <code>vendor/**</code>.</p>
+<p>Renovate re-runs <code>go mod vendor</code> for every gomod update rather than going through <code>make</code>. That deletes and recreates <code>vendor/</code>, which takes the generated <code>osv-scanner.toml</code> files with it, and <a href="check-go-mod.html">check-go-mod</a> then fails a pull request nobody can fix without a manual commit. Renovate’s own <code>postUpgradeTasks</code> normally restores them before the branch is pushed; this job is the backstop that makes the commit when that did not happen - <code>make vendor-osv</code>, pushed back onto the bot’s branch. See <a href="../agent/choice-osv-vendor-overrides.html">osv vendor overrides</a>.</p>
 <p>The trigger is <code>pull_request_target</code>, which is the one event in this repository that runs with a writable token, so the shape of the job is dictated by that:</p>
 <ul>
 <li>It <strong>never checks the pull request out</strong>. It generates the overrides from the base checkout and commits them through the git data API, which needs the three file contents and nothing else. Checking the pull request out would put a freshly bumped dependency’s tree on a runner holding a write token, which is the failure <code>pull_request_target</code> is known for.</li>
-<li>It is gated on <code>github.event.pull_request.user.login == 'dependabot[bot]'</code>. Dependabot’s branches live in this repository so the app token can push to them; a fork cannot be pushed to at all, and no other actor re-vendors on its own.</li>
+<li>It is gated on the author’s login ending in <code>[bot]</code>, matched on the suffix because self-hosted Renovate opens pull requests as whichever GitHub App minted its token. Bot branches live in this repository so the app token can push to them; a fork cannot be pushed to at all, and no other actor re-vendors on its own.</li>
 </ul>
 <p>OpenSSF Scorecard’s Dangerous-Workflow check zeroes a <code>pull_request_target</code> workflow whose checkout takes an attacker-controlled <code>ref:</code>. This one takes none, which is the state to keep it in.</p>
 

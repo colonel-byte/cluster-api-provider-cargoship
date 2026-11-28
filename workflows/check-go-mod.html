@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,7 +192,7 @@
 </ul>
 <p>This matters more here than in most repositories: <code>vendor/</code> is committed and every job builds with <code>-mod=vendor</code>, so a stale tree means CI tests different code than <code>go.mod</code> declares - silently, and in the direction of passing.</p>
 <p>The <code>k8s.io/*</code> modules are held at the versions <code>sigs.k8s.io/cluster-api</code> was built against. Read <a href="../agent/choice-tool-dependencies.html">tool dependencies</a> before raising a pin: a newer patch wants <code>structured-merge-diff/v7</code> while cluster-api pins v6, and the module stops compiling.</p>
-<p>Dependabot re-vendors on every gomod update and trips the <code>vendor/</code> check every time; <a href="fix-vendor-osv.html">fix-vendor-osv</a> pushes the regenerated overrides back onto its branch.</p>
+<p>Renovate re-vendors on every gomod update and trips the <code>vendor/</code> check every time; <a href="fix-vendor-osv.html">fix-vendor-osv</a> pushes the regenerated overrides back onto its branch.</p>
 
                     </main>
 

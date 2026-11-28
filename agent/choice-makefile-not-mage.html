@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -195,12 +195,12 @@
 <h2 id="why-mage-owns-the-generators"><a class="header" href="#why-mage-owns-the-generators">Why mage owns the generators</a></h2>
 <p>This repository started with one generator, <code>controller-gen</code>, which is a single command with flags and belongs in a Makefile recipe. The book is the second one, and it is not that: it reads the docs tree, works out each page’s sidebar label, and writes <code>docs/SUMMARY.md</code> from what it finds, because a page that is added and not listed there is simply missing from the book and <code>mdbook build</code> does not say so.</p>
 <p>That was a <code>cp</code> and two <code>sed</code> expressions, and it could not have grown into the summary generator without becoming unreadable and untestable. It is now <code>magefiles/pkg/gen/docs</code>, an ordinary Go package with tests, called by <code>make docs</code>, which <code>make generate</code> depends on. Shell in a Makefile recipe has no unit tests and no way to get them.</p>
-<p>mage is pinned in <code>go.mod</code> as a tool dependency, the same way <code>controller-gen</code> and <code>kustomize</code> are, so <code>make docs</code> needs nothing installed and Dependabot owns the version - see <a href="choice-tool-dependencies.html">choice-tool-dependencies</a>.</p>
+<p>mage is pinned in <code>go.mod</code> as a tool dependency, the same way <code>controller-gen</code> and <code>kustomize</code> are, so <code>make docs</code> needs nothing installed and Renovate owns the version - see <a href="choice-tool-dependencies.html">choice-tool-dependencies</a>.</p>
 <h2 id="the-rule-for-anything-added-later"><a class="header" href="#the-rule-for-anything-added-later">The rule for anything added later</a></h2>
 <p><strong>A generator that is one command with flags stays a Makefile recipe. A generator that has to read the repository and decide something goes in <code>magefiles/</code>, as a package with tests, and gets a Makefile target that calls it.</strong></p>
 <p>The second half of that matters as much as the first: <code>mage</code> is never the documented way to run anything here. Everything is reachable through <code>make</code>, because that is what the ecosystem’s documentation tells a contributor to type, and a second entry point that only some targets have is worse than either tool on its own.</p>
 <h2 id="what-is-kept-from-cargoships-pattern"><a class="header" href="#what-is-kept-from-cargoships-pattern">What is kept from cargoship’s pattern</a></h2>
-<p>Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, Dependabot with the same grouping and daily cadence, the same pre-commit hooks, a vendored <code>vendor/</code> tree, and <code>.gitattributes</code> grouped by the generator that writes each path. The generator layout is now shared too - <code>magefiles/pkg/gen/...</code>, with the magefile holding no logic of its own.</p>
+<p>Everything about releasing and dependencies, which is the part that is genuinely house style rather than ecosystem convention: release-please with the same changelog sections and tag format, goreleaser with cosign signing against the same key, automated dependency updates with the same grouping, the same pre-commit hooks, a vendored <code>vendor/</code> tree, and <code>.gitattributes</code> grouped by the generator that writes each path. The generator layout is now shared too - <code>magefiles/pkg/gen/...</code>, with the magefile holding no logic of its own.</p>
 
                     </main>
 

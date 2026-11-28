@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -185,7 +185,7 @@
                         <h1 id="pr-title-check"><a class="header" href="#pr-title-check">PR Title Check</a></h1>
 <p>Source: <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/commitlint.yaml"><code>commitlint.yaml</code></a>. Runs on a pull request being opened, reopened, edited, synchronized or milestoned, and on the merge queue.</p>
 <p>Lints the <strong>pull request title</strong>, not the individual commits, because release-please squash-merges and the title becomes the final commit message - which is what release-please then reads to decide the next version and write the changelog. A title that is not a conventional commit produces a release that is wrong or missing. <code>wagoid/commitlint-github-action</code> lints commit messages instead, so it is not a drop-in replacement.</p>
-<p>The config lives in <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/tree/main/.github/commitlint"><code>.github/commitlint/</code></a> and is installed with <code>npm ci</code> from a committed lockfile. Dependabot gets <code>.commitlintrc.dependabot.yaml</code>, the same config with <code>header-max-length</code> off: it cannot shorten a module path, and ten of the modules in <code>go.mod</code> overflow a 100-character title.</p>
+<p>The config lives in <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/tree/main/.github/commitlint"><code>.github/commitlint/</code></a> and is installed with <code>npm ci</code> from a committed lockfile. Any <code>*[bot]</code> author gets <code>.commitlintrc.bot.yaml</code>, the same config with <code>header-max-length</code> off: a bot cannot shorten a module path, and a long import path overflows a 100-character title.</p>
 <p>On the <code>merge_group</code> event every step is skipped and the job reports success. That is deliberate rather than a gap: there is no pull request under that event, the title was already linted on the pull request that got queued, and <code>title_check</code> is a required status check that the merge queue waits for a result from.</p>
 <p><code>milestoned</code> is in the trigger list as a workaround for release-please’s own pull requests not firing pull request workflows; adding one to a milestone fires this.</p>
 
@@ -197,7 +197,7 @@
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../workflows/dependabot-validate.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../workflows/deploy-book.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -211,7 +211,7 @@
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../workflows/dependabot-validate.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../workflows/deploy-book.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

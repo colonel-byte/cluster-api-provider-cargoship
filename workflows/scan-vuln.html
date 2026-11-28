@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -185,7 +185,7 @@
                         <h1 id="vulnerability-scan"><a class="header" href="#vulnerability-scan">Vulnerability scan</a></h1>
 <p>Source: <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/scan-vuln.yaml"><code>scan-vuln.yaml</code></a>. Runs on every pull request, in the merge queue, and weekly on a schedule, with in-progress runs cancelled per ref.</p>
 <p><code>govulncheck</code> reports Go advisories that are <strong>reachable</strong> from this module’s code, rather than every advisory against something in <code>go.mod</code>. It runs with <code>-mod=mod</code>, not vendor: it needs the module graph to decide what is reachable and cannot read one from a vendored tree, which makes this one of the two jobs here allowed network access. The toolchain comes from <code>go-version-file</code>, which is load-bearing - the only finding this check has ever produced was a standard library advisory, cleared by raising the floor in <code>go.mod</code> rather than by changing a dependency.</p>
-<p><code>images</code> builds a controller image locally, saves it to a tar, and scans it with trivy at <code>CRITICAL,HIGH</code>, <code>--ignore-unfixed</code>, <code>--scanners vuln</code>. The trivy version is a pin no Dependabot ecosystem tracks, so it is bumped by hand.</p>
+<p><code>images</code> builds a controller image locally, saves it to a tar, and scans it with trivy at <code>CRITICAL,HIGH</code>, <code>--ignore-unfixed</code>, <code>--scanners vuln</code>. The trivy version is a pin no real manager tracks, so it carries a <code>renovate:</code> annotation and Renovate moves it.</p>
 <p>Both tools are downloaded and run directly rather than through their published actions. Each wrapper failed the job with its own step reported as “skipped” and no diagnostic of any kind, and the invocation either one wraps is two to four lines.</p>
 <p><code>vendor/</code> being committed reports advisories that are not this module’s; <a href="../agent/choice-osv-vendor-overrides.html">osv vendor overrides</a> explains what is done about that and what is left.</p>
 

@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -186,7 +186,7 @@
 <p>Source: <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/check-kustomize-hold.yaml"><code>check-kustomize-hold.yaml</code></a>. Runs weekly on a schedule, and on demand.</p>
 <p><code>go.mod</code> holds <code>sigs.k8s.io/kustomize/*</code> below the latest patch release, because the newer releases require a <code>k8s.io/kube-openapi</code> that moved to <code>structured-merge-diff</code> v7 while the pinned apimachinery still compiles against v6. Taking the bump breaks every job with <code>cannot use typeSchema.Types ... v7/schema.TypeDef as v6/schema.TypeDef</code>.</p>
 <p>Nothing in the tree records when that stops being true, and the hold is on tool-only dependencies nobody imports, so it would sit there unnoticed indefinitely. This job tries the bump every week - <code>go get ...@latest</code>, <code>go mod tidy</code>, <code>go mod vendor</code>, <code>go build ./...</code> - and opens or updates an issue the week it compiles.</p>
-<p>It never commits anything. Picking versions is Dependabot’s job, and the lift wants a human to run the tests; the issue carries the <code>go.mod</code> diff and asks for <code>make verify</code> to be run by hand on the real change.</p>
+<p>It never commits anything. Picking versions is Renovate’s job, and the lift wants a human to run the tests; the issue carries the <code>go.mod</code> diff and asks for <code>make verify</code> to be run by hand on the real change.</p>
 <p>An unchanged <code>go.mod</code> means kustomize is already at the latest release, so there is no hold left to lift and nothing is reported. That is checked before the build, because a no-op upgrade builds fine and would otherwise open an issue every week.</p>
 <p>This is the only workflow here that is allowed to reach the module proxy, which is the whole point of it - so it carries no <code>GOFLAGS: -mod=vendor</code>.</p>
 

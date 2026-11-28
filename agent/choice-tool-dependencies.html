@@ -37,10 +37,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "../searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3b8763a5.js"></script>
+        <script src="../toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,7 +183,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="tool-versions-live-in-gomod-except-golangci-lint"><a class="header" href="#tool-versions-live-in-gomod-except-golangci-lint">Tool versions live in <code>go.mod</code>, except golangci-lint</a></h1>
-<p><code>controller-gen</code>, <code>kustomize</code> and <code>setup-envtest</code> are <code>tool</code> directives in <code>go.mod</code>. The <code>Makefile</code> calls them through <code>go tool</code>, so there is no version to pin in two places, Dependabot owns the bumps, and a vendored checkout resolves them with no network access - which is the same property the rest of this repository has.</p>
+<p><code>controller-gen</code>, <code>kustomize</code> and <code>setup-envtest</code> are <code>tool</code> directives in <code>go.mod</code>. The <code>Makefile</code> calls them through <code>go tool</code>, so there is no version to pin in two places, Renovate owns the bumps, and a vendored checkout resolves them with no network access - which is the same property the rest of this repository has.</p>
 <p><strong><code>golangci-lint</code> is deliberately not one of them.</strong> It runs from <code>.pre-commit-config.yaml</code>, which is also how <code>colonel-byte/cargoship</code> runs it.</p>
 <h2 id="why-golangci-lint-cannot-be-a-tool-dependency-here"><a class="header" href="#why-golangci-lint-cannot-be-a-tool-dependency-here">Why golangci-lint cannot be a tool dependency here</a></h2>
 <p>A tool directive puts the tool’s dependencies in the module’s own graph. golangci-lint’s graph pulls <code>k8s.io/*</code> up to a newer patch release than Cluster API’s, and the two are not compatible:</p>

@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5739b43a.js";
+            window.path_to_searchindex_js = "searchindex-2374ab89.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-3b8763a5.js"></script>
+        <script src="toc-5466a2d4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -215,7 +215,7 @@ cosign verify --key cosign.pub ghcr.io/colonel-byte/cluster-api-cargoship-contro
 <h2 id="ai-assisted-development"><a class="header" href="#ai-assisted-development">AI-assisted development</a></h2>
 <p>This repository’s code, docs and design records are written with AI coding agents in the loop; <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/AGENTS.md"><code>AGENTS.md</code></a> is the instruction set they work from. Each release publishes <code>ai-bom.json</code>, a per-release snapshot of the disclosure in <a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/ai-bom.json"><code>.github/ai-bom.json</code></a>, attested the same way as the other release artifacts, <a href="#verifying-a-release">above</a>.</p>
 <h2 id="security-in-ci"><a class="header" href="#security-in-ci">Security in CI</a></h2>
-<p>Pull requests and <code>main</code> are scanned by CodeQL, dependencies are updated by Dependabot, Go advisories are checked for reachability by <code>govulncheck</code> and the controller images by trivy (<a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/scan-vuln.yaml"><code>scan-vuln.yaml</code></a>), and supply-chain practices are scored weekly by OpenSSF Scorecard. Results appear in the repository’s Security tab. <code>vendor/</code> is committed so the repository builds with no network access, which costs points on a couple of Scorecard checks and reports advisories that are not this module’s; <a href="agent/choice-osv-vendor-overrides.html"><code>choice-osv-vendor-overrides</code></a> explains what is done about it and what is left.</p>
+<p>Pull requests and <code>main</code> are scanned by CodeQL, dependencies are updated by Renovate, Go advisories are checked for reachability by <code>govulncheck</code> and the controller images by trivy (<a href="https://github.com/colonel-byte/cluster-api-provider-cargoship/blob/main/.github/workflows/scan-vuln.yaml"><code>scan-vuln.yaml</code></a>), and supply-chain practices are scored weekly by OpenSSF Scorecard. Results appear in the repository’s Security tab. <code>vendor/</code> is committed so the repository builds with no network access, which costs points on a couple of Scorecard checks and reports advisories that are not this module’s; <a href="agent/choice-osv-vendor-overrides.html"><code>choice-osv-vendor-overrides</code></a> explains what is done about it and what is left.</p>
 
                     </main>
 
