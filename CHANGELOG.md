@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.9.1](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.9.0...v0.9.1) (2026-11-28)
+
+
+### CI/CD
+
+* replace dependabot with self-hosted renovate ([#153](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/153)) ([2e40a89](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/2e40a895b929e70e82498e755aad3601b94ce5ad))
+
+
+### Build
+
+* **deps:** bump anchore/sbom-action/download-syft from 0.24.3 to 0.24.4 in the core group ([#151](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/151)) ([0267ab2](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/0267ab23d174215d946abeebc090d4e387b184cf))
+* **deps:** bump github.com/sigstore/rekor from 1.6.3 to 1.6.5 ([#147](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/147)) ([e74feb0](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/e74feb03c6a92c14b8964fe2a8cdce8d32375eb6))
+* **deps:** bump github.com/sigstore/sigstore from 1.11.3 to 1.11.4 ([#146](https://github.com/colonel-byte/cluster-api-provider-cargoship/issues/146)) ([08267b6](https://github.com/colonel-byte/cluster-api-provider-cargoship/commit/08267b6677ce14e1729102d4a1af027e5b9e9e15))
+
 ## [0.9.0](https://github.com/colonel-byte/cluster-api-provider-cargoship/compare/v0.8.3...v0.9.0) (2026-11-25)
 
 
