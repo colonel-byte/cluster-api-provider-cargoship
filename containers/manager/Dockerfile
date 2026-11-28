@@ -24,7 +24,7 @@
 # exec into. These controllers hold a cluster-wide SSH key in memory, which is the single most
 # valuable thing in the management cluster, so the image has nothing in it that could read process
 # memory or open a socket.
-FROM cgr.dev/chainguard/static:latest@sha256:fc42af33e643f20d08baf03cddcc1c02ba57052dfb02edb0d79f3fc47bcea8d9
+FROM cgr.dev/chainguard/static:latest@sha256:599c3cd7597b84aa149c4282beecc8c6d4e1cb5c95dc8d982e70cd0a2a9147a2
 
 ARG TARGETPLATFORM
 ARG MANAGER
